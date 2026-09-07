@@ -152,6 +152,8 @@ function pop() {
 }
 const PRESS_CSS = `
   * { -webkit-tap-highlight-color: transparent; }
+  button, label, .row-press, .composer, [data-row] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  input, textarea { -webkit-user-select: text; user-select: text; }
   button, input, label, .row-press { touch-action: manipulation; }
   .press { transition: transform 70ms ease-out, opacity 70ms; }
   .press:active { transform: scale(0.9); }
@@ -295,7 +297,7 @@ export default function App() {
   }, [tasks.length, ready, open]);
 
   return (
-    <div ref={pageRef} onPointerDownCapture={onDown} style={{ ...page, position: "relative", overflow: "hidden" }}>
+    <div ref={pageRef} onPointerDownCapture={(e) => { onDown(e); try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === "suspended") audio.resume(); } catch {} }} style={{ ...page, position: "relative", overflow: "hidden" }}>
       <style>{`@import url("https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=swap");` + PRESS_CSS}</style>
       {ghosts.map((g) => (
         <div key={g.id} className="ghost" style={{ left: g.x, top: g.y, width: g.w, height: g.h }}>{g.title}</div>
@@ -321,7 +323,7 @@ export default function App() {
         <span className="press" style={roundBtn} onClick={() => tap()}>⚲</span>
       </div>
       <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-      <div style={{ height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "24px 0" }}>
+      <div style={{ height: "100%", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", display: "flex", flexDirection: "column", padding: "24px 0" }}>
         <div style={{ flex: "1 0 auto" }} />
         {todayList.map((t) => (
           <div key={t.id} style={{ position: "relative", marginBottom: t.projectId ? 4 * Math.min(2, stepsOf(t.projectId).filter((x) => !x.done).length - 1) + 6 : 0 }}>
@@ -427,7 +429,7 @@ function Task({ task, project, steps, onBack, onChange, onPatch, onOpen, onPlan,
         </div>
         <input type="checkbox" className="press" checked={task.done} onChange={() => { tap(task.done ? 8 : 18); onChange((x) => ({ ...x, done: !x.done })); }} style={{ ...box, background: task.done ? "#F5F5F3" : "#2A2A2A", boxShadow: !task.done && task.priority ? `inset 0 0 0 2px ${PRI[task.priority]}` : "none" }} />
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 0" }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "16px 0" }}>
         {task.isProject && steps.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             {steps.map((st) => (
@@ -444,7 +446,7 @@ function Task({ task, project, steps, onBack, onChange, onPatch, onOpen, onPlan,
             {plan.map((st, i) => (
               <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "6px 0" }}>
                 <span style={{ color: T.muted, width: 18, flexShrink: 0 }}>{i + 1}.</span>
-                <input value={st} onChange={(e) => setPlan((p) => p.map((x, j) => (j === i ? e.target.value : x)))} style={{ ...input, height: "auto", padding: 0, fontSize: 15 }} />
+                <input value={st} onChange={(e) => setPlan((p) => p.map((x, j) => (j === i ? e.target.value : x)))} style={{ ...input, height: "auto", padding: 0, fontSize: 16 }} />
                 <button className="press" onClick={() => setPlan((p) => p.filter((_, j) => j !== i))} style={{ ...roundBtn, width: 28, height: 28, fontSize: 14, color: T.muted }}>✕</button>
               </div>
             ))}
@@ -491,11 +493,13 @@ function Composer({ value, onChange, onSend, placeholder, disabled, onFiles, dat
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const mic = () => {
     if (!SR) return;
-    if (rec) { ref.current?.stop(); setRec(false); return; }
+    if (rec) { if (ref.current) ref.current.keep = false; ref.current?.stop(); setRec(false); return; }
     const r = new SR(); r.lang = "ru-RU"; r.interimResults = true; r.continuous = true;
     let fin = "";
     r.onresult = (e) => { let it = ""; for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript; if (e.results[i].isFinal) fin += t + " "; else it += t; } onChange((fin + it).trim()); };
-    r.onend = r.onerror = () => setRec(false);
+    r.onerror = () => setRec(false);
+    r.onend = () => { if (ref.current === r && ref.current.keep) { try { r.start(); } catch { setRec(false); } } else setRec(false); };
+    r.keep = true;
     ref.current = r; r.start(); setRec(true);
   };
   const can = value.trim() && !disabled;
@@ -531,6 +535,11 @@ function Composer({ value, onChange, onSend, placeholder, disabled, onFiles, dat
     tap(14);
     fire(held ? OPTIONS[sel].due : undefined);
   };
+  const cancel = () => {
+    if (!press.current) return;
+    if (press.current.held) return; // iOS шлёт pointercancel при удержании — игнорируем, ждём pointerup/touchend
+    clearTimeout(press.current.timer); press.current = null; setMenu(false);
+  };
   return (
     <div ref={boxRef} className="composer" style={{ ...composer, position: "relative" }}>
       {menu && (
@@ -546,9 +555,9 @@ function Composer({ value, onChange, onSend, placeholder, disabled, onFiles, dat
       {can ? (
         <span style={{ position: "relative", display: "flex" }}>
           <button className={"press" + (ring ? " ring" : "")}
-            onPointerDown={dateMenu ? down : undefined} onPointerMove={dateMenu ? move : undefined} onPointerUp={dateMenu ? up : undefined} onPointerCancel={dateMenu ? up : undefined}
+            onPointerDown={dateMenu ? down : undefined} onPointerMove={dateMenu ? move : undefined} onPointerUp={dateMenu ? up : undefined} onPointerCancel={dateMenu ? cancel : undefined} onTouchEnd={dateMenu ? (e) => { if (press.current?.held) { e.preventDefault(); up(); } } : undefined} onContextMenu={(e) => e.preventDefault()}
             onClick={dateMenu ? undefined : () => { tap(14); fire(); }}
-            style={{ ...inBtn, background: "#F5F5F3", color: "#111", border: "none", touchAction: "none" }} aria-label="Отправить"><Ic d="M12 19V5M5 12l7-7 7 7" /></button>
+            style={{ ...inBtn, background: "#F5F5F3", color: "#111", border: "none", touchAction: "none", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }} aria-label="Отправить"><Ic d="M12 19V5M5 12l7-7 7 7" /></button>
         </span>
       ) : (
         <button className="press" onClick={() => { tap(); mic(); }} style={{ ...inBtn, background: rec ? "#e5645a" : "#2A2A2A", color: rec ? "#fff" : "#D6D6D2", border: "none" }} aria-label="Голосовой ввод"><Ic d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM19 11a7 7 0 0 1-14 0M12 18v3" /></button>
@@ -559,7 +568,7 @@ function Composer({ value, onChange, onSend, placeholder, disabled, onFiles, dat
 
 const PRI = ["#4A4A48", "#E8A33D", "#E5645A"]; // обычная, важная, срочная
 const T = { bg: "#161616", card: "#232323", line: "#343434", text: "#EDEDEB", muted: "#9A9A96" };
-const page = { fontFamily: "Play, Inter, -apple-system, system-ui, sans-serif", fontSize: 16, color: T.text, background: T.bg, height: "100vh", boxSizing: "border-box", padding: 16, display: "flex", flexDirection: "column", maxWidth: 600, margin: "0 auto" };
+const page = { fontFamily: "Play, Inter, -apple-system, system-ui, sans-serif", fontSize: 16, color: T.text, background: T.bg, height: "100dvh", boxSizing: "border-box", padding: "max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", maxWidth: 600, margin: "0 auto" };
 const topBar = { display: "flex", alignItems: "center", justifyContent: "space-between", height: 48, marginBottom: 8 };
 const roundBtn = { width: 44, height: 44, borderRadius: 22, border: "1px solid #3A3A3A", background: "transparent", color: T.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer", padding: 0, flexShrink: 0, fontFamily: "inherit" };
 const cardBox = { background: "transparent", border: "1px solid transparent", borderRadius: 28, padding: 11, marginBottom: 0, flexShrink: 0, boxSizing: "border-box" };
