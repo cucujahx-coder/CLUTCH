@@ -244,6 +244,11 @@ function ask(text){
 /* ---------- отрисовка ---------- */
 const $=i=>document.getElementById(i);
 let list,thread,acts,hctl;
+/* Ключ текущей карточки: к нему привязаны «добавляю шаг» и взведённое удаление,
+   поэтому переключение на другую задачу само их сбрасывает */
+const curKey=()=>S.cur?S.cur.k+':'+S.cur.id:'';
+let addingFor=null, delArm=null;
+const closeStep=()=>{addingFor=null;paint()};
 function paint(){
  const openT=S.ts.filter(x=>!x.done);
  $('cnt').textContent=openT.length;
@@ -304,35 +309,66 @@ function paintDetail(){
  acts.innerHTML='<span class="due-wrap"><button class="qa'+(it.due?' on':'')+'" type="button" data-a="due">'+I('calendar',16)+esc(fmtDue(it.due)||'Срок')+'</button><input type="date" aria-label="Срок" value="'+(it.due||'')+'"></span>'+
   (isP?'<button class="qa" type="button" data-a="step">'+I('plus',16)+'Добавить шаг</button>'
      :(x.pj===null?'<button class="qa" type="button" data-a="proj">'+I('list-check',16)+'Сделать проектом</button>':''))+
-  '<button class="qa danger" type="button" data-a="del">'+I('trash',16)+(isP?'Удалить проект':'Удалить')+'</button>';
+  '<button class="qa danger'+(delArm===curKey()?' armed':'')+'" type="button" data-a="del">'+I('trash',16)+
+   (delArm===curKey()?'Точно удалить?':(isP?'Удалить проект':'Удалить'))+'</button>';
  acts.querySelector('input[type=date]').onchange=e=>setDue(e.target.value);
  acts.querySelectorAll('.qa').forEach(b=>{const a=b.dataset.a;
   if(a==='due')b.onclick=()=>{const i=acts.querySelector('input[type=date]'); i.showPicker?i.showPicker():i.focus();};
-  if(a==='step')b.onclick=()=>{const t=prompt('Название шага'); if(t&&t.trim())addStep(t.trim());};
+  if(a==='step')b.onclick=()=>{addingFor=curKey();paint();};
   if(a==='proj')b.onclick=makeProject;
-  if(a==='del')b.onclick=()=>{if(confirm('Удалить'+(isP?' проект вместе с шагами':'')+'?'))delItem();};
+  /* Два касания вместо confirm(): системный диалог на iOS в standalone
+     ведёт себя непредсказуемо, а промах по «Удалить» пальцем слишком дёшев */
+  if(a==='del')b.onclick=()=>{
+   if(delArm===curKey()){delArm=null;delItem();return;}
+   delArm=curKey(); paint();
+   setTimeout(()=>{if(delArm){delArm=null;paint();}},4000);
+  };
  });
 
  thread.innerHTML='';
  const add=h=>{const e=document.createElement('div'); e.innerHTML=h; thread.appendChild(e.firstChild);};
  add('<div class="bub">'+(isP?'Что мешает?':'Как продвинулись?')+'</div>');
  add('<div class="ans">'+esc(isP?p.why:x.a)+'</div>');
- if(isP&&op.length){
+ const adding=isP&&addingFor===curKey();
+ if(isP&&(op.length||adding)){
   const w=document.createElement('div'); w.className='steps';
-  op.forEach((t,i,arr)=>{const r=taskRow(t,1,1); if(i===arr.length-1)r.style.borderBottom='none'; w.appendChild(r);});
+  op.forEach((t,i)=>{const r=taskRow(t,1,1); if(i===op.length-1&&!adding)r.style.borderBottom='none'; w.appendChild(r);});
+  if(adding){
+   const r=document.createElement('div'); r.className='row sm addstep'; r.style.borderBottom='none';
+   r.innerHTML='<input class="stepin" placeholder="Название шага" aria-label="Название шага">';
+   w.appendChild(r);
+  }
   thread.appendChild(w);
  }
  if(!isP&&x.file)add('<div class="card">'+I('file-text',20,'text-accent')+'<div style="min-width:0; flex:1;"><div class="f1">'+esc(x.file)+'</div><div class="f2">вложение задачи · открыть</div></div></div>');
  it.chat.forEach(m=>add(m.u?'<div class="bub">'+esc(m.u)+'</div>':(m.typing?'<div class="ans typing"><i></i><i></i><i></i></div>':'<div class="ans">'+esc(m.a)+'</div>')));
  thread.scrollTop=thread.scrollHeight;
+ /* Поле шага: Enter добавляет и остаётся открытым — шаги обычно вносят пачкой.
+    Проверка isConnected нужна, потому что paint() сносит старое поле и это тоже blur. */
+ const si=thread.querySelector('.stepin');
+ if(si){
+  si.focus();
+  si.onkeydown=e=>{
+   if(e.key==='Enter'){e.preventDefault();const v=si.value.trim();v?addStep(v):closeStep();}
+   else if(e.key==='Escape'){e.preventDefault();closeStep();}
+  };
+  si.onblur=()=>setTimeout(()=>{if(!si.isConnected)return;const v=si.value.trim();v?addStep(v):closeStep();},0);
+ }
 }
 
 /* ---------- оболочка ---------- */
 let view='list', open, back;
+/* Видимая высота окна в --vh. На телефоне клавиатура ужимает область просмотра,
+   а 100dvh про это не знает — без этого композер уезжает под клавиатуру. */
+function trackVH(){
+ const set=()=>{const vv=window.visualViewport;document.documentElement.style.setProperty('--vh',(vv?vv.height:window.innerHeight)+'px');};
+ set();
+ if(window.visualViewport){visualViewport.addEventListener('resize',set);visualViewport.addEventListener('scroll',set);}
+ addEventListener('resize',set);
+ addEventListener('orientationchange',()=>setTimeout(set,150));
+}
 function shellTwo(){
  const grid=document.querySelector('.grid');
- const setVH=()=>{const vv=window.visualViewport;document.documentElement.style.setProperty('--vh',(vv?vv.height:window.innerHeight)+'px');};
- setVH(); if(window.visualViewport){visualViewport.addEventListener('resize',setVH);visualViewport.addEventListener('scroll',setVH);}
  let kbT;
  document.addEventListener('focusin',e=>{
   if(!(e.target instanceof HTMLInputElement)||e.target.type==='date')return;
@@ -360,6 +396,7 @@ function shellNav(){
 /* ---------- старт ---------- */
 S=load();
 list=$('list'); thread=$('thread'); acts=$('acts'); hctl=$('hctl');
+trackVH();
 (MODE==='nav'?shellNav:shellTwo)();
 const nt=$('nt'),err=$('err'),msg=$('msg'),ct=$('ct');
 $('add').innerHTML=I('plus',20); $('send').innerHTML=I('arrow-right',20);

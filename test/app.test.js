@@ -9,7 +9,6 @@ function load(file,pre){
  const dom=new JSDOM(html,{runScripts:'outside-only',pretendToBeVisual:true,url:'https://example.org/'});
  const w=dom.window,d=w.document;
  w.matchMedia=()=>({matches:true}); w.scrollTo=()=>{}; w.Element.prototype.scrollIntoView=function(){};
- w.confirm=()=>true; w.prompt=()=>'Новый шаг';
  w.localStorage.clear();
  if(pre)pre(w);
  w.eval(html.match(/window\.MODE=['"]\w+['"]/)[0]);
@@ -100,8 +99,15 @@ function actions(){
  assert(A.S.cur.k==='p','открылся проект');
  assert(A.openIn(A.S.cur.id).length===1,'исходная задача стала первым шагом');
 
- qa('step').click();  // prompt застаблен на «Новый шаг»
+ qa('step').click();
+ const si=()=>d.querySelector('#thread .stepin');
+ assert(!!si(),'поле шага появилось прямо в списке');
+ si().value='Новый шаг';
+ si().dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
  assert(A.openIn(A.S.cur.id).length===2,'шаг добавлен');
+ assert(!!si(),'поле осталось открытым для следующего шага');
+ si().dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+ assert(!si(),'Escape закрывает поле');
  assert(d.querySelectorAll('#thread .row').length===2,'шаги видны в чате');
 
  $('ct').value='Переименованный проект';
@@ -110,7 +116,10 @@ function actions(){
 
  const steps=A.S.ts.length, pid=A.S.cur.id;
  qa('del').click();
- assert(!A.S.pr.some(p=>p.id===pid),'проект удалён');
+ assert(A.S.pr.some(p=>p.id===pid),'первое касание по «Удалить» ничего не удаляет');
+ assert(qa('del').textContent.includes('Точно'),'кнопка просит подтвердить');
+ qa('del').click();
+ assert(!A.S.pr.some(p=>p.id===pid),'второе касание удаляет проект');
  assert(A.S.ts.length===steps-2,'шаги удалены вместе с проектом');
 }
 
