@@ -17,18 +17,39 @@ async function askPlan(task) {
   return [`Разобраться, что уже есть по «${task.title}»`, "Определить результат и срок", "Сделать первый маленький шаг", "Проверить и скорректировать", "Довести до конца"];
 }
 
+// Точка подключения API: отобрать задачи на день. Возвращает { items: [{ id, include }] }.
+// Сначала срочное, потом шаги проектов, дальше по давности; в план попадает не больше DAY_MAX.
+const DAY_MAX = 12;
+async function askDayPlan(candidates, forDate) {
+  await new Promise((r) => setTimeout(r, 700));
+  const sorted = [...candidates].sort((a, b) =>
+    (b.priority || 0) - (a.priority || 0) ||
+    (a.projectId ? -1 : 0) - (b.projectId ? -1 : 0) ||
+    (a.createdAt || 0) - (b.createdAt || 0));
+  return { items: sorted.map((t, i) => ({ id: t.id, include: i < DAY_MAX })) };
+}
+
 const uid = () => Math.random().toString(36).slice(2, 10);
-const KEY = "everyday:v4";
+// Отметка выполнения: doneAt нужен, чтобы в плане показать сделанное именно сегодня
+const mark = (t, done) => ({ ...t, done, doneAt: done ? Date.now() : null });
+const KEY = "clutch:v5";
+const OLD_KEYS = ["clutch-plan:v1", "everyday:v4"]; // читаем один раз, если новый ключ ещё пуст
+const PLAN_KEY = "clutch:plan";
 let mem = [];
-const load = async () => {
-  try { const r = await window.storage.get(KEY); if (r?.value) return JSON.parse(r.value); } catch {}
-  try { const v = localStorage.getItem(KEY); if (v) return JSON.parse(v); } catch {}
+const load = () => {
+  try {
+    const v = localStorage.getItem(KEY);
+    if (v) return JSON.parse(v);
+    for (const k of OLD_KEYS) {
+      const old = localStorage.getItem(k);
+      if (old) { const t = JSON.parse(old); localStorage.setItem(KEY, old); return t; }
+    }
+  } catch {}
   return mem;
 };
-const save = async (t) => {
-  mem = t; const j = JSON.stringify(t);
-  try { if (await window.storage.set(KEY, j)) return; } catch {}
-  try { localStorage.setItem(KEY, j); } catch {}
+const save = (t) => {
+  mem = t;
+  try { localStorage.setItem(KEY, JSON.stringify(t)); } catch {}
 };
 
 
@@ -101,10 +122,10 @@ function demo() {
   const pid = uid();
   const proj = { id: pid, title: "Ремонт в ванной", done: false, due: todayStr(), priority: 1, isProject: true, createdAt: Date.now() - 5e6, messages: [{ id: uid(), role: "user", text: "С чего начать ремонт?" }, { id: uid(), role: "ai", text: "Сначала замеры и список работ, потом выбор плитки. Разбил на 7 шагов." }] };
   const stepsT = ["Замерить помещение и составить список работ", "Выбрать плитку и сантехнику", "Найти мастера, согласовать смету", "Демонтаж старого", "Черновые работы: трубы, электрика", "Укладка плитки", "Установка сантехники и приёмка"];
-  const projSteps = stepsT.map((t, k) => ({ id: uid(), title: t, done: k < 1, due: todayStr(), priority: 0, projectId: pid, order: k, messages: [] }));
+  const projSteps = stepsT.map((t, k) => ({ id: uid(), title: t, done: k < 1, due: null, priority: 0, projectId: pid, order: k, messages: [] }));
   return [proj, ...projSteps,
     ...Array.from({ length: nDone }, (_, k) => mk(titles[i++], true, plusDays(-k))),
-    ...Array.from({ length: nToday }, () => mk(titles[i++], false, todayStr(), Math.random() < 0.35 ? rnd(1, 2) : 0)),
+    ...Array.from({ length: nToday }, () => mk(titles[i++], false, null, Math.random() < 0.35 ? rnd(1, 2) : 0)),
     ...Array.from({ length: nLate }, () => mk(titles[i++], false, plusDays(-rnd(1, 5)), Math.random() < 0.5 ? 2 : 0)),
     ...Array.from({ length: nLater }, () => mk(titles[i++], false, plusDays(rnd(1, 14)), Math.random() < 0.25 ? 1 : 0)),
   ];
@@ -115,7 +136,7 @@ let hapticEl = null;
 function iosTick() {
   if (!hapticEl) {
     const label = document.createElement("label");
-    label.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none";
+    label.style.cssText = "position:fixed;left:0;bottom:0;width:1px;height:1px;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1";
     const input = document.createElement("input");
     input.type = "checkbox"; input.setAttribute("switch", "");
     label.appendChild(input); document.body.appendChild(label);
@@ -152,8 +173,9 @@ function pop() {
 }
 const PRESS_CSS = `
   * { -webkit-tap-highlight-color: transparent; }
-  button, label, .row-press, .composer, [data-row] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-  input, textarea { -webkit-user-select: text; user-select: text; }
+  html, body { overscroll-behavior: none; margin: 0; }
+  .page-root { padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  button, label, .composer { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
   button, input, label, .row-press { touch-action: manipulation; }
   .press { transition: transform 70ms ease-out, opacity 70ms; }
   .press:active { transform: scale(0.9); }
@@ -196,9 +218,24 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [openId, setOpenId] = useState(null);
   const [draft, setDraft] = useState("");
+  const bottomRef = useRef(null);
+  const [bottomH, setBottomH] = useState(140);
+  useEffect(() => {
+    const el = bottomRef.current; if (!el) return;
+    const upd = () => setBottomH(el.offsetHeight);
+    upd();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(upd) : null;
+    ro?.observe(el); window.addEventListener("resize", upd);
+    return () => { ro?.disconnect(); window.removeEventListener("resize", upd); };
+  }, []);
+  const [tab, setTab] = useState(0); // одна страница; 0 = Inbox, 1 = план (для логики добавления)
+  const [plan, setPlan] = useState(null); // { forDate, items: [{ id, include }] }
+  const [planning, setPlanning] = useState(false);
+  useEffect(() => { try { const v = localStorage.getItem(PLAN_KEY); if (v) setPlan(JSON.parse(v)); } catch {} }, []);
+  useEffect(() => { try { if (plan) localStorage.setItem(PLAN_KEY, JSON.stringify(plan)); else localStorage.removeItem(PLAN_KEY); } catch {} }, [plan]);
 
   const rollover = (ts) => ts.map((t) => (!t.done && t.due && t.due < todayStr() ? { ...t, due: todayStr() } : t));
-  useEffect(() => { if (DEMO) { setTasks(rollover(demo())); setReady(true); return; } load().then((t) => { setTasks(rollover(t)); setReady(true); }); }, []);
+  useEffect(() => { if (DEMO) { setTasks(rollover(demo())); setReady(true); return; } const t = load(); setTasks(rollover(t)); setReady(true); }, []);
   useEffect(() => { if (ready && !DEMO) save(tasks); }, [tasks, ready]);
 
   const patch = (id, fn) => setTasks((ts) => ts.map((t) => (t.id === id ? fn(t) : t)));
@@ -214,16 +251,27 @@ export default function App() {
   };
   const [undo, setUndo] = useState(null);
   const undoTimer = useRef(null);
-  const offerUndo = (id, title) => {
+  const offerUndo = (id, title, removed = null) => {
     clearTimeout(undoTimer.current);
-    setUndo({ id, title });
+    setUndo({ id, title, removed });
     undoTimer.current = setTimeout(() => setUndo(null), 5000);
   };
   const doUndo = () => {
     if (!undo) return;
     tap(10);
-    patch(undo.id, (x) => ({ ...x, done: false }));
+    if (undo.removed) setTasks((ts) => [...ts, undo.removed]);
+    else patch(undo.id, (x) => mark(x, false));
     clearTimeout(undoTimer.current); setUndo(null);
+  };
+  const [focus, setFocus] = useState(false);
+  const focusDone = (t) => { pop(); tap(25); patch(t.id, (x) => mark(x, true)); offerUndo(t.id, t.title); };
+  const focusDelete = (t) => { tap(20); setTasks((ts) => ts.filter((x) => x.id !== t.id)); offerUndo(t.id, t.title, t); };
+  const focusPostpone = async (t, reason, days) => {
+    tap(12);
+    const msg = { id: uid(), role: "user", text: reason };
+    patch(t.id, (x) => ({ ...x, due: plusDays(days), messages: [...x.messages, msg] }));
+    const reply = await askAssistant({ ...t, messages: [...t.messages, msg] });
+    patch(t.id, (x) => ({ ...x, messages: [...x.messages, { id: uid(), role: "ai", text: reply }] }));
   };
 
   const [flashCard, setFlashCard] = useState(null);
@@ -238,7 +286,7 @@ export default function App() {
       setTimeout(() => setGhosts((g) => g.filter((z) => z.id !== gid)), 200);
     }
     explode(e);
-    patch(id, (x) => ({ ...x, done: true }));
+    patch(id, (x) => mark(x, true));
     // если это шаг проекта — в тот же слот прилетает следующий шаг
     const me = byId[id];
     const next = me?.projectId ? tasks.filter((t) => t.projectId === me.projectId && !t.done && t.id !== id).sort((a, b) => a.order - b.order)[0] : null;
@@ -259,21 +307,37 @@ export default function App() {
     const parsed = parseDue(draft.replace(/!+\s*$/, "").trim());
     const title = parsed.title, due = forcedDue || parsed.due;
     const id = uid();
-    setTasks((ts) => [...ts, { id, title, due: due || todayStr(), done: false, priority: Math.min(bang, 2), createdAt: Date.now(), messages: [] }]);
+    setTasks((ts) => [...ts, { id, title, due: due || null, done: false, priority: Math.min(bang, 2), createdAt: Date.now(), messages: [] }]);
+    if ((tab === 1 && plan && !planStale) || (due && due <= todayStr() && plan && !planStale)) setPlan((p) => (p && p.forDate === todayStr() ? { ...p, items: [...p.items, { id, include: true }] } : { forDate: todayStr(), items: [{ id, include: true }] }));
     setLastId(id); setTimeout(() => setLastId(null), 400);
     setFlashCard(due && due > todayStr() ? "later" : "today"); setTimeout(() => setFlashCard(null), 420);
     setDraft("");
   };
   const preview = draft.trim() ? parseDue(draft.replace(/!+\s*$/, "").trim()).due : null;
-  const byDue = (a, b) => (a.due || "9").localeCompare(b.due || "9");
-  const done = tasks.filter((t) => t.done);
   const byId = Object.fromEntries(tasks.map((t) => [t.id, t]));
   const anchor = (t) => (t.projectId && byId[t.projectId]) || t;
   const firstStep = {};
   for (const t of tasks) if (t.projectId && !t.done && (!firstStep[t.projectId] || t.order < firstStep[t.projectId].order)) firstStep[t.projectId] = t;
+  const planFor = todayStr();
+  const planStale = !plan || plan.forDate !== planFor;
+  const candidates = tasks.filter((t) => !t.done && !t.isProject && (!t.projectId || firstStep[t.projectId]?.id === t.id) && (!t.due || t.due <= planFor));
+  const generatePlan = async () => {
+    if (planning) return;
+    setPlanning(true); tap(14);
+    try {
+      const res = await askDayPlan(candidates, planFor);
+      setPlan({ forDate: planFor, items: res.items });
+      setTab(1);
+    } finally { setPlanning(false); }
+  };
+  const togglePlanItem = (id) => { tap(6); setPlan((p) => ({ ...p, items: p.items.map((x) => (x.id === id ? { ...x, include: !x.include } : x)) })); };
+  const planIds = new Set(plan && !planStale ? plan.items.filter((x) => x.include).map((x) => x.id) : []);
+  const planProjects = new Set([...planIds].map((id) => byId[id]?.projectId).filter(Boolean));
+  const inPlan = (t) => planIds.has(t.id) || (t.projectId && planProjects.has(t.projectId) && firstStep[t.projectId]?.id === t.id);
   const todayList = tasks
-    .filter((t) => !t.done && !t.isProject && (!t.due || t.due <= todayStr()) && (!t.projectId || firstStep[t.projectId]?.id === t.id))
+    .filter((t) => inPlan(t) && !t.done && !t.isProject && (!t.due || t.due <= todayStr()) && (!t.projectId || firstStep[t.projectId]?.id === t.id))
     .sort((a, b) => ((anchor(a).priority || 0) - (anchor(b).priority || 0)) || (anchor(a).createdAt || 0) - (anchor(b).createdAt || 0));
+  const inboxList = tasks.filter((t) => !t.done && !t.isProject && !t.projectId && !t.due && !(plan && !planStale && plan.items.some((x) => x.id === t.id && x.include))).sort((a, b) => ((a.priority || 0) - (b.priority || 0)) || ((a.createdAt || 0) - (b.createdAt || 0)));
   const stepsOf = (pid) => tasks.filter((t) => t.projectId === pid).sort((a, b) => a.order - b.order);
   const makeProject = (id, steps) => {
     const base = byId[id]; if (!base) return;
@@ -283,57 +347,35 @@ export default function App() {
       ...steps.map((title, i) => ({ id: uid(), title, due: base.due || todayStr(), done: false, priority: 0, projectId: id, order: i, messages: [] })),
     ]);
   };
-  const upcoming = tasks.filter((t) => !t.done && t.due && t.due > todayStr()).sort(byDue);
-  const groups = todayList.length ? [{ label: "Сегодня", zone: "today", items: todayList }] : [];
+  // Секции вкладки «План», сверху вниз: выполненное сегодня → предстоящее → текущее у композера.
+  // Внутри каждой самое близкое к «сейчас» — внизу, ближе к большому пальцу.
+  const doneToday = tasks
+    .filter((t) => t.done && !t.isProject && t.doneAt && iso(new Date(t.doneAt)) === todayStr())
+    .sort((a, b) => a.doneAt - b.doneAt);
+  const upcomingList = tasks
+    .filter((t) => !t.done && !t.isProject && t.due && t.due > todayStr() && (!t.projectId || firstStep[t.projectId]?.id === t.id))
+    .sort((a, b) => (b.due || "").localeCompare(a.due || ""));
   const open = tasks.find((t) => t.id === openId);
   const listEnd = useRef(null);
   const todayEnd = useRef(null);
   const prevLen = useRef(0);
   // К низу прокручиваем только при первой загрузке и при добавлении новой задачи; дальше скролл свободный
+  useEffect(() => { if (ready && plan && !planStale) setTab(1); }, [ready]);
   useEffect(() => {
     if (open) return;
     if (ready && (prevLen.current === 0 || tasks.length > prevLen.current)) todayEnd.current ? todayEnd.current.scrollIntoView({ block: "center" }) : listEnd.current?.scrollIntoView({ block: "end" });
     prevLen.current = tasks.length;
   }, [tasks.length, ready, open]);
 
-  return (
-    <div ref={pageRef} onPointerDownCapture={(e) => { onDown(e); try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === "suspended") audio.resume(); } catch {} }} style={{ ...page, position: "relative", overflow: "hidden" }}>
-      <style>{`@import url("https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=swap");` + PRESS_CSS}</style>
-      {ghosts.map((g) => (
-        <div key={g.id} className="ghost" style={{ left: g.x, top: g.y, width: g.w, height: g.h }}>{g.title}</div>
-      ))}
-      {booms.map((b) => (
-        <span key={b.id}>
-          <span className="screen-flash" />
-          <span className="flash" style={{ left: b.x, top: b.y }} />
-          {b.sparks.map((sp, i) => <span key={i} className="spark" style={{ left: b.x, top: b.y, background: sp.c, "--dx": sp.dx + "px", "--dy": sp.dy + "px" }} />)}
-          <span className="boom" style={{ left: b.x, top: b.y }}>💥</span>
-        </span>
-      ))}
-      <Sheet open={!!open} onClose={() => setOpenId(null)}>
-        {open && <Task task={open} project={open.projectId ? byId[open.projectId] : null} steps={stepsOf(open.isProject ? open.id : open.projectId)}
-          onBack={() => setOpenId(null)} onChange={(fn) => patch(open.id, fn)} onPatch={patch}
-          onOpen={(id) => setOpenId(id)}
-          onPlan={(steps) => makeProject(open.id, steps)}
-          onDelete={() => { setTasks((ts) => ts.filter((t) => t.id !== open.id && t.projectId !== open.id)); setOpenId(null); }} />}
-      </Sheet>
-      <div style={topBar}>
-        <span className="press" style={roundBtn} onClick={() => tap()}>≡</span>
-        <span style={{ fontWeight: 600, fontSize: 18 }}>Задачи</span>
-        <span className="press" style={roundBtn} onClick={() => tap()}>⚲</span>
-      </div>
-      <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-      <div style={{ height: "100%", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", display: "flex", flexDirection: "column", padding: "24px 0" }}>
-        <div style={{ flex: "1 0 auto" }} />
-        {todayList.map((t) => (
+  const renderRows = (list) => list.map((t) => (
           <div key={t.id} style={{ position: "relative", marginBottom: t.projectId ? 4 * Math.min(2, stepsOf(t.projectId).filter((x) => !x.done).length - 1) + 6 : 0 }}>
           {t.projectId && Array.from({ length: Math.min(2, stepsOf(t.projectId).filter((x) => !x.done).length - 1) }, (_, k) => (
             <div key={k} style={{ position: "absolute", left: 8 * (k + 1), right: 8 * (k + 1), bottom: -4 * (k + 1), height: 40, borderRadius: 28, background: "#1C1C1C", border: `1px solid ${T.line}`, opacity: 1 - 0.3 * (k + 1), zIndex: 0 }} />
           ))}
-          <div data-row ref={t.id === todayList[todayList.length - 1].id ? todayEnd : null} className={"row-press " + (landed === t.id ? "landed" : lastId === t.id ? "appear" : "")} style={{ ...cardBox, ...row, position: "relative", zIndex: 1, ...(t.projectId ? { background: "#1C1C1C", border: `1px solid ${T.line}` } : {}) }}>
+          <div data-row ref={list === todayList && t.id === list[list.length - 1].id ? todayEnd : null} className={"row-press " + (landed === t.id ? "landed" : lastId === t.id ? "appear" : "")} style={{ ...cardBox, ...row, position: "relative", zIndex: 1, ...(t.projectId ? { background: "#1C1C1C", border: `1px solid ${T.line}` } : {}) }}>
             <span onClick={() => { tap(8); setOpenId(t.id); }} style={{ flex: 1, minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, height: "100%", padding: "0 8px 0 12px", touchAction: "pan-y" }}>
               <span data-title style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: T.text }}>{t.title}</span>
                 {t.projectId && byId[t.projectId] ? (
                   <span style={{ fontSize: 13, color: T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {byId[t.projectId].title} · {stepsOf(t.projectId).findIndex((x) => x.id === t.id) + 1} из {stepsOf(t.projectId).length}
@@ -347,9 +389,132 @@ export default function App() {
             </span>
           </div>
           </div>
-        ))}
-        <div ref={listEnd} style={{ height: 16 }} />
+        ));
+
+  return (
+    <div ref={pageRef} className="page-root" onPointerDownCapture={(e) => { onDown(e); try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === "suspended") audio.resume(); } catch {} }} style={{ ...page, overflow: "hidden" }}>
+      <style>{`@import url("https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=swap");` + PRESS_CSS}</style>
+      {ghosts.map((g) => (
+        <div key={g.id} className="ghost" style={{ left: g.x, top: g.y, width: g.w, height: g.h }}>{g.title}</div>
+      ))}
+      {booms.map((b) => (
+        <span key={b.id}>
+          <span className="screen-flash" />
+          <span className="flash" style={{ left: b.x, top: b.y }} />
+          {b.sparks.map((sp, i) => <span key={i} className="spark" style={{ left: b.x, top: b.y, background: sp.c, "--dx": sp.dx + "px", "--dy": sp.dy + "px" }} />)}
+          <span className="boom" style={{ left: b.x, top: b.y }}>💥</span>
+        </span>
+      ))}
+      {focus && <Focus tasks={todayList} byId={byId} stepsOf={stepsOf} composer={<Composer value={draft} onChange={setDraft} onSend={add} dateMenu placeholder="Новая задача" />} onClose={() => setFocus(false)} onOpen={(id) => setOpenId(id)} onDone={focusDone} onDelete={focusDelete} onPostpone={focusPostpone} undo={undo} onUndo={doUndo} />}
+      <Sheet open={!!open} onClose={() => setOpenId(null)}>
+        {open && <Task task={open} project={open.projectId ? byId[open.projectId] : null} steps={stepsOf(open.isProject ? open.id : open.projectId)}
+          inPlan={!open.isProject && !!plan && !planStale && plan.items.some((x) => x.id === open.id && x.include)}
+          onTogglePlan={() => { tap(); setPlan((p) => { const base = p && p.forDate === todayStr() ? p : { forDate: todayStr(), items: [] }; const has = base.items.find((x) => x.id === open.id); return { ...base, items: has ? base.items.map((x) => (x.id === open.id ? { ...x, include: !x.include } : x)) : [...base.items, { id: open.id, include: true }] }; }); }}
+          onBack={() => setOpenId(null)} onChange={(fn) => patch(open.id, fn)} onPatch={patch}
+          onOpen={(id) => setOpenId(id)}
+          onPlan={(steps) => makeProject(open.id, steps)}
+          onDelete={() => { setTasks((ts) => ts.filter((t) => t.id !== open.id && t.projectId !== open.id)); setOpenId(null); }} />}
+      </Sheet>
+      <div style={topBar}>
+        <span className="press" style={roundBtn} onClick={() => tap()}>≡</span>
+        <div style={seg}>
+          {[
+            ["inbox", "Inbox", () => setTab(0)],
+            ["plan", "План", () => { if (plan && !planStale) setTab(1); else generatePlan(); }],
+            ["focus", "Фокус", () => { if (todayList.length) setFocus(true); else if (plan && !planStale) setTab(1); else generatePlan(); }],
+          ].map(([k, label, go]) => {
+            const active = k === "focus" ? focus : k === "plan" ? (tab === 1 && !focus) : (tab === 0 && !focus);
+            return <button key={k} className="press" onClick={() => { tap(6); go(); }} style={{ ...segBtn, background: active ? "#F5F5F3" : "transparent", color: active ? "#111" : T.muted }}>{label}</button>;
+          })}
+        </div>
+        <span style={{ width: 44 }} />
       </div>
+      <div style={{ position: "absolute", left: 16, right: 16, top: 72, bottom: bottomH + 16, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: "1 0 auto", minHeight: 24 }} />
+        {tab !== 1 || !plan || planStale ? (
+          <>
+            {ready && inboxList.length === 0 && <p style={empty}>Inbox пуст. Напиши задачу внизу.</p>}
+            {renderRows(inboxList)}
+          </>
+        ) : (
+          <>
+            {doneToday.length > 0 && (
+              <>
+                <div style={head}>Выполнено</div>
+                {doneToday.map((t) => (
+                  <div key={t.id} className="row-press" style={{ ...cardBox, ...row, opacity: 0.5 }}>
+                    <span onClick={() => { tap(8); setOpenId(t.id); }} style={{ flex: 1, minWidth: 0, cursor: "pointer", padding: "0 8px 0 12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: T.muted, textDecoration: "line-through" }}>{t.title}</span>
+                    <input type="checkbox" className="press" checked onChange={() => { tap(8); patch(t.id, (x) => mark(x, false)); }} style={{ ...box, background: "#F5F5F3" }} aria-label="Вернуть в работу" />
+                  </div>
+                ))}
+              </>
+            )}
+            {upcomingList.length > 0 && (
+              <>
+                <div style={head}>Предстоящие</div>
+                {upcomingList.map((t) => (
+                  <div key={t.id} data-row className="row-press" style={{ ...cardBox, ...row, ...(t.projectId ? { background: "#1C1C1C", border: `1px solid ${T.line}`, marginBottom: 6 } : {}) }}>
+                    <span onClick={() => { tap(8); setOpenId(t.id); }} style={{ flex: 1, minWidth: 0, cursor: "pointer", display: "flex", flexDirection: "column", gap: 3, padding: "0 8px 0 12px" }}>
+                      <span data-title style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: T.text }}>{t.title}</span>
+                      <span style={{ fontSize: 13, color: T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {fmtDue(t.due)}{t.projectId && byId[t.projectId] ? ` · ${byId[t.projectId].title}` : ""}
+                      </span>
+                    </span>
+                    <input type="checkbox" className="press" checked={false} onChange={(e) => complete(e, t.id, t.title)} style={{ ...box, background: "#2A2A2A", boxShadow: anchor(t).priority ? `inset 0 0 0 2px ${PRI[anchor(t).priority]}` : "none" }} />
+                  </div>
+                ))}
+              </>
+            )}
+            {(doneToday.length > 0 || upcomingList.length > 0) && todayList.length > 0 && <div style={head}>Сегодня</div>}
+            {[...plan.items].sort((a, b) => {
+              const ta = byId[a.id], tb = byId[b.id];
+              // снизу вверх: включённые ниже выключенных, внутри — по приоритету (срочные у самого низа)
+              return (a.include ? 1 : 0) - (b.include ? 1 : 0) || ((ta ? anchor(ta).priority || 0 : 0) - (tb ? anchor(tb).priority || 0 : 0)) || ((ta?.createdAt || 0) - (tb?.createdAt || 0));
+            }).map((it) => {
+              let t = byId[it.id]; if (!t) return null;
+              if (t.projectId) { const cur = firstStep[t.projectId]; if (!cur) return null; if (cur.id !== t.id && plan.items.some((o) => o.id === cur.id)) return null; t = cur; }
+              if (t.done || (t.due && t.due > todayStr())) return null;
+              return (
+                <div key={it.id} data-row className="row-press" style={{ ...cardBox, ...row, opacity: it.include ? 1 : 0.4, ...(t.projectId ? { background: "#1C1C1C", border: `1px solid ${T.line}`, marginBottom: 6 } : {}) }}>
+                  <span onClick={() => { tap(8); setOpenId(t.id); }} style={{ flex: 1, minWidth: 0, cursor: "pointer", display: "flex", flexDirection: "column", gap: 3, padding: "0 8px 0 12px" }}>
+                    <span data-title style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: T.text, textDecoration: it.include ? "none" : "line-through" }}>{t.title}</span>
+                    {t.projectId && byId[t.projectId] && (
+                      <span style={{ fontSize: 13, color: T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {byId[t.projectId].title} · {stepsOf(t.projectId).findIndex((x) => x.id === t.id) + 1} из {stepsOf(t.projectId).length}
+                      </span>
+                    )}
+                  </span>
+                  {it.include ? (
+                    <span style={{ position: "relative", display: "flex", flexShrink: 0 }}>
+                      <input type="checkbox" className="press" checked={false} onChange={(e) => complete(e, t.id, t.title)} style={{ ...box, background: "#2A2A2A", boxShadow: anchor(t).priority ? `inset 0 0 0 2px ${PRI[anchor(t).priority]}` : "none" }} />
+                      {t.projectId && <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: T.muted, pointerEvents: "none" }}>{stepsOf(t.projectId).filter((x) => !x.done).length}</span>}
+                    </span>
+                  ) : (
+                    <button className="press" onClick={() => togglePlanItem(it.id)} style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", color: T.muted, background: "#2A2A2A" }} aria-label="Вернуть в план"><Ic d="M12 5v14M5 12h14" /></button>
+                  )}
+                </div>
+              );
+            })}
+            {todayList.length === 0 && <p style={empty}>Всё на сегодня сделано</p>}
+          </>
+        )}
+        <div ref={listEnd} style={{ height: 20, flexShrink: 0 }} />
+      </div>
+      <div ref={bottomRef} style={{ position: "absolute", left: 16, right: 16, bottom: 16, display: "flex", flexDirection: "column" }}>
+      {/* Кнопка действия над полем ввода */}
+      <div style={{ display: "flex", gap: 8, padding: "0 0 8px", flexShrink: 0 }}>
+        {tab === 1 && plan && !planStale ? (
+          <>
+            <button className="press" onClick={() => { tap(); setFocus(true); }} disabled={!todayList.length} style={{ ...chip, flex: 1, justifyContent: "center", height: 52, background: todayList.length ? "#F5F5F3" : "#2A2A2A", color: todayList.length ? "#111" : T.muted, fontWeight: 600, fontSize: 16 }}>
+              Фокус-режим · {todayList.length}
+            </button>
+            <button className="press" onClick={generatePlan} disabled={planning} style={{ ...chip, height: 52 }}>{planning ? "…" : "Заново"}</button>
+          </>
+        ) : (
+          <button className="press" onClick={generatePlan} disabled={planning || !candidates.length} style={{ ...chip, flex: 1, justifyContent: "center", height: 52, background: candidates.length ? "#F5F5F3" : "#2A2A2A", color: candidates.length ? "#111" : T.muted, fontWeight: 600, fontSize: 16, opacity: planning ? 0.6 : 1 }}>
+            {planning ? "Составляю…" : `Спланировать · ${candidates.length}`}
+          </button>
+        )}
       </div>
       {undo && (
         <div className="appear" style={toast}>
@@ -358,11 +523,106 @@ export default function App() {
         </div>
       )}
       {preview && <div style={{ fontSize: 13, color: T.muted, margin: "0 0 6px 20px" }}>→ {fmtDue(preview)}</div>}
-      <Composer value={draft} onChange={setDraft} onSend={add} dateMenu placeholder="Новая задача" onFiles={(fs) => setTasks((ts) => [...ts, ...fs.map((f) => ({ id: uid(), title: f.name, due: todayStr(), done: false, messages: [] }))])} />
+      <Composer value={draft} onChange={setDraft} onSend={add} dateMenu placeholder="Новая задача" onFiles={(fs) => setTasks((ts) => [...ts, ...fs.map((f) => ({ id: uid(), title: f.name, due: tab === 0 ? null : todayStr(), done: false, createdAt: Date.now(), messages: [] }))])} />
+      </div>
     </div>
   );
 }
 
+
+// ── Фокус-режим: задачи по одной, как колода ──
+function Focus({ tasks, byId, stepsOf, composer, onClose, onOpen, onDone, onDelete, onPostpone, undo, onUndo }) {
+  const seen = useRef(null);
+  if (seen.current === null) seen.current = new Set(tasks.map((t) => t.id));
+  const [total, setTotal] = useState(() => tasks.length);
+  useEffect(() => {
+    let added = 0;
+    for (const t of tasks) if (!seen.current.has(t.id)) { seen.current.add(t.id); added++; }
+    if (added) setTotal(seen.current.size);
+  }, [tasks]);
+  const [ask, setAsk] = useState(null);   // задача, по которой спрашиваем «что мешает»
+  const [note, setNote] = useState("");
+  const [drag, setDrag] = useState({ x: 0, y: 0, on: false });
+  const [fly, setFly] = useState(null);   // направление улёта текущей карточки
+  const start = useRef(null);
+  const card = tasks[0];
+  const doneCount = total - tasks.length;
+
+  const down = (e) => { start.current = { x: e.clientX, y: e.clientY, t: Date.now() }; e.currentTarget.setPointerCapture?.(e.pointerId); setDrag({ x: 0, y: 0, on: true }); };
+  const move = (e) => { if (!start.current) return; setDrag({ x: e.clientX - start.current.x, y: e.clientY - start.current.y, on: true }); };
+  const up = () => {
+    if (!start.current || !card) return;
+    const { x, y } = drag; const dt = Date.now() - start.current.t; start.current = null;
+    const W = 110, U = 120;
+    if (x > W) { setFly("right"); setTimeout(() => { onDone(card); setFly(null); setDrag({ x: 0, y: 0, on: false }); }, 220); return; }
+    if (x < -W) { setDrag({ x: 0, y: 0, on: false }); setAsk(card); return; }
+    if (y < -U && Math.abs(x) < 60) { setFly("up"); setTimeout(() => { onDelete(card); setFly(null); setDrag({ x: 0, y: 0, on: false }); }, 220); return; }
+    if (Math.abs(x) < 6 && Math.abs(y) < 6 && dt < 300) { tap(8); onOpen(card.id); }
+    setDrag({ x: 0, y: 0, on: false });
+  };
+  const postpone = (reason, days) => { const t = ask; setAsk(null); setNote(""); setFly("left"); setTimeout(() => { onPostpone(t, reason, days); setFly(null); }, 220); };
+
+  const rot = drag.x / 18;
+  const tf = fly === "right" ? "translate(120vw, -10vh) rotate(25deg)" : fly === "left" ? "translate(-120vw, -10vh) rotate(-25deg)" : fly === "up" ? "translate(0, -120vh) scale(0.8)" : `translate(${drag.x}px, ${drag.y}px) rotate(${rot}deg)`;
+  const hint = drag.x > 40 ? "done" : drag.x < -40 ? "later" : drag.y < -50 ? "del" : null;
+
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "radial-gradient(140% 100% at 50% -10%, #242424 0%, #181818 45%, #111111 100%)", zIndex: 20, display: "flex", flexDirection: "column", padding: 16, boxSizing: "border-box" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", height: 48, flexShrink: 0 }}>
+        <button className="press" onClick={() => { tap(); onClose(); }} style={roundBtn}>✕</button>
+        <span style={{ fontSize: 15, color: T.muted }}>{tasks.length ? `${doneCount + 1} из ${total}` : "Готово"}</span>
+        {undo ? <button className="press" onClick={onUndo} style={{ ...roundBtn, width: "auto", padding: "0 16px", background: "#F5F5F3", color: "#111", border: "none", fontSize: 14, fontWeight: 600 }}>Вернуть</button> : <span style={{ width: 44 }} />}
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {!card && (
+          <div style={{ textAlign: "center", color: T.muted, fontSize: 17, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 44, marginBottom: 8 }}>✓</div>
+            На сегодня всё разобрано.<br />Сделано: {doneCount} из {total}
+          </div>
+        )}
+        {/* следующие карточки — стопка позади */}
+        {tasks.slice(1, 3).map((t, i) => (
+          <div key={t.id} style={{ ...focusCard, position: "absolute", transform: `translateY(${(i + 1) * 12}px) scale(${1 - (i + 1) * 0.04})`, opacity: 1 - (i + 1) * 0.35, zIndex: 2 - i }} />
+        ))}
+        {card && !ask && (
+          <div onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+            style={{ ...focusCard, position: "absolute", zIndex: 5, transform: tf, transition: drag.on ? "none" : "transform 220ms cubic-bezier(.2,.8,.2,1)", touchAction: "none", cursor: "grab" }}>
+            <div style={{ position: "absolute", top: 18, left: 20, right: 20, display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase" }}>
+              <span style={{ color: "#E5645A", opacity: hint === "later" ? 1 : 0.25 }}>← Отложить</span>
+              <span style={{ color: T.muted, opacity: hint === "del" ? 1 : 0.25 }}>↑ Удалить</span>
+              <span style={{ color: "#5BC17A", opacity: hint === "done" ? 1 : 0.25 }}>Сделано →</span>
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 600, lineHeight: 1.25, color: T.text, textAlign: "center", padding: "0 8px" }}>{card.title}</div>
+            {card.projectId && byId[card.projectId] && (
+              <div style={{ marginTop: 10, fontSize: 14, color: T.muted, textAlign: "center" }}>{byId[card.projectId].title} · {stepsOf(card.projectId).findIndex((x) => x.id === card.id) + 1} из {stepsOf(card.projectId).length}</div>
+            )}
+            {card.messages.length > 0 && <div style={{ marginTop: 10, fontSize: 14, color: T.muted, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{card.messages[card.messages.length - 1].text}</div>}
+            <div style={{ position: "absolute", bottom: 18, fontSize: 13, color: T.muted }}>тап — открыть чат</div>
+          </div>
+        )}
+        {ask && (
+          <div style={{ ...focusCard, position: "absolute", zIndex: 6, justifyContent: "flex-start", padding: 24 }}>
+            <div style={{ fontSize: 15, color: T.muted, marginBottom: 6 }}>Откладываем</div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: T.text, marginBottom: 22 }}>{ask.title}</div>
+            <div style={{ fontSize: 15, color: T.muted, marginBottom: 12 }}>Что мешает?</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+              {[["Просто завтра", 1], ["Нет времени сегодня", 1], ["Жду кого-то / чего-то", 2], ["Не знаю, с чего начать", 1]].map(([r, d]) => (
+                <button key={r} className="press" onClick={() => postpone(r, d)} style={{ ...chip, justifyContent: "flex-start", height: 48, fontSize: 16 }}>{r}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8, width: "100%", marginTop: 12 }}>
+              <input value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === "Enter" && note.trim() && postpone(note.trim(), 1)} placeholder="Своими словами…" style={{ ...input, height: 48, border: `1px solid ${T.line}`, borderRadius: 24, padding: "0 16px", flex: 1 }} />
+              <button className="press" disabled={!note.trim()} onClick={() => postpone(note.trim(), 1)} style={{ ...inBtn, background: note.trim() ? "#F5F5F3" : "#2A2A2A", color: note.trim() ? "#111" : T.muted }}><Ic d="M12 19V5M5 12l7-7 7 7" /></button>
+            </div>
+            <button className="press" onClick={() => { tap(); setAsk(null); }} style={{ marginTop: "auto", background: "transparent", border: "none", color: T.muted, fontFamily: "inherit", fontSize: 15, cursor: "pointer" }}>Отмена</button>
+          </div>
+        )}
+      </div>
+      <div style={{ flexShrink: 0, paddingTop: 12 }}>{composer}</div>
+    </div>
+  );
+}
 
 function Sheet({ open, onClose, children }) {
   const [closing, setClosing] = useState(false);
@@ -386,7 +646,7 @@ function Sheet({ open, onClose, children }) {
         @keyframes dimOut { from { opacity: 1 } to { opacity: 0 } }
       `}</style>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 10, animation: `${open ? "dimIn" : "dimOut"} 300ms ease forwards` }} />
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: 44, background: T.bg, borderRadius: "28px 28px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)", zIndex: 11, display: "flex", flexDirection: "column", overflow: "hidden", willChange: "transform", animation: `${open ? "sheetIn" : "sheetOut"} 300ms cubic-bezier(.32,.72,0,1) forwards` }}>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: 44, background: "linear-gradient(180deg, #202020 0%, #141414 100%)", borderRadius: "28px 28px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)", zIndex: 11, display: "flex", flexDirection: "column", overflow: "hidden", willChange: "transform", animation: `${open ? "sheetIn" : "sheetOut"} 300ms cubic-bezier(.32,.72,0,1) forwards` }}>
         <div style={{ width: 40, height: 5, borderRadius: 3, background: "#3A3A3A", margin: "10px auto 0", flexShrink: 0 }} />
         {keep.current}
       </div>
@@ -394,7 +654,7 @@ function Sheet({ open, onClose, children }) {
   );
 }
 
-function Task({ task, project, steps, onBack, onChange, onPatch, onOpen, onPlan, onDelete }) {
+function Task({ task, project, steps, inPlan, onTogglePlan, onBack, onChange, onPatch, onOpen, onPlan, onDelete }) {
   const [plan, setPlan] = useState(null);      // предложенный ИИ план до подтверждения
   const [planning, setPlanning] = useState(false);
   const draftPlan = async () => {
@@ -420,21 +680,21 @@ function Task({ task, project, steps, onBack, onChange, onPatch, onOpen, onPlan,
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: 16, boxSizing: "border-box" }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "0 12px" }}>
         <button className="press" onClick={() => { tap(); onBack(); }} style={roundBtn}>✕</button>
         <div style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
           <h1 style={{ ...h1, fontSize: 18, margin: 0, textDecoration: task.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</h1>
           {project && <div onClick={() => onOpen(project.id)} style={{ fontSize: 13, color: T.muted, marginTop: 2, cursor: "pointer" }}>{project.title} · {steps.findIndex((x) => x.id === task.id) + 1} из {steps.length}</div>}
           {task.isProject && <div style={{ fontSize: 13, color: T.muted, marginTop: 2 }}>Проект · {steps.filter((x) => x.done).length} из {steps.length}</div>}
         </div>
-        <input type="checkbox" className="press" checked={task.done} onChange={() => { tap(task.done ? 8 : 18); onChange((x) => ({ ...x, done: !x.done })); }} style={{ ...box, background: task.done ? "#F5F5F3" : "#2A2A2A", boxShadow: !task.done && task.priority ? `inset 0 0 0 2px ${PRI[task.priority]}` : "none" }} />
+        <input type="checkbox" className="press" checked={task.done} onChange={() => { tap(task.done ? 8 : 18); onChange((x) => mark(x, !x.done)); }} style={{ ...box, background: task.done ? "#F5F5F3" : "#2A2A2A", boxShadow: !task.done && task.priority ? `inset 0 0 0 2px ${PRI[task.priority]}` : "none" }} />
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "16px 0" }}>
         {task.isProject && steps.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             {steps.map((st) => (
               <div key={st.id} style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 44 }}>
-                <input type="checkbox" className="press" checked={st.done} onChange={() => { tap(st.done ? 8 : 18); onPatch(st.id, (x) => ({ ...x, done: !x.done })); }} style={{ ...box, width: 28, height: 28, background: st.done ? "#F5F5F3" : "#2A2A2A" }} />
+                <input type="checkbox" className="press" checked={st.done} onChange={() => { tap(st.done ? 8 : 18); onPatch(st.id, (x) => mark(x, !x.done)); }} style={{ ...box, width: 28, height: 28, background: st.done ? "#F5F5F3" : "#2A2A2A" }} />
                 <span onClick={() => onOpen(st.id)} style={{ flex: 1, minWidth: 0, cursor: "pointer", color: st.done ? T.muted : T.text, textDecoration: st.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.title}</span>
               </div>
             ))}
@@ -476,6 +736,9 @@ function Task({ task, project, steps, onBack, onChange, onPatch, onOpen, onPlan,
         <button className="press" onClick={() => { tap(); onChange((x) => ({ ...x, priority: ((x.priority || 0) + 1) % 3 })); }} style={{ ...chip, color: task.priority ? PRI[task.priority] : T.muted, borderColor: task.priority ? PRI[task.priority] : T.line }}>
           {["Обычная", "Важная", "Срочная"][task.priority || 0]}
         </button>
+        {!task.isProject && (
+          <button className="press" onClick={onTogglePlan} style={{ ...chip, color: inPlan ? T.text : T.muted }}>{inPlan ? "В плане ✓" : "В план"}</button>
+        )}
         {!task.isProject && !task.projectId && (
           <button className="press" onClick={draftPlan} disabled={planning || !!plan} style={{ ...chip, opacity: planning ? 0.6 : 1 }}>{planning ? "Думаю…" : "Разбить на шаги"}</button>
         )}
@@ -541,7 +804,7 @@ function Composer({ value, onChange, onSend, placeholder, disabled, onFiles, dat
     clearTimeout(press.current.timer); press.current = null; setMenu(false);
   };
   return (
-    <div ref={boxRef} className="composer" style={{ ...composer, position: "relative" }}>
+    <div ref={boxRef} className="composer" style={{ ...composer, position: "relative", marginTop: 4, flexShrink: 0 }}>
       {menu && (
         <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "row-reverse", gap: 4, padding: 6, zIndex: 5, borderRadius: "inherit", background: "#1C1C1C" }}>
           {OPTIONS.map((o, i) => (
@@ -568,23 +831,25 @@ function Composer({ value, onChange, onSend, placeholder, disabled, onFiles, dat
 
 const PRI = ["#4A4A48", "#E8A33D", "#E5645A"]; // обычная, важная, срочная
 const T = { bg: "#161616", card: "#232323", line: "#343434", text: "#EDEDEB", muted: "#9A9A96" };
-const page = { fontFamily: "Play, Inter, -apple-system, system-ui, sans-serif", fontSize: 16, color: T.text, background: T.bg, height: "100dvh", boxSizing: "border-box", padding: "max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", maxWidth: 600, margin: "0 auto" };
-const topBar = { display: "flex", alignItems: "center", justifyContent: "space-between", height: 48, marginBottom: 8 };
+const page = { fontFamily: "Play, Inter, -apple-system, system-ui, sans-serif", fontSize: 16, color: T.text, background: "radial-gradient(140% 100% at 50% -10%, #242424 0%, #181818 45%, #111111 100%)", position: "relative", height: "100vh", minHeight: "100vh", width: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", maxWidth: 600, margin: "0 auto" };
+const topBar = { display: "flex", alignItems: "center", justifyContent: "space-between", height: 48, marginBottom: 8, padding: "0 12px", flexShrink: 0 };
 const roundBtn = { width: 44, height: 44, borderRadius: 22, border: "1px solid #3A3A3A", background: "transparent", color: T.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer", padding: 0, flexShrink: 0, fontFamily: "inherit" };
 const cardBox = { background: "transparent", border: "1px solid transparent", borderRadius: 28, padding: 11, marginBottom: 0, flexShrink: 0, boxSizing: "border-box" };
 const head = { fontSize: 13, fontWeight: 600, color: T.muted, textTransform: "uppercase", letterSpacing: 0.6, padding: "12px 0 4px" };
-const row = { display: "flex", alignItems: "center", gap: 6, minHeight: 68, fontSize: 17 };
+const row = { display: "flex", alignItems: "center", gap: 6, height: 68, fontSize: 17, flexShrink: 0 };
 const box = { width: 44, height: 44, margin: 0, flexShrink: 0, appearance: "none", WebkitAppearance: "none", borderRadius: "50%", border: "none", background: "transparent", cursor: "pointer" };
 const composer = { display: "flex", alignItems: "center", gap: 6, height: 68, padding: 11, border: `1px solid ${T.line}`, borderRadius: 28, background: "#1C1C1C", boxSizing: "border-box" };
 const input = { flex: 1, minWidth: 0, height: "100%", fontSize: 17, padding: "0 8px", border: "none", background: "transparent", color: T.text, fontFamily: "inherit", outline: "none" };
 const inBtn = { width: 44, height: 44, borderRadius: 22, border: "none", background: "transparent", color: "#D6D6D2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, flexShrink: 0 };
-const btn = { fontSize: 16, padding: "0 14px", border: `1px solid ${T.line}`, borderRadius: 12, background: "transparent", color: T.text, cursor: "pointer", fontFamily: "inherit" };
 const h1 = { fontSize: 24, fontWeight: 600, margin: "0 0 12px" };
 const bubble = { maxWidth: "85%", background: "#2B2B2B", padding: "14px 20px", borderRadius: 26, fontSize: 17, lineHeight: 1.5, whiteSpace: "pre-wrap" };
 const aiText = { margin: "16px 0", lineHeight: 1.6, whiteSpace: "pre-wrap" };
-const Ic = ({ d }) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>;
+const Ic = ({ d, size = 16 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>;
 const chip = { position: "relative", display: "inline-flex", alignItems: "center", height: 44, padding: "0 18px", borderRadius: 22, border: "none", background: "#2A2A2A", color: T.text, fontFamily: "inherit", fontSize: 15, cursor: "pointer" };
 const toast = { display: "flex", alignItems: "center", gap: 12, height: 48, padding: "0 8px 0 20px", marginBottom: 8, borderRadius: 24, background: "#1C1C1C", border: `1px solid ${T.line}`, fontSize: 15 };
 const undoBtn = { height: 34, padding: "0 14px", borderRadius: 17, border: "none", background: "#F5F5F3", color: "#111", fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer" };
-const _dateMenuBox = { position: "absolute", right: 0, bottom: 52, display: "flex", flexDirection: "column-reverse", gap: 4, padding: 4, borderRadius: 26, background: "#1C1C1C", border: `1px solid ${T.line}`, boxShadow: "0 12px 40px rgba(0,0,0,0.6)", zIndex: 30 };
 const dateItem = { height: "100%", minWidth: 0, padding: 0, borderRadius: 22, display: "flex", alignItems: "center", justifyContent: "center", whiteSpace: "nowrap", fontSize: 14, fontWeight: 600, overflow: "hidden", transition: "background 80ms, transform 80ms" };
+const empty = { color: T.muted, fontSize: 15, textAlign: "center", padding: "24px 8px", margin: 0 };
+const focusCard = { width: "100%", maxWidth: 420, height: "70%", maxHeight: 420, borderRadius: 32, background: "#1C1C1C", border: `1px solid ${T.line}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, boxSizing: "border-box", boxShadow: "0 20px 60px rgba(0,0,0,0.6)", userSelect: "none", WebkitUserSelect: "none" };
+const seg = { display: "flex", gap: 2, padding: 3, borderRadius: 22, background: "#1C1C1C", border: `1px solid ${T.line}` };
+const segBtn = { height: 36, padding: "0 14px", borderRadius: 18, border: "none", fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "background 120ms, color 120ms" };
