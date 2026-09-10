@@ -80,45 +80,74 @@ function storage(){
  assert(!!s3.w.localStorage.getItem('tasks:v1'),'перенос сохранён под новым ключом');
 }
 
-/* ---------- действия над задачей ---------- */
-function actions(){
+/* ---------- действия: меню по долгому нажатию ---------- */
+async function actions(){
  console.log('действия');
  const {w,d}=load('index.html');
- const A=w.app, $=i=>d.getElementById(i);
- const qa=a=>d.querySelector('#acts [data-a='+a+']');
- const dateIn=()=>d.querySelector('#acts input[type=date]');
+ const A=w.app, wait=ms=>new Promise(r=>setTimeout(r,ms));
+ const rows=()=>[...d.querySelectorAll('#list .row')];
+ const sheet=()=>d.querySelector('.sheet');
+ const mi=a=>d.querySelector('.sheet .mi[data-a='+a+']');
+ /* Правая кнопка открывает то же меню, что и удержание пальцем,
+    и в jsdom это единственный воспроизводимый путь */
+ const press=el=>el.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true}));
 
- dateIn().value='2030-01-15';
- dateIn().dispatchEvent(new w.Event('change'));
- assert(A.curItem().due==='2030-01-15','срок сохранён');
- assert($('cm').textContent.startsWith('15 янв'),'срок показан в шапке');
+ assert(!d.getElementById('acts'),'панели действий в чате больше нет');
 
+ // долгое нажатие не должно открывать саму задачу
+ const was=A.S.cur.k+':'+A.S.cur.id;
+ press(rows()[1]);
+ assert(sheet()&&!sheet().hidden,'меню открылось долгим нажатием');
+ rows()[1].click();
+ assert(A.S.cur.k+':'+A.S.cur.id===was,'после долгого нажатия строка не открывается');
+ A.closeMenu();
+
+ // срок
+ const title=rows()[0].querySelector('.t1').textContent;
+ press(rows()[0]);
+ mi('del').click();
+ assert(!sheet().hidden,'нажатие сразу после открытия игнорируется');
+ await wait(450);
+ assert(!!mi('due')&&!!mi('proj')&&!!mi('del'),'в меню задачи срок, проект и удаление');
+ const din=d.querySelector('.sheet input[type=date]');
+ din.value='2030-01-15'; din.dispatchEvent(new w.Event('change'));
+ assert(A.S.ts.find(x=>x.t===title).due==='2030-01-15','срок выставлен из меню');
+ assert(sheet().hidden,'меню закрылось после выбора даты');
+
+ // задача становится проектом
  const before=A.S.pr.length;
- qa('proj').click();
+ press(rows()[0]); await wait(450);
+ mi('proj').click();
  assert(A.S.pr.length===before+1,'создан проект');
  assert(A.S.cur.k==='p','открылся проект');
  assert(A.openIn(A.S.cur.id).length===1,'исходная задача стала первым шагом');
 
- qa('step').click();
+ // добавление шага из меню проекта
+ const pid=A.S.cur.id;
+ press(rows().find(r=>r.dataset.pj===String(pid))); await wait(450);
+ assert(!!mi('step')&&!mi('proj'),'в меню проекта шаг вместо «сделать проектом»');
+ mi('step').click();
  const si=()=>d.querySelector('#thread .stepin');
- assert(!!si(),'поле шага появилось прямо в списке');
+ assert(!!si(),'поле шага появилось в списке шагов');
  si().value='Новый шаг';
  si().dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
- assert(A.openIn(A.S.cur.id).length===2,'шаг добавлен');
- assert(!!si(),'поле осталось открытым для следующего шага');
+ assert(A.openIn(pid).length===2,'шаг добавлен');
  si().dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
  assert(!si(),'Escape закрывает поле');
- assert(d.querySelectorAll('#thread .row').length===2,'шаги видны в чате');
 
- $('ct').value='Переименованный проект';
- $('ct').dispatchEvent(new w.Event('input'));
+ // переименование прямо в шапке
+ d.getElementById('ct').value='Переименованный проект';
+ d.getElementById('ct').dispatchEvent(new w.Event('input'));
  assert(A.curItem().n==='Переименованный проект','название правится в шапке');
 
- const steps=A.S.ts.length, pid=A.S.cur.id;
- qa('del').click();
- assert(A.S.pr.some(p=>p.id===pid),'первое касание по «Удалить» ничего не удаляет');
- assert(qa('del').textContent.includes('Точно'),'кнопка просит подтвердить');
- qa('del').click();
+ // удаление проекта в два касания
+ const steps=A.S.ts.length;
+ press(rows().find(r=>r.dataset.pj===String(pid))); await wait(450);
+ mi('del').click();
+ assert(A.S.pr.some(p=>p.id===pid),'первое касание ничего не удаляет');
+ assert(mi('del').textContent.includes('Точно'),'меню просит подтвердить');
+ await wait(450);
+ mi('del').click();
  assert(!A.S.pr.some(p=>p.id===pid),'второе касание удаляет проект');
  assert(A.S.ts.length===steps-2,'шаги удалены вместе с проектом');
 }
@@ -139,6 +168,6 @@ function actions(){
  t.rows()[1].click(); t.d.dispatchEvent(new t.w.KeyboardEvent('keydown',{key:'Escape'})); assert(on('scr-list'),'Esc закрывает экран');
 
  storage();
- actions();
+ await actions();
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
 })();

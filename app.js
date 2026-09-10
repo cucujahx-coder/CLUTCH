@@ -182,9 +182,78 @@ function taskRow(x,ic,sm){
  const b=document.createElement('div'); b.className='cel';
  b.innerHTML='<div class="t1" style="color:var(--text-'+(x.done?'muted':'primary')+');'+(x.done?'text-decoration:line-through;':'')+'">'+esc(x.t)+'</div>'+sub(x,ic);
  d.appendChild(b); d.appendChild(hit(x,d,sm,0));
- const go=()=>{S.cur={k:'t',id:x.id};save();open();};
+ const go=()=>{if(suppressRow)return; S.cur={k:'t',id:x.id};save();open();};
  d.onclick=go; d.onkeydown=key(go);
+ armLongPress(d,()=>showMenu('t',x.id));
  return d;
+}
+
+/* ---------- долгое нажатие ---------- */
+/* 500 мс — столько же держит iOS до своего меню. Сдвиг больше 10 px считаем
+   прокруткой и отменяем. Правая кнопка мыши открывает то же меню. */
+function armLongPress(el,fn){
+ let t=null,x=0,y=0;
+ const cancel=()=>{if(t){clearTimeout(t);t=null}};
+ el.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  suppressRow=false; x=e.clientX; y=e.clientY; cancel();
+  t=setTimeout(()=>{t=null;suppressRow=true;fn();},500);
+ });
+ el.addEventListener('pointermove',e=>{if(t&&(Math.abs(e.clientX-x)>10||Math.abs(e.clientY-y)>10))cancel()});
+ ['pointerup','pointercancel','pointerleave'].forEach(n=>el.addEventListener(n,cancel));
+ el.addEventListener('contextmenu',e=>{e.preventDefault();cancel();suppressRow=true;fn()});
+}
+
+/* ---------- меню действий ---------- */
+function menuRoot(){
+ if(menuEl)return menuEl;
+ menuEl=document.createElement('div');
+ menuEl.className='sheet'; menuEl.hidden=true;
+ menuEl.innerHTML='<div class="sheet-back"></div><div class="sheet-body" role="menu"></div>';
+ /* Меню открывается ещё при нажатом пальце: следом придёт pointerup и клик
+    по подложке. Первые 400 мс её нажатия игнорируем, иначе меню схлопнется. */
+ menuEl.querySelector('.sheet-back').onclick=()=>{if(Date.now()-menuAt>400)closeMenu()};
+ document.body.appendChild(menuEl);
+ return menuEl;
+}
+function closeMenu(){
+ menuFor=null; menuArmed=false;
+ if(menuEl){menuEl.hidden=true; menuEl.querySelector('.sheet-body').innerHTML='';}
+}
+function showMenu(kind,id){
+ if(!(kind==='p'?prById(id):byId(id)))return;
+ menuFor={kind,id}; menuArmed=false; menuAt=Date.now(); tapMenu();
+}
+function tapMenu(){
+ if(!menuFor)return closeMenu();
+ const {kind,id}=menuFor, isP=kind==='p', it=isP?prById(id):byId(id);
+ if(!it)return closeMenu();
+ const r=menuRoot(), body=r.querySelector('.sheet-body');
+ const mi=(a,icon,label,val)=>'<button class="mi'+(a==='del'?' danger':'')+'" type="button" data-a="'+a+'">'+
+   I(icon,20)+'<span>'+esc(label)+'</span>'+(val?'<span class="val">'+esc(val)+'</span>':'')+
+   (a==='due'?'<input type="date" aria-label="Срок" value="'+(it.due||'')+'">':'')+'</button>';
+ let h='<div class="sheet-title">'+esc(isP?it.n:it.t)+'</div>';
+ h+=mi('due','calendar','Срок',fmtDue(it.due)||'не задан');
+ if(isP)h+=mi('step','plus','Добавить шаг');
+ else if(it.pj===null)h+=mi('proj','list-check','Сделать проектом');
+ h+=mi('del','trash',menuArmed?'Точно удалить?':(isP?'Удалить проект':'Удалить'));
+ body.innerHTML=h; r.hidden=false;
+ const fresh=()=>Date.now()-menuAt>400;
+ body.querySelector('input[type=date]').onchange=e=>{it.due=e.target.value||null; save(); closeMenu(); paint();};
+ body.querySelectorAll('.mi').forEach(b=>{const a=b.dataset.a;
+  b.onclick=()=>{
+   if(!fresh())return;
+   if(a==='due'){const i=body.querySelector('input[type=date]'); i.showPicker?i.showPicker():i.focus(); return;}
+   if(a==='step'){S.cur={k:'p',id}; addingFor=curKey(); closeMenu(); open(); return;}
+   if(a==='proj'){S.cur={k:'t',id}; closeMenu(); makeProject(); return;}
+   /* Удаление в два касания: системный confirm() в standalone на iOS
+      ведёт себя непредсказуемо, а промах пальцем слишком дёшев */
+   if(a==='del'){
+    if(!menuArmed){menuArmed=true; menuAt=Date.now(); tapMenu(); return;}
+    S.cur={k:kind,id}; closeMenu(); delItem();
+   }
+  };
+ });
 }
 
 /* ---------- действия ---------- */
@@ -200,7 +269,6 @@ function delItem(){
  S.cur=n?(S.ts[0]?{k:'t',id:S.ts[0].id}:{k:'p',id:S.pr[0].id}):null;
  save(); paint();
 }
-function setDue(v){const it=curItem(); if(!it)return; it.due=v||null; save(); paint();}
 /* Задача превращается в проект: сама становится записью в pr, а её название — первым шагом */
 function makeProject(){
  const x=curItem(); if(S.cur.k==='p'||!x)return;
@@ -243,12 +311,14 @@ function ask(text){
 
 /* ---------- отрисовка ---------- */
 const $=i=>document.getElementById(i);
-let list,thread,acts,hctl;
+let list,thread,hctl;
 /* Ключ текущей карточки: к нему привязаны «добавляю шаг» и взведённое удаление,
    поэтому переключение на другую задачу само их сбрасывает */
 const curKey=()=>S.cur?S.cur.k+':'+S.cur.id:'';
-let addingFor=null, delArm=null;
+let addingFor=null;
 const closeStep=()=>{addingFor=null;paint()};
+/* Меню действий по долгому нажатию на строку */
+let menuEl=null, menuFor=null, menuArmed=false, menuAt=0, suppressRow=false;
 function paint(){
  const openT=S.ts.filter(x=>!x.done);
  $('cnt').textContent=openT.length;
@@ -266,8 +336,9 @@ function paint(){
    '<span class="s sf" style="color:var(--text-secondary);">→ '+esc(nx.t)+'</span>'+
    '<span class="s" style="color:var(--text-muted);">· '+esc(fmtDue(nx.due||p.due)||'без срока')+'</span></div>';
   d.appendChild(b); d.appendChild(ringEl(all.length-op.length,all.length,nx,d));
-  const go=()=>{S.cur={k:'p',id:p.id};save();open();};
+  const go=()=>{if(suppressRow)return; S.cur={k:'p',id:p.id};save();open();};
   d.onclick=go; d.onkeydown=key(go);
+  armLongPress(d,()=>showMenu('p',p.id));
   list.appendChild(d);
  });
  if(!list.children.length)list.innerHTML='<div class="empty">Задач нет. Добавьте первую внизу.</div>';
@@ -286,7 +357,7 @@ function paint(){
 function paintDetail(){
  if(!S.cur||!curItem()){
   const n=S.ts[0]||S.pr[0];
-  if(!n){$('crumb').innerHTML='';$('ct').value='';$('cm').textContent='';hctl.innerHTML='';acts.innerHTML='';thread.innerHTML='';return;}
+  if(!n){$('crumb').innerHTML='';$('ct').value='';$('cm').textContent='';hctl.innerHTML='';thread.innerHTML='';return;}
   S.cur=S.ts[0]?{k:'t',id:S.ts[0].id}:{k:'p',id:S.pr[0].id};
  }
  const isP=S.cur.k==='p', p=isP?prById(S.cur.id):null, x=isP?null:byId(S.cur.id);
@@ -306,24 +377,6 @@ function paintDetail(){
  hctl.appendChild(isP?ringEl(all.length-op.length,all.length,0,0):hit(x,null,0,1));
 
  const it=isP?p:x;
- acts.innerHTML='<span class="due-wrap"><button class="qa'+(it.due?' on':'')+'" type="button" data-a="due">'+I('calendar',16)+esc(fmtDue(it.due)||'Срок')+'</button><input type="date" aria-label="Срок" value="'+(it.due||'')+'"></span>'+
-  (isP?'<button class="qa" type="button" data-a="step">'+I('plus',16)+'Добавить шаг</button>'
-     :(x.pj===null?'<button class="qa" type="button" data-a="proj">'+I('list-check',16)+'Сделать проектом</button>':''))+
-  '<button class="qa danger'+(delArm===curKey()?' armed':'')+'" type="button" data-a="del">'+I('trash',16)+
-   (delArm===curKey()?'Точно удалить?':(isP?'Удалить проект':'Удалить'))+'</button>';
- acts.querySelector('input[type=date]').onchange=e=>setDue(e.target.value);
- acts.querySelectorAll('.qa').forEach(b=>{const a=b.dataset.a;
-  if(a==='due')b.onclick=()=>{const i=acts.querySelector('input[type=date]'); i.showPicker?i.showPicker():i.focus();};
-  if(a==='step')b.onclick=()=>{addingFor=curKey();paint();};
-  if(a==='proj')b.onclick=makeProject;
-  /* Два касания вместо confirm(): системный диалог на iOS в standalone
-     ведёт себя непредсказуемо, а промах по «Удалить» пальцем слишком дёшев */
-  if(a==='del')b.onclick=()=>{
-   if(delArm===curKey()){delArm=null;delItem();return;}
-   delArm=curKey(); paint();
-   setTimeout(()=>{if(delArm){delArm=null;paint();}},4000);
-  };
- });
 
  thread.innerHTML='';
  const add=h=>{const e=document.createElement('div'); e.innerHTML=h; thread.appendChild(e.firstChild);};
@@ -390,12 +443,12 @@ function shellNav(){
  back=()=>{show('list');paint();const r=list.querySelector('[aria-current="true"]');if(r)r.focus();};
  $('back').innerHTML=I('chevron-left',24);
  $('back').onclick=back;
- document.addEventListener('keydown',e=>{if(e.key==='Escape'&&view==='detail')back();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menuFor&&view==='detail')back();});
 }
 
 /* ---------- старт ---------- */
 S=load();
-list=$('list'); thread=$('thread'); acts=$('acts'); hctl=$('hctl');
+list=$('list'); thread=$('thread'); hctl=$('hctl');
 trackVH();
 (MODE==='nav'?shellNav:shellTwo)();
 const nt=$('nt'),err=$('err'),msg=$('msg'),ct=$('ct');
@@ -417,10 +470,11 @@ ct.onblur=()=>{const it=curItem(); if(!it)return; const v=ct.value.trim();
 ct.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ct.blur();}};
 $('add').onclick=submitTask; nt.onkeydown=e=>{if(e.key==='Enter')submitTask();};
 $('send').onclick=sendMsg; msg.onkeydown=e=>{if(e.key==='Enter')sendMsg();};
+addEventListener('keydown',e=>{if(e.key==='Escape'&&menuFor)closeMenu();});
 addEventListener('pagehide',flush); addEventListener('beforeunload',flush);
 paint();
 /* Поверхность для тестов и отладки из консоли браузера. S переприсваивается при загрузке,
    поэтому отдаётся геттером, иначе снаружи виден устаревший объект. */
-window.app={get S(){return S},byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,setDue,fmtDue,flush,paint};
+window.app={get S(){return S},byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu};
 
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
