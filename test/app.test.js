@@ -228,9 +228,9 @@ function payload(){
  touch('touchstart',8,300); touch('touchmove',700,305); touch('touchend');
  assert(on('scr-list')&&!t.d.getElementById('scr-detail').style.transform,'свайп вправо от края возвращает к списку');
 
- /* клавиатура: контейнер = видимая область. Высота обновляется по обоим событиям,
-    смещение — только по resize: iOS панорамирует и при прокрутке списка, и если
-    тянуться за смещением там, контейнер уезжает под пальцем. */
+ /* клавиатура: контейнер = видимая область. Обе величины читаются по обоим событиям.
+    Обновлять смещение только по resize нельзя — оно протухает: iOS панорамирует при
+    фокусе, а возвращает смещение в ноль уже событием scroll. */
  const vvL={}, kbw=load('index.html',w2=>{w2.visualViewport={height:400,offsetTop:0,addEventListener:(n,f)=>{vvL[n]=f;}};}).w;
  const css=n=>kbw.document.documentElement.style.getPropertyValue(n);
  assert(css('--vh')==='400px'&&css('--vvtop')==='0px','высота и смещение берутся у видимой области');
@@ -238,8 +238,10 @@ function payload(){
  assert(css('--vh')==='300px','клавиатура выехала — контейнер ужался');
  assert(css('--vvtop')==='120px','панорамирование при открытии клавиатуры скомпенсировано');
  kbw.visualViewport.height=280; kbw.visualViewport.offsetTop=200; vvL.scroll();
- assert(css('--vh')==='280px','прокрутка обновляет высоту');
- assert(css('--vvtop')==='120px','но не смещение — иначе контейнер уезжал бы при прокрутке списка');
+ assert(css('--vh')==='280px','событие scroll обновляет высоту');
+ assert(css('--vvtop')==='200px','и смещение тоже — иначе оно протухает, когда iOS возвращает его в ноль');
+ kbw.visualViewport.height=796; kbw.visualViewport.offsetTop=0; vvL.scroll();
+ assert(css('--vvtop')==='0px','возврат смещения в ноль доходит до переменной');
 
  /* выполнение хлопает петардой (синтез Web Audio); снятие отметки — тихо */
  let booms=0;

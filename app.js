@@ -591,31 +591,33 @@ function paintDetail(){
 let view='list', open, back;
 /* Видимая высота окна в --vh. На телефоне клавиатура ужимает область просмотра,
    а 100dvh про это не знает — без этого композер уезжает под клавиатуру. */
-/* Контейнер приложения = видимая область. Высота из visualViewport.height, смещение
+/* Контейнер приложения = видимая область: высота из visualViewport.height, смещение
    сверху из visualViewport.offsetTop.
 
-   Ключевое — РАЗНЫЕ события для этих двух величин:
-   • resize (клавиатура появилась или убралась) — обновляем обе. iOS в момент фокуса
-     панорамирует страницу, чтобы показать поле, оказавшееся под клавиатурой; без
-     компенсации смещения шапка и список уезжают выше края экрана.
-   • scroll (прокрутка списка при открытой клавиатуре) — только высоту. iOS панорамирует
-     видимую область и при прокрутке тоже, и если тянуться за смещением здесь, контейнер
-     будет уезжать под пальцем.
+   Обе величины читаются по ОБОИМ событиям. Пробовали обновлять смещение только по
+   resize — оно протухало: iOS панорамирует при фокусе (offsetTop становится, скажем,
+   186), а возвращает в ноль уже событием scroll. Контейнер оставался опущенным на
+   эти 186, и композер уходил под клавиатуру.
 
-   После resize смещение перечитываем ещё дважды: iOS доводит панорамирование уже
-   после того, как сообщил новый размер. */
+   После resize перечитываем ещё дважды: iOS доводит панорамирование уже после того,
+   как сообщил новый размер. */
+let vvTrace=[];
 function trackVH(){
  const root=document.documentElement, vv=window.visualViewport;
- const h=()=>root.style.setProperty('--vh',(vv?vv.height:innerHeight)+'px');
- const top=()=>root.style.setProperty('--vvtop',(vv?vv.offsetTop:0)+'px');
- const both=()=>{h();top();};
- both();
+ const set=src=>{
+  const h=vv?vv.height:innerHeight, t=vv?vv.offsetTop:0;
+  root.style.setProperty('--vh',h+'px');
+  root.style.setProperty('--vvtop',t+'px');
+  if(vvTrace.length>7)vvTrace.shift();
+  vvTrace.push(src+Math.round(t));
+ };
+ set('i');
  if(vv){
-  vv.addEventListener('resize',()=>{both();setTimeout(both,150);setTimeout(both,400);});
-  vv.addEventListener('scroll',h);
+  vv.addEventListener('resize',()=>{set('r');setTimeout(()=>set('r'),150);setTimeout(()=>set('r'),400);});
+  vv.addEventListener('scroll',()=>set('s'));
  }
- addEventListener('resize',both);
- addEventListener('orientationchange',()=>setTimeout(both,150));
+ addEventListener('resize',()=>set('w'));
+ addEventListener('orientationchange',()=>setTimeout(()=>set('o'),150));
 }
 function shellTwo(){
  const grid=document.querySelector('.grid');
@@ -751,7 +753,8 @@ if(/(^|[?&])debug(=|&|$)/.test(location.search)){
    'перем.  --vh '+(cs.getPropertyValue('--vh').trim()||'—')+'  --vvtop '+(cs.getPropertyValue('--vvtop').trim()||'—')+'\n'+
    'app     '+rect(document.querySelector('.app'))+'\n'+
    'композер '+rect(document.querySelector('.scr.on .ft')||document.querySelector('.ft'))+'\n'+
-   'фокус   '+((document.activeElement&&document.activeElement.id)||'нет');
+   'фокус   '+((document.activeElement&&document.activeElement.id)||'нет')+'\n'+
+   'трасса  '+vvTrace.join(' ');
   requestAnimationFrame(tick);
  };
  tick();
