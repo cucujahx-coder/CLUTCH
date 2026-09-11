@@ -730,6 +730,33 @@ window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,add
    (skipWaiting + clients.claim), но страница продолжает исполнять старый код до перезагрузки —
    поэтому перезагружаем её один раз при смене управляющего воркера. Только если он уже был:
    при первой в жизни установке controllerchange тоже срабатывает, и перезагрузка была бы лишней. */
+/* Диагностика раскладки. Открыть страницу с ?debug — поверх интерфейса появятся живые
+   числа: размеры окна и видимой области, смещение, значения переменных и положение
+   контейнера с композером. Нужно потому, что поведение клавиатуры воспроизводится только
+   на настоящем телефоне: в эмуляторе браузера её нет вовсе. Снимок экрана с открытой
+   клавиатурой заменяет целый круг догадок. */
+if(/(^|[?&])debug(=|&|$)/.test(location.search)){
+ const box=document.createElement('pre');
+ box.style.cssText='position:fixed;left:0;top:0;z-index:9999;margin:0;padding:4px 6px;'+
+  'font:10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#0f0;'+
+  'background:rgba(0,0,0,.82);white-space:pre;pointer-events:none;max-width:100%';
+ document.body.appendChild(box);
+ const n=v=>Math.round(v);
+ const rect=e=>{const b=e&&e.getBoundingClientRect();return b?n(b.top)+'..'+n(b.bottom)+' ('+n(b.height)+')':'нет'};
+ const tick=()=>{
+  const vv=window.visualViewport, cs=getComputedStyle(document.documentElement);
+  box.textContent=
+   'окно    '+n(innerWidth)+'x'+n(innerHeight)+'   scrollY '+n(scrollY)+'\n'+
+   'видимая h '+(vv?n(vv.height):'—')+'  top '+(vv?n(vv.offsetTop):'—')+'  pageTop '+(vv?n(vv.pageTop):'—')+'  scale '+(vv?vv.scale:'—')+'\n'+
+   'перем.  --vh '+(cs.getPropertyValue('--vh').trim()||'—')+'  --vvtop '+(cs.getPropertyValue('--vvtop').trim()||'—')+'\n'+
+   'app     '+rect(document.querySelector('.app'))+'\n'+
+   'композер '+rect(document.querySelector('.scr.on .ft')||document.querySelector('.ft'))+'\n'+
+   'фокус   '+((document.activeElement&&document.activeElement.id)||'нет');
+  requestAnimationFrame(tick);
+ };
+ tick();
+}
+
 if('serviceWorker' in navigator){
  const had=!!navigator.serviceWorker.controller; let done=false;
  navigator.serviceWorker.addEventListener('controllerchange',()=>{
