@@ -409,7 +409,7 @@ function addStep(title){
    нельзя: бандл публичный. Поэтому запрос уходит в воркер, а ключ и системный
    промпт живут там. Пока адрес пуст, отвечает локальная заглушка — приложение
    остаётся рабочим и без сервера. */
-const API='https://clutch-chat.abc-clutch.workers.dev';
+const API='https://abc-clutch.workers.dev';
 
 /* Модели уходят данные задачи, а не готовый промпт: воркер собирает его сам */
 function chatPayload(item,isP){
