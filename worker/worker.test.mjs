@@ -13,6 +13,15 @@ const post=(body,origin=ORIGIN)=>worker.fetch(new Request('https://w.dev/',{meth
 const base={kind:'task',title:'Оплатить хостинг',due:'2026-09-20',note:'черновик готов',
  messages:[{role:'user',text:'с чего начать?'}]};
 
+// страница проверки на GET
+const get=await worker.fetch(new Request('https://w.dev/',{headers:{Origin:ORIGIN}}),env);
+const gt=await get.text();
+ok(get.status===200&&gt.includes('работает'),'GET отдаёт страницу проверки');
+ok((get.headers.get('content-type')||'').includes('text/plain'),'у неё есть content-type — браузер покажет текст, а не скачает файл');
+ok(gt.includes('Ключ: задан'),'страница проверки сообщает про ключ');
+const getNoKey=await worker.fetch(new Request('https://w.dev/',{headers:{Origin:ORIGIN}}),{});
+ok((await getNoKey.text()).includes('НЕ ЗАДАН'),'без ключа страница проверки об этом говорит');
+
 // preflight
 const pre=await worker.fetch(new Request('https://w.dev/',{method:'OPTIONS',headers:{Origin:ORIGIN}}),env);
 ok(pre.status===200&&pre.headers.get('Access-Control-Allow-Origin')===ORIGIN,'preflight отдаёт нужный origin');

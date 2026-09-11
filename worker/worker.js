@@ -55,7 +55,16 @@ export default {
   const o=req.headers.get('Origin')||'';
   const h=cors(o);
   if(req.method==='OPTIONS')return new Response(null,{headers:h});
-  if(req.method!=='POST')return new Response('Only POST',{status:405,headers:h});
+  /* GET — страница проверки: открыл адрес в браузере и сразу видишь, жив ли воркер.
+     Обязателен content-type: без него браузер не показывает текст, а скачивает файл,
+     и живой воркер выглядит как «сайт не открывается». */
+  if(req.method==='GET')return new Response(
+   'Чат-воркер работает.\n'+
+   'Модель: '+MODEL+'\n'+
+   'Ключ: '+(env.ANTHROPIC_API_KEY?'задан':'НЕ ЗАДАН — wrangler secret put ANTHROPIC_API_KEY')+'\n'+
+   'Отвечает на POST с данными задачи.\n',
+   {status:200,headers:{...h,'content-type':'text/plain; charset=utf-8'}});
+  if(req.method!=='POST')return new Response('Only POST',{status:405,headers:{...h,'content-type':'text/plain; charset=utf-8'}});
   if(o&&!ALLOW.includes(o))return json({error:'origin not allowed'},403,h);
   if(!env.ANTHROPIC_API_KEY)return json({error:'ANTHROPIC_API_KEY не задан'},500,h);
 
