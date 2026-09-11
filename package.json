@@ -5,8 +5,12 @@
   "description": "Задачи и проекты с чатом. Без сборки и зависимостей: статические файлы, сохранение в localStorage, работает офлайн.",
   "scripts": {
     "start": "npx --yes serve .",
-    "test": "node test/app.test.js"
+    "test": "node test/app.test.js && node worker/worker.test.mjs",
+    "test:app": "node test/app.test.js",
+    "test:worker": "node worker/worker.test.mjs"
   },
-  "devDependencies": { "jsdom": "^24.0.0" },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  },
   "license": "MIT"
 }

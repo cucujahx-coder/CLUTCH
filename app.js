@@ -405,9 +405,42 @@ function addStep(title){
 }
 
 /* ---------- чат ----------
-   Точка подключения модели. Сейчас — локальная заглушка; когда появится
-   серверная функция, здесь останется один fetch, остальное не изменится. */
+   API — адрес серверной функции из worker/. Ключ Anthropic в статике держать
+   нельзя: бандл публичный. Поэтому запрос уходит в воркер, а ключ и системный
+   промпт живут там. Пока адрес пуст, отвечает локальная заглушка — приложение
+   остаётся рабочим и без сервера. */
+const API='';
+
+/* Модели уходят данные задачи, а не готовый промпт: воркер собирает его сам */
+function chatPayload(item,isP){
+ const hist=item.chat
+  .filter(m=>!m.typing)
+  .map(m=>m.u!==undefined?{role:'user',text:m.u}:{role:'assistant',text:m.a});
+ const p={kind:isP?'project':'task',title:isP?item.n:item.t,due:item.due||null,
+  note:isP?item.why:item.a,messages:hist};
+ if(isP)p.steps=inPj(item.id).map(x=>({t:x.t,done:!!x.done}));
+ else if(item.pj!==null){const pr=prById(item.pj); if(pr)p.project=pr.n;}
+ return p;
+}
+
 async function askAssistant(text,item,isP){
+ if(!API)return stubReply(text,item,isP);
+ try{
+  const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify(chatPayload(item,isP))});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const d=await r.json();
+  const t=(d.text||'').trim();
+  return t||'Пустой ответ. Попробуйте переспросить.';
+ }catch(e){
+  /* Приложение офлайн-first: сеть отвалилась — говорим об этом в чате,
+     а не роняем интерфейс */
+  return 'Не получилось связаться с моделью. Проверьте сеть и попробуйте ещё раз.';
+ }
+}
+
+/* Заглушка на время без сервера */
+async function stubReply(text,item,isP){
  await new Promise(r=>setTimeout(r,RM?0:600));
  const t=text.toLowerCase();
  if(isP){
@@ -700,6 +733,6 @@ addEventListener('pagehide',flush); addEventListener('beforeunload',flush);
 paint();
 /* Поверхность для тестов и отладки из консоли браузера. S переприсваивается при загрузке,
    поэтому отдаётся геттером, иначе снаружи виден устаревший объект. */
-window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu};
+window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload};
 
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));

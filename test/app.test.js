@@ -172,6 +172,37 @@ async function actions(){
  assert(A.S.ts.length===steps-2,'шаги удалены вместе с проектом');
 }
 
+/* ---------- данные, уходящие модели ---------- */
+function payload(){
+ console.log('запрос к модели');
+ const {w,d}=load('index.html');
+ const A=w.app;
+
+ // задача: переписка без плейсхолдера «печатает», последнее слово за пользователем
+ const task=A.S.ts.find(x=>x.pj===null);
+ A.S.cur={k:'t',id:task.id};
+ task.chat.push({u:'привет'},{a:'ответ'},{u:'второй вопрос'},{typing:1});
+ let p=A.chatPayload(task,false);
+ assert(p.kind==='task'&&p.title===task.t,'задача: вид и название');
+ assert(p.messages.length===3,'плейсхолдер «печатает» не уходит на сервер');
+ assert(p.messages.map(m=>m.role).join(',')==='user,assistant,user','роли расставлены по чередованию');
+ assert(p.messages[2].text==='второй вопрос','последнее сообщение — вопрос пользователя');
+ assert(!('steps' in p),'у одиночной задачи шагов нет');
+
+ // шаг проекта несёт название родителя
+ const step=A.S.ts.find(x=>x.pj!==null);
+ p=A.chatPayload(step,false);
+ assert(p.project===A.prById(step.pj).n,'шаг проекта передаёт название проекта');
+
+ // проект несёт свои шаги с отметками
+ const pr=A.S.pr[0];
+ p=A.chatPayload(pr,true);
+ assert(p.kind==='project'&&p.title===pr.n,'проект: вид и название');
+ assert(p.steps.length===A.inPj(pr.id).length,'переданы все шаги проекта');
+ assert(p.steps.some(x=>x.done)&&p.steps.some(x=>!x.done),'у шагов проставлены отметки');
+ assert(p.note===pr.why,'заметка проекта — это «что мешает»');
+}
+
 (async()=>{
  const s=await common('panels.html');
  s.d.getElementById('msg').focus(); assert(s.d.querySelector('.grid').classList.contains('kb-detail'),'клавиатура: чат раскрыт');
@@ -217,5 +248,6 @@ async function actions(){
 
  storage();
  await actions();
+ payload();
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
 })();
