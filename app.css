@@ -126,7 +126,9 @@ input{-webkit-user-select:text;user-select:text}
   background:color-mix(in srgb,var(--surface-2) 82%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 .nav #thread{padding-bottom:calc(var(--input) + var(--s3) * 2 + var(--s4) + var(--kb,0px))}
 /* клавиатура открыта: панели на месте, над клавиатурой поднимаются только поля ввода и содержимое панелей */
-.nav .pnl > .ft{transform:translateY(calc(-1 * var(--kb,0px)));transition:transform .3s var(--ease-out)}
+/* Без перехода: --kb меняется на каждом событии visualViewport, и анимация
+   гналась бы за движущейся целью — поле ввода заметно плавало */
+.nav .pnl > .ft{transform:translateY(calc(-1 * var(--kb,0px)))}
 .nav #list{padding-bottom:calc(var(--input) + var(--s3) * 2 + var(--kb,0px))}
 @media (max-width:760px){
   .nav .scr{gap:var(--s2);padding:max(var(--s2),env(safe-area-inset-top)) max(var(--s2),env(safe-area-inset-right)) max(var(--s2),env(safe-area-inset-bottom)) max(var(--s2),env(safe-area-inset-left))}

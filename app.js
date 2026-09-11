@@ -428,14 +428,18 @@ async function askAssistant(text,item,isP){
  try{
   const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},
    body:JSON.stringify(chatPayload(item,isP))});
-  if(!r.ok)throw new Error('HTTP '+r.status);
+  if(!r.ok){
+   let why=''; try{why=(await r.json()).error||''}catch(_){}
+   throw new Error('HTTP '+r.status+(why?' · '+why:''));
+  }
   const d=await r.json();
   const t=(d.text||'').trim();
   return t||'Пустой ответ. Попробуйте переспросить.';
  }catch(e){
-  /* Приложение офлайн-first: сеть отвалилась — говорим об этом в чате,
-     а не роняем интерфейс */
-  return 'Не получилось связаться с моделью. Проверьте сеть и попробуйте ещё раз.';
+  /* Приложение офлайн-first: сеть отвалилась — говорим об этом в чате, а не роняем
+     интерфейс. Причину показываем: без неё истёкший ключ, чужой origin и опечатка
+     в адресе выглядят одинаково, и починить вслепую нельзя. */
+  return 'Не получилось связаться с моделью: '+(e&&e.message||e)+'.';
  }
 }
 
@@ -587,7 +591,7 @@ let view='list', open, back;
 /* Видимая высота окна в --vh. На телефоне клавиатура ужимает область просмотра,
    а 100dvh про это не знает — без этого композер уезжает под клавиатуру. */
 function trackVH(){
- const root=document.documentElement; let kb0=0;
+ const root=document.documentElement; let kb0=0, settle;
  const set=()=>{
   const vv=window.visualViewport;
   if(MODE==='nav'){
@@ -598,7 +602,11 @@ function trackVH(){
    root.style.setProperty('--vh',innerHeight+'px');
    let kb=vv?Math.round(innerHeight-vv.height-(vv.offsetTop||0)):0; if(kb<80)kb=0;
    root.style.setProperty('--kb',kb+'px');
-   if(kb!==kb0){const box=view==='detail'?thread:list; if(box)box.scrollTop+=kb-kb0; kb0=kb;}
+   /* Компенсацию прокрутки применяем один раз, когда клавиатура доехала:
+      на каждом кадре это давало ступенчатое подёргивание списка */
+   if(kb!==kb0){clearTimeout(settle);settle=setTimeout(()=>{
+    const box=view==='detail'?thread:list; if(box)box.scrollTop+=kb-kb0; kb0=kb;
+   },120);}
    return;
   }
   root.style.setProperty('--vh',(vv?vv.height:window.innerHeight)+'px');
@@ -633,7 +641,7 @@ function shellNav(){
  back=()=>{show('list');paint();const r=list.querySelector('[aria-current="true"]');if(r)r.focus({preventScroll:true});};
  $('back').innerHTML=I('chevron-left',16);
  /* iOS при фокусе на поле пытается прокрутить страницу к нему — возвращаем: поле и так поднято на --kb */
- document.addEventListener('focusin',e=>{if(e.target instanceof HTMLInputElement&&e.target.type!=='date')setTimeout(()=>window.scrollTo(0,0),50);});
+ document.addEventListener('focusin',e=>{if(e.target instanceof HTMLInputElement&&e.target.type!=='date')setTimeout(()=>{if(window.scrollY)window.scrollTo(0,0);},50);});
  $('back').onclick=back;
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menuFor&&view==='detail')back();});
  armSwipeBack();
@@ -689,19 +697,6 @@ const nt=$('nt'),err=$('err'),msg=$('msg'),ct=$('ct');
    невидимо переносим к верху экрана — прятать его не от чего, iOS ничего не двигает. Когда клавиатура
    открылась и --kb посчитан, перенос снимаем, и поле встаёт над клавиатурой. Только index.html и только
    не в iframe: в превью страница клавиатуру не видит, и поле осталось бы под ней. */
-const IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-function focusNoPan(inp){
- const host=inp.closest('.ft');
- if(MODE!=='nav'||!IOS||window.top!==window||!window.visualViewport||!host){inp.focus({preventScroll:true});return;}
- host.style.transition='none'; host.style.opacity='0';
- host.style.transform='translateY('+Math.round(80-host.getBoundingClientRect().top)+'px)';
- inp.focus({preventScroll:true});
- let done=false;
- const fin=()=>{if(done)return; done=true; visualViewport.removeEventListener('resize',onRs);
-  host.style.transform=''; host.style.opacity=''; requestAnimationFrame(()=>{host.style.transition='';});};
- const onRs=()=>setTimeout(fin,30);
- visualViewport.addEventListener('resize',onRs); setTimeout(fin,800);
-}
 $('add').innerHTML=I('plus',16); $('send').innerHTML=I('arrow-right',16);
 $('brand-ic').innerHTML=I('inbox',12);   // иконка над логотипом — та же, что «без проекта» в шапке чата
 nt.oninput=()=>{err.style.display='none';};
@@ -724,8 +719,10 @@ ct.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ct.blur();}};
 $('add').onclick=submitTask;
 nt.onkeydown=e=>{if(e.key==='Enter')submitTask();};
 $('send').onclick=sendMsg;
-/* по тапу поле фокусируется само, до нашего кода — поэтому на iOS перехватываем касание и фокусируем через focusNoPan */
-[nt,msg].forEach(f=>f.addEventListener('touchend',e=>{if(IOS&&MODE==='nav'&&window.top===window&&document.activeElement!==f){e.preventDefault();focusNoPan(f);}})); msg.onkeydown=e=>{if(e.key==='Enter')sendMsg();};
+/* Поле фокусируется обычным тапом. Перехвата касания больше нет: с
+   interactive-widget=resizes-content слой раскладки ужимается сам, iOS не
+   прокручивает страницу к полю, и прятать поле на время фокуса незачем. */
+msg.onkeydown=e=>{if(e.key==='Enter')sendMsg();};
 const tog=()=>{S.showDone=S.showDone?0:1;save();paint();};
 $('inbox').onclick=e=>{if(!e.target.closest('.logo'))tog();};   // логотип список не переключает $('inbox').querySelector('.ttl').onkeydown=key(tog);
 addEventListener('keydown',e=>{if(e.key==='Escape'&&menuFor)closeMenu();});
@@ -735,4 +732,14 @@ paint();
    поэтому отдаётся геттером, иначе снаружи виден устаревший объект. */
 window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload};
 
-if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+/* Обновление установленного приложения. Новый service worker забирает управление сам
+   (skipWaiting + clients.claim), но страница продолжает исполнять старый код до перезагрузки —
+   поэтому перезагружаем её один раз при смене управляющего воркера. Только если он уже был:
+   при первой в жизни установке controllerchange тоже срабатывает, и перезагрузка была бы лишней. */
+if('serviceWorker' in navigator){
+ const had=!!navigator.serviceWorker.controller; let done=false;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{
+  if(!had||done)return; done=true; location.reload();
+ });
+ addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
