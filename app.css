@@ -77,11 +77,12 @@ input{-webkit-user-select:text;user-select:text}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
 
 /* ---------- оболочка: две панели (panels.html) ---------- */
-/* Приложение точно накрывает видимую область: высота и смещение сверху приходят из
-   visualViewport. Тогда композер лежит на дне видимой части и оказывается над клавиатурой
-   сам. Подгонять его под высоту клавиатуры бесполезно: iOS не ужимает слой раскладки,
-   а панорамирует видимую область внутри него, и сдвиг зависит ещё и от панорамирования. */
-.app{position:fixed;left:0;right:0;top:var(--vvtop,0px);height:var(--vh,100dvh)}
+/* Приложение занимает ровно видимую область: высоту берём у visualViewport, и композер,
+   лежащий на дне контейнера, оказывается над клавиатурой сам.
+   Смещение сверху (offsetTop) сюда подставлять НЕЛЬЗЯ: при открытой клавиатуре iOS уже
+   держит position:fixed привязанным к видимой области, и своя подстановка применяет
+   панорамирование второй раз — контейнер уезжает при прокрутке списка. Пробовали. */
+.app{position:fixed;left:0;right:0;top:0;height:var(--vh,100dvh)}
 .two .app{max-width:1080px;margin:0 auto;
   padding:max(var(--s4),env(safe-area-inset-top)) max(var(--s4),env(safe-area-inset-right)) max(var(--s4),env(safe-area-inset-bottom)) max(var(--s4),env(safe-area-inset-left))}
 .two .grid{display:grid;grid-template-columns:minmax(300px,400px) minmax(0,1fr);gap:var(--s4);align-items:stretch;height:100%;min-height:0}

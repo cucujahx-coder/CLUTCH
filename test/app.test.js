@@ -228,17 +228,17 @@ function payload(){
  touch('touchstart',8,300); touch('touchmove',700,305); touch('touchend');
  assert(on('scr-list')&&!t.d.getElementById('scr-detail').style.transform,'свайп вправо от края возвращает к списку');
 
- /* клавиатура: контейнер накрывает видимую область — берёт у неё и высоту, и смещение
-    сверху. iOS не ужимает слой раскладки, а панорамирует видимую область внутри него,
-    поэтому без смещения композер уезжает под клавиатуру. */
+ /* клавиатура: контейнер ужимается до высоты видимой области. Смещение (offsetTop)
+    намеренно не используется — на iOS оно применилось бы вторым разом поверх
+    собственной привязки position:fixed, и контейнер уезжал при прокрутке. */
  const vvL={}, kbw=load('index.html',w2=>{w2.visualViewport={height:400,offsetTop:0,addEventListener:(n,f)=>{vvL[n]=f;}};}).w;
  const css=n=>kbw.document.documentElement.style.getPropertyValue(n);
  assert(css('--vh')==='400px','высота берётся у видимой области, а не у окна');
- assert(css('--vvtop')==='0px','смещения нет, пока нет клавиатуры');
  kbw.visualViewport.height=300; kbw.visualViewport.offsetTop=120; vvL.resize();
- assert(css('--vh')==='300px'&&css('--vvtop')==='120px','панорамирование учтено: контейнер съезжает вместе с видимой областью');
- kbw.visualViewport.height=400; kbw.visualViewport.offsetTop=0; vvL.scroll();
- assert(css('--vh')==='400px'&&css('--vvtop')==='0px','событие scroll тоже обновляет значения');
+ assert(css('--vh')==='300px','клавиатура выехала — контейнер ужался');
+ assert(css('--vvtop')==='','смещение не подставляется: iOS применил бы панорамирование дважды');
+ kbw.visualViewport.height=400; vvL.scroll();
+ assert(css('--vh')==='400px','событие scroll тоже обновляет высоту');
 
  /* выполнение хлопает петардой (синтез Web Audio); снятие отметки — тихо */
  let booms=0;
