@@ -254,6 +254,16 @@ function payload(){
  kb2.visualViewport.height=800; vvL2.resize();
  assert(box.scrollTop===300,'клавиатура убралась — прокрутка вернулась');
 
+ /* Главное: раскладка возвращается, даже если iOS не прислал ни одного события.
+    Именно так ломалось — клавиатура скрывалась, а всё оставалось поднятым. */
+ const vvL3={}, kb3=load('index.html',w2=>{w2.visualViewport={height:800,offsetTop:0,addEventListener:(n,f)=>{vvL3[n]=f;}};}).w;
+ const css3=n=>kb3.document.documentElement.style.getPropertyValue(n);
+ kb3.visualViewport.height=460; vvL3.resize();   // фокус намеренно не ставим
+ assert(css3('--vh')==='460px','клавиатура открылась');
+ kb3.visualViewport.height=800;            // ни одного события не шлём
+ await new Promise(r=>setTimeout(r,300));
+ assert(css3('--vh')==='800px','высота вернулась без события и без фокуса — сверка идёт, пока клавиатура на экране');
+
  /* выполнение хлопает петардой (синтез Web Audio); снятие отметки — тихо */
  let booms=0;
  const snd=load('index.html',w2=>{w2.AudioContext=function(){const node=()=>({connect:()=>{},start:()=>{},stop:()=>{},gain:{value:1,setValueAtTime:()=>{},exponentialRampToValueAtTime:()=>{}},frequency:{value:0,setValueAtTime:()=>{},exponentialRampToValueAtTime:()=>{}}});

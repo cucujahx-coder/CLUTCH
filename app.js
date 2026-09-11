@@ -592,42 +592,56 @@ let view='list', open, back;
 /* Видимая высота окна в --vh. На телефоне клавиатура ужимает область просмотра,
    а 100dvh про это не знает — без этого композер уезжает под клавиатуру. */
 /* Контейнер приложения = видимая область: высота из visualViewport.height, смещение
-   сверху из visualViewport.offsetTop.
+   сверху из visualViewport.offsetTop. Обе величины — чистая функция текущего состояния,
+   без накопленных дельт: пропущенное обновление не оставляет след.
 
-   Обе величины читаются по ОБОИМ событиям. Пробовали обновлять смещение только по
-   resize — оно протухало: iOS панорамирует при фокусе (offsetTop становится, скажем,
-   186), а возвращает в ноль уже событием scroll. Контейнер оставался опущенным на
-   эти 186, и композер уходил под клавиатуру.
-
-   После resize перечитываем ещё дважды: iOS доводит панорамирование уже после того,
-   как сообщил новый размер. */
+   Событиям iOS доверять нельзя. За время работы они подводили четырежды: при скрытии
+   клавиатуры могло не прийти ни одного, и раскладка застревала в поднятом состоянии,
+   накладывая блоки друг на друга. Поэтому пока поле в фокусе и ещё секунду после —
+   сверяемся с фактическими размерами каждый кадр. Расхождение живёт максимум один кадр,
+   и неважно, какие события версия Safari решила прислать. Вне ввода — обычные события. */
 let vvTrace=[];
 function trackVH(){
  const root=document.documentElement, vv=window.visualViewport;
- let lastH=null;
- const set=src=>{
+ let lastH=null, until=0, ticking=false;
+ const apply=src=>{
   const h=vv?vv.height:innerHeight, t=vv?vv.offsetTop:0;
   root.style.setProperty('--vh',h+'px');
   root.style.setProperty('--vvtop',t+'px');
-  /* Область ужалась под клавиатуру — держим низ содержимого на месте. Без этого список
-     и лента съезжают вверх ровно на высоту клавиатуры и прячут то, что было у поля ввода.
-     Чтение offsetHeight перед правкой прокрутки заставляет браузер применить новую высоту:
-     иначе scrollTop обрежется по старым размерам. */
   if(lastH!==null&&h!==lastH){
+   /* Высота изменилась — держим низ содержимого на месте. Чтение offsetHeight заставляет
+      браузер применить новую высоту, иначе scrollTop обрежется по старым размерам. */
    const d=lastH-h;
    document.querySelectorAll('.bd').forEach(b=>{void b.offsetHeight; b.scrollTop+=d;});
+   if(vvTrace.length>7)vvTrace.shift();
+   vvTrace.push(src+Math.round(h));
   }
   lastH=h;
-  if(vvTrace.length>7)vvTrace.shift();
-  vvTrace.push(src+Math.round(t));
  };
- set('i');
+ const typing=()=>{const a=document.activeElement; return !!a&&a.tagName==='INPUT'};
+ /* Видимая область меньше окна — значит клавиатура ещё на экране */
+ const shrunk=()=>innerHeight-(vv?vv.height:innerHeight)>80;
+ /* Сверяемся, пока идёт ввод ИЛИ пока клавиатура на экране. Второе условие важнее:
+    оно не даёт застрять в поднятом состоянии, даже если событие фокуса не пришло —
+    цикл не остановится, пока раскладка не вернётся к полной высоте. */
+ const pump=()=>{
+  apply('f');
+  if(typing()||shrunk()||Date.now()<until)requestAnimationFrame(pump); else ticking=false;
+ };
+ const watch=ms=>{
+  until=Math.max(until,Date.now()+ms);
+  if(!ticking){ticking=true;requestAnimationFrame(pump);}
+ };
+ apply('i');
  if(vv){
-  vv.addEventListener('resize',()=>{set('r');setTimeout(()=>set('r'),150);setTimeout(()=>set('r'),400);});
-  vv.addEventListener('scroll',()=>set('s'));
+  vv.addEventListener('resize',()=>{apply('r');watch(800);});
+  vv.addEventListener('scroll',()=>apply('s'));
  }
- addEventListener('resize',()=>set('w'));
- addEventListener('orientationchange',()=>setTimeout(()=>set('o'),150));
+ addEventListener('resize',()=>apply('w'));
+ addEventListener('orientationchange',()=>setTimeout(()=>apply('o'),150));
+ /* Фокус и потеря фокуса — моменты, когда клавиатура появляется и убирается */
+ addEventListener('focusin',e=>{if(e.target instanceof HTMLInputElement)watch(1500);});
+ addEventListener('focusout',e=>{if(e.target instanceof HTMLInputElement)watch(1500);});
 }
 function shellTwo(){
  const grid=document.querySelector('.grid');
