@@ -168,10 +168,11 @@ input{-webkit-user-select:text;user-select:text}
 .bd{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 var(--s4);min-height:0;
   display:flex;flex-direction:column}
 .bd>*{flex:none}
-/* Содержимое прижато к низу: короткий список стоит у поля ввода, а не висит под шапкой.
+/* Лента переписки прижата к низу: короткий разговор стоит у поля ввода. Список задач
+   намеренно НЕ прижимается — он начинается сверху, так решил владелец.
    Именно распоркой, а не justify-content:flex-end — тот ломает прокрутку, верх содержимого
    становится недостижим. Распорка занимает свободное место, а когда его нет, схлопывается. */
-.bd::before{content:"";flex:1 0 auto}
+.thread::before{content:"";flex:1 0 auto}
 .thread{display:flex;flex-direction:column;gap:var(--s4);padding-top:var(--s4);padding-bottom:var(--s4)}
 .ft{padding:var(--s3) var(--s4);border-top:0.5px solid var(--border);flex:none}
 .ftr{display:flex;gap:var(--s2)}
