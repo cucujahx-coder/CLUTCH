@@ -591,21 +591,31 @@ function paintDetail(){
 let view='list', open, back;
 /* Видимая высота окна в --vh. На телефоне клавиатура ужимает область просмотра,
    а 100dvh про это не знает — без этого композер уезжает под клавиатуру. */
-/* Высота видимой области в --vh: при открытой клавиатуре она меньше окна, и контейнер
-   приложения ужимается до неё — композер оказывается над клавиатурой сам.
-   Смещение видимой области (offsetTop) намеренно НЕ используется: на iOS при открытой
-   клавиатуре position:fixed и так привязан к видимой области, и своя подстановка
-   применяла бы панорамирование второй раз — контейнер уезжал при прокрутке списка. */
+/* Контейнер приложения = видимая область. Высота из visualViewport.height, смещение
+   сверху из visualViewport.offsetTop.
+
+   Ключевое — РАЗНЫЕ события для этих двух величин:
+   • resize (клавиатура появилась или убралась) — обновляем обе. iOS в момент фокуса
+     панорамирует страницу, чтобы показать поле, оказавшееся под клавиатурой; без
+     компенсации смещения шапка и список уезжают выше края экрана.
+   • scroll (прокрутка списка при открытой клавиатуре) — только высоту. iOS панорамирует
+     видимую область и при прокрутке тоже, и если тянуться за смещением здесь, контейнер
+     будет уезжать под пальцем.
+
+   После resize смещение перечитываем ещё дважды: iOS доводит панорамирование уже
+   после того, как сообщил новый размер. */
 function trackVH(){
- const root=document.documentElement;
- const set=()=>{
-  const vv=window.visualViewport;
-  root.style.setProperty('--vh',(vv?vv.height:innerHeight)+'px');
- };
- set();
- if(window.visualViewport){visualViewport.addEventListener('resize',set);visualViewport.addEventListener('scroll',set);}
- addEventListener('resize',set);
- addEventListener('orientationchange',()=>setTimeout(set,150));
+ const root=document.documentElement, vv=window.visualViewport;
+ const h=()=>root.style.setProperty('--vh',(vv?vv.height:innerHeight)+'px');
+ const top=()=>root.style.setProperty('--vvtop',(vv?vv.offsetTop:0)+'px');
+ const both=()=>{h();top();};
+ both();
+ if(vv){
+  vv.addEventListener('resize',()=>{both();setTimeout(both,150);setTimeout(both,400);});
+  vv.addEventListener('scroll',h);
+ }
+ addEventListener('resize',both);
+ addEventListener('orientationchange',()=>setTimeout(both,150));
 }
 function shellTwo(){
  const grid=document.querySelector('.grid');
