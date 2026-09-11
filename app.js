@@ -604,10 +604,20 @@ let view='list', open, back;
 let vvTrace=[];
 function trackVH(){
  const root=document.documentElement, vv=window.visualViewport;
+ let lastH=null;
  const set=src=>{
   const h=vv?vv.height:innerHeight, t=vv?vv.offsetTop:0;
   root.style.setProperty('--vh',h+'px');
   root.style.setProperty('--vvtop',t+'px');
+  /* Область ужалась под клавиатуру — держим низ содержимого на месте. Без этого список
+     и лента съезжают вверх ровно на высоту клавиатуры и прячут то, что было у поля ввода.
+     Чтение offsetHeight перед правкой прокрутки заставляет браузер применить новую высоту:
+     иначе scrollTop обрежется по старым размерам. */
+  if(lastH!==null&&h!==lastH){
+   const d=lastH-h;
+   document.querySelectorAll('.bd').forEach(b=>{void b.offsetHeight; b.scrollTop+=d;});
+  }
+  lastH=h;
   if(vvTrace.length>7)vvTrace.shift();
   vvTrace.push(src+Math.round(t));
  };

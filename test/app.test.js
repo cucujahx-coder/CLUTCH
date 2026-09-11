@@ -231,7 +231,7 @@ function payload(){
  /* клавиатура: контейнер = видимая область. Обе величины читаются по обоим событиям.
     Обновлять смещение только по resize нельзя — оно протухает: iOS панорамирует при
     фокусе, а возвращает смещение в ноль уже событием scroll. */
- const vvL={}, kbw=load('index.html',w2=>{w2.visualViewport={height:400,offsetTop:0,addEventListener:(n,f)=>{vvL[n]=f;}};}).w;
+ const vvL={}, vvL2={}, kbw=load('index.html',w2=>{w2.visualViewport={height:400,offsetTop:0,addEventListener:(n,f)=>{vvL[n]=f;}};}).w;
  const css=n=>kbw.document.documentElement.style.getPropertyValue(n);
  assert(css('--vh')==='400px'&&css('--vvtop')==='0px','высота и смещение берутся у видимой области');
  kbw.visualViewport.height=300; kbw.visualViewport.offsetTop=120; vvL.resize();
@@ -242,6 +242,17 @@ function payload(){
  assert(css('--vvtop')==='200px','и смещение тоже — иначе оно протухает, когда iOS возвращает его в ноль');
  kbw.visualViewport.height=796; kbw.visualViewport.offsetTop=0; vvL.scroll();
  assert(css('--vvtop')==='0px','возврат смещения в ноль доходит до переменной');
+
+ /* область ужалась под клавиатуру — низ содержимого остаётся на месте */
+ const kb2=load('index.html',w2=>{w2.visualViewport={height:800,offsetTop:0,addEventListener:(n,f)=>{vvL2[n]=f;}};}).w;
+ const box=kb2.document.getElementById('list');
+ Object.defineProperty(box,'scrollHeight',{value:2000,configurable:true});
+ Object.defineProperty(box,'clientHeight',{value:800,configurable:true});
+ box.scrollTop=300;
+ kb2.visualViewport.height=460; vvL2.resize();
+ assert(box.scrollTop===640,'прокрутка сдвинулась на высоту клавиатуры — низ содержимого не уехал');
+ kb2.visualViewport.height=800; vvL2.resize();
+ assert(box.scrollTop===300,'клавиатура убралась — прокрутка вернулась');
 
  /* выполнение хлопает петардой (синтез Web Audio); снятие отметки — тихо */
  let booms=0;
