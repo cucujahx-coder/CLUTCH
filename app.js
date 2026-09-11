@@ -1,27 +1,34 @@
-/* Задачи — движок. Общий для index.html (две панели) и screens.html (полноэкранные переходы).
-   Оболочка задаёт MODE ('two' | 'nav') до подключения этого файла. */
+/* Задачи — движок. Общий для index.html (два экрана: задачи и чат) и panels.html (две панели рядом).
+   Оболочка задаёт MODE ('nav' | 'two') до подключения этого файла. */
 const MODE = window.MODE || 'two';
 
-/* ---------- icons (inline SVG, стиль Tabler) ---------- */
+/* ---------- icons (пиксельные, 8×8) ----------
+   Каждая иконка — 8 строк по 8 символов: # закрашено, . пусто. I() собирает из них SVG:
+   подряд идущие пиксели строки сливаются в один <rect>, shape-rendering="crispEdges" не даёт размыть края.
+   Размер подгоняется под плотность экрана: пиксель иконки — целое число физических пикселей
+   (на iPhone ×3 иконка 12 px выходит 13⅓ px = 5 точек на пиксель, на Retina ×2 — ровно 12 px). */
 const P={
- paperclip:'M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5',
- clock:'M12 21a9 9 0 1 0 0 -18a9 9 0 0 0 0 18zM12 7v5l3 3',
- check:'M5 12l5 5l10 -10',
- plus:'M12 5v14M5 12h14',
- 'arrow-right':'M5 12h14M13 18l6 -6M13 6l6 6',
- folder:'M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2',
- 'corner-down-right':'M6 6v6a3 3 0 0 0 3 3h10M15 11l4 4l-4 4',
- inbox:'M4 4h16v12h-4l-2 3h-4l-2 -3h-4zM4 13h5l1 2h4l1 -2h5',
- refresh:'M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4',
- 'alert-triangle':'M12 9v4M10.4 3.5l-8.1 14a1.9 1.9 0 0 0 1.6 2.8h16.2a1.9 1.9 0 0 0 1.6 -2.8l-8.1 -14a1.9 1.9 0 0 0 -3.2 0zM12 17h.01',
- 'list-check':'M3.5 5.5l1.5 1.5l2.5 -2.5M3.5 11.5l1.5 1.5l2.5 -2.5M3.5 17.5l1.5 1.5l2.5 -2.5M11 6h9M11 12h9M11 18h9',
- calendar:'M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2zM16 3v4M8 3v4M4 11h16',
- mail:'M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2zM3 7l9 6l9 -6',
- 'chevron-left':'M15 6l-6 6l6 6',
- trash:'M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12M9 7v-3h6v3',
- 'file-text':'M14 3v4a1 1 0 0 0 1 1h4M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2zM9 9h1M9 13h6M9 17h6'
+ 'plus':'........|...##...|...##...|.######.|.######.|...##...|...##...|........',
+ 'arrow-right':'........|....#...|....##..|#######.|#######.|....##..|....#...|........',
+ 'chevron-left':'........|....##..|...##...|..##....|..##....|...##...|....##..|........',
+ 'folder':'........|###.....|#######.|#......#|#......#|#......#|########|........',
+ 'corner-down-right':'.#......|.#......|.#...#..|.#...##.|.#######|.....##.|.....#..|........',
+ 'inbox':'........|########|#......#|#......#|###..###|#..##..#|########|........',
+ 'refresh':'..####.#|.#....##|#....###|#.......|.......#|###....#|##....#.|#.####..',
+ 'alert-triangle':'...##...|...##...|..#..#..|..#..#..|.#.##.#.|.#....#.|#..##..#|########',
+ 'list-check':'........|##.#####|........|##.#####|........|##.#####|........|........',
+ 'calendar':'.#....#.|########|#......#|#.#.#..#|#......#|#.#.#.##|#......#|########',
+ 'trash':'...##...|########|.#....#.|.#.##.#.|.#.##.#.|.#.##.#.|.#....#.|..####..',
+ 'file-text':'#####...|#...##..|#....##.|#.###.#.|#.....#.|#.###.#.|#.....#.|#######.'
 };
-const I=(n,s,c)=>'<svg class="ic" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" aria-hidden="true"'+(c?' style="color:var(--'+c+')"':'')+'><path d="'+P[n]+'"/></svg>';
+const iconPx=s=>{const d=window.devicePixelRatio||1;return +(Math.max(1,Math.round(s*d/8))*8/d).toFixed(3);};
+/* фактический размер иконки 12 (на iPhone 13⅓) — в CSS: по нему знак «>» в строках центрируется под иконкой шапки */
+document.documentElement.style.setProperty('--hd-ic',iconPx(12)+'px');
+const I=(n,s,c)=>{
+ const z=iconPx(s); let r='';
+ P[n].split('|').forEach((row,y)=>{for(let x=0;x<8;){if(row[x]!=='#'){x++;continue;}let w=0;while(row[x+w]==='#')w++;r+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="1"/>';x+=w;}});
+ return '<svg class="ic px" width="'+z+'" height="'+z+'" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"'+(c?' style="color:var(--'+c+')"':'')+'>'+r+'</svg>';
+};
 const esc=t=>String(t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
 /* ---------- даты ---------- */
@@ -100,8 +107,37 @@ function seed(){
  return st;
 }
 
+/* ---------- сущности ----------
+   Тип записи — для подписи диктору и data-kind у строки (слева от названия у всех строк один знак «>»).
+   Проект и шаг — по структуре данных;
+   у задачи тип берётся из поля kind, а если его нет — угадывается по словам в названии.
+   Порядок правил важен: «каждый день звонить маме» — рутина, а не звонок. */
+const KIND={
+ task:'Задача', project:'Проект', step:'Шаг проекта', reminder:'Напоминание', routine:'Рутина', call:'Звонок',
+ meeting:'Встреча', payment:'Оплата', purchase:'Покупка', mail:'Письмо', idea:'Идея'
+};
+const GUESS=[
+ ['routine',/(^|\s)(кажд(ый|ую|ое|ые)|ежедневн|еженедельн|ежемесячн|по (утрам|вечерам|будням|выходным)|рутин|привычк)/],
+ ['reminder',/(напомн|не забыть|не забудь)/],
+ ['call',/(позвон|дозвон|созвон|звонок|перезвон)/],
+ ['payment',/(оплат|заплат|перевести деньги|счёт|счет за)/],
+ ['purchase',/(^|\s)(купить|докупить|заказать|покупк)/],
+ ['meeting',/(записаться|встреч|при[её]м у|к врачу|собеседован)/],
+ ['mail',/(письм|написать|ответить|e-?mail|почт)/],
+ ['idea',/(^|\s)(идея|придумать|подумать)/]
+];
+function kindOf(x,isP){
+ if(isP)return 'project';
+ if(x.pj!==null&&x.pj!==undefined)return 'step';
+ if(x.kind&&KIND[x.kind])return x.kind;
+ const t=String(x.t||'').toLowerCase();
+ for(const [k,re] of GUESS)if(re.test(t))return k;
+ return 'task';
+}
+/* маркер слева от названия — знак «>» тем же пиксельным шрифтом, одинаковый для всех типов */
+const kindIcon=()=>'<span class="ki" aria-hidden="true"></span>';   // сам знак — в CSS (.ki::before), чтобы не попадал в текст названия
+
 /* ---------- выборки ---------- */
-const IC={art:['paperclip','text-accent'],wait:['clock','text-warning'],dec:['check','text-success']};
 const byId=i=>S.ts.find(x=>x.id===i);
 const prById=i=>S.pr.find(p=>p.id===i);
 const inPj=p=>S.ts.filter(x=>x.pj===p);
@@ -110,29 +146,83 @@ const curItem=()=>S.cur&&(S.cur.k==='p'?prById(S.cur.id):byId(S.cur.id));
 
 /* ---------- анимации ---------- */
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* Кривые движения, те же значения — токены --ease-* в app.css.
+   bounce — перелёт и возврат, для появления; out — плавное торможение; in — разгон перед уходом */
+const EASE={bounce:'cubic-bezier(.34,1.56,.64,1)',out:'cubic-bezier(.22,1,.36,1)',in:'cubic-bezier(.55,0,.75,.3)'};
+/* Обёртка над Web Animations: при reduced motion и там, где animate нет (jsdom), ничего не делает */
+const anim=(el,kf,o)=>(!RM&&el&&el.animate)?el.animate(kf,o):null;
+/* Появление с отскоком: чуть снизу и меньше, перелёт через конечный размер и возврат */
+function popIn(el,i){
+ if(!el)return;
+ anim(el,[{opacity:0,transform:'translateY(10px) scale(.94)'},{opacity:1,transform:'none'}],
+  {duration:480,delay:(i||0)*40,easing:EASE.bounce,fill:'backwards'});
+}
 function parts(host,cx,cy){
- if(RM)return;
- for(let i=0;i<9;i++){const a=(i/9)*Math.PI*2,d=16+Math.random()*16,s=document.createElement('span');
+ if(RM||!host.animate)return;
+ for(let i=0;i<14;i++){const a=(i/14)*Math.PI*2,d=28+Math.random()*28,s=document.createElement('span');
   s.style.cssText='position:absolute; left:'+cx+'px; top:'+cy+'px; width:5px; height:5px; margin:-2.5px 0 0 -2.5px; border-radius:50%; pointer-events:none; background:var(--text-'+(i%2?'accent':'success')+');';
   host.appendChild(s);
-  s.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:'translate('+(Math.cos(a)*d).toFixed(1)+'px,'+(Math.sin(a)*d).toFixed(1)+'px) scale(0)',opacity:0}],{duration:400,easing:'cubic-bezier(.2,.8,.3,1)',fill:'forwards'});}
+  s.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:'translate('+(Math.cos(a)*d).toFixed(1)+'px,'+(Math.sin(a)*d).toFixed(1)+'px) scale(0)',opacity:0}],{duration:120,easing:EASE.out,fill:'forwards'});}
+}
+/* Выполнение — по очереди и почти мгновенно (всё меньше 0,1 с): тряска текста 32 мс со свечением → белая вспышка строки →
+   строка исчезает за 32 мс. Звук — сразу при нажатии. Тайминги в одном месте: */
+const SNAP='cubic-bezier(.8,0,1,1)', T_SHAKE=32, T_GONE=48, T_COLLAPSE=32, T_FLASH=80;
+function zap(el){
+ if(RM||!el||!el.animate)return;
+ el.classList.add('zap');
+ el.animate([
+  /* 2 рывка по кадру (~16 мс); размах 6 px, чтобы глаз успел заметить */
+  {transform:'translate(-6px,1px)'},{transform:'translate(6px,-1px)'},
+  {transform:'translate(0,0)'}
+ ],{duration:T_SHAKE,easing:'steps(1,end)'});
+ setTimeout(()=>el.classList.remove('zap'),T_GONE+T_COLLAPSE);
 }
 function boomRow(row,cb){
- if(RM||!row){cb();return;}
+ if(RM||!row||!row.animate){cb();return;}
  const h=row.offsetHeight;
- row.style.overflow='hidden'; row.style.position='relative'; row.style.pointerEvents='none';
- parts(row,row.offsetWidth-24,h/2);
- row.animate([{height:h+'px',opacity:1,transform:'scale(1)'},{height:h+'px',opacity:.95,transform:'scale(1.03)',offset:.28},{height:'0px',opacity:0,transform:'scale(.9)'}],{duration:340,easing:'ease-in',fill:'forwards'});
- setTimeout(cb,350);
+ row.style.overflow='hidden'; row.style.pointerEvents='none';
+ setTimeout(()=>row.animate([{height:h+'px',opacity:1},{height:'0px',opacity:0}],{duration:T_COLLAPSE,easing:SNAP,fill:'forwards'}),T_GONE);
+ setTimeout(cb,T_GONE+T_COLLAPSE+10);
 }
 function boomSpot(el,cb){
- if(RM){cb();return;}
+ if(RM||!el.animate){cb();return;}
  el.style.pointerEvents='none';
  parts(el,el.offsetWidth/2,el.offsetHeight/2);
  const c=el.firstChild;
- if(c)c.animate([{transform:'scale(1)'},{transform:'scale(1.25)',offset:.35},{transform:'scale(1)'}],{duration:340,easing:'ease-out'});
- setTimeout(cb,300);
+ /* Удар: кружок раздувается и сразу возвращается */
+ if(c)c.animate([{transform:'scale(1.4)'},{transform:'scale(1)'}],{duration:60,easing:EASE.out});
+ setTimeout(cb,60);
 }
+/* Звук петарды синтезируется на месте (Web Audio), файла нет: короткий шум с резким спадом,
+   низкий «бум» и пара искр-щелчков в хвосте. Контекст создаётся при первом нажатии — иначе iOS его не пустит */
+let AC=null;
+function bangSound(){
+ const C=window.AudioContext||window.webkitAudioContext; if(!C)return;
+ try{
+  AC=AC||new C(); if(AC.state==='suspended')AC.resume();
+  const t=AC.currentTime, sr=AC.sampleRate, n=Math.floor(sr*.3), buf=AC.createBuffer(1,n,sr), d=buf.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/sr*30);
+  for(let j=0;j<5;j++){const o=Math.floor(sr*(.04+Math.random()*.22)); for(let i=0;i<80&&o+i<n;i++)d[o+i]+=(Math.random()*2-1)*.6*Math.exp(-i/14);}
+  const out=AC.createDynamicsCompressor(); out.connect(AC.destination);
+  const src=AC.createBufferSource(), hp=AC.createBiquadFilter(), g=AC.createGain();
+  src.buffer=buf; hp.type='highpass'; hp.frequency.value=250; g.gain.value=.9;
+  src.connect(hp); hp.connect(g); g.connect(out); src.start(t);
+  const osc=AC.createOscillator(), og=AC.createGain();
+  osc.frequency.setValueAtTime(170,t); osc.frequency.exponentialRampToValueAtTime(40,t+.12);
+  og.gain.setValueAtTime(1,t); og.gain.exponentialRampToValueAtTime(.001,t+.16);
+  osc.connect(og); og.connect(out); osc.start(t); osc.stop(t+.18);
+ }catch(e){}
+}
+/* Белая вспышка только у выполняемой задачи: фон её строки (или шапки чата, если нажали кружок в шапке)
+   на 20 мс белый и сразу гаснет (начинается после тряски, строка к этому моменту ещё на месте). Фон, а не накладка сверху — чтобы трясущийся светящийся текст было видно.
+   При reduced motion не мигаем, звук остаётся */
+function flash(el){
+ const t=!RM&&el&&el.closest&&(el.closest('.row')||el.closest('.hd')); if(!t||!t.animate)return;
+ const bg=getComputedStyle(t).backgroundColor||'transparent';
+ t.animate([{backgroundColor:'#fff'},{backgroundColor:'#fff',offset:.25,easing:EASE.out},{backgroundColor:bg}],{duration:T_FLASH});
+}
+/* Звук сразу, тряска текста сразу, вспышка — когда тряска кончилась */
+function bang(el,text){bangSound(); zap(text); if(!RM)setTimeout(()=>flash(el),T_SHAKE);}
 const key=go=>e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go(e);}};
 
 /* ---------- контролы ---------- */
@@ -145,6 +235,7 @@ function hit(x,row,sm,spot){
  h.innerHTML='<span class="dot'+(sm?' sm':'')+(x.done?' on':'')+'">'+(x.done?'✓':'')+'</span>';
  const go=e=>{e.stopPropagation();
   if(x.done){mark(x,0);paint();save();return;}
+  bang(h,spot?document.getElementById('ct'):row&&row.querySelector('.cel'));
   (spot?boomSpot(h,()=>{mark(x,1);paint();save();}):boomRow(row,()=>{mark(x,1);paint();save();}));};
  h.onclick=go; h.onkeydown=key(go);
  return h;
@@ -158,29 +249,39 @@ function ringEl(done,total,step,row){
   g.setAttribute('aria-label','Отметить шаг: '+step.t);
   const go=e=>{e.stopPropagation();
    const last=total-done===1;
-   boomSpot(g,()=>{mark(step,1); save(); if(last&&row){boomRow(row,paint);}else paint();});};
+   bang(g,row&&row.querySelector('.cel'));
+   /* последний шаг — строка проекта уходит сразу по общему расписанию, кружок только пружинит */
+   if(last&&row){boomSpot(g,()=>{}); boomRow(row,()=>{mark(step,1); save(); paint();});}
+   else boomSpot(g,()=>{mark(step,1); save(); paint();});};
   g.onclick=go; g.onkeydown=key(go);
  } else {g.style.cursor='default'; g.setAttribute('role','img'); g.setAttribute('aria-label','Осталось шагов: '+(total-done));}
  return g;
 }
-function sub(x,ic){
- if(!x.tail&&!x.due)return '';
+/* Подпись под названием. gaps — показывать и то, чего нет: «без диалога» (ни одного сообщения и нет
+   подписи-состояния) и «без срока». Так в основном списке у каждой строки видно, в каком она состоянии;
+   у шагов в чате проекта пустоты не пишем, чтобы не шуметь. */
+function sub(x,gaps){
+ const noTalk=gaps&&!x.tail&&!x.n&&!(x.chat&&x.chat.length), noDue=gaps&&!x.due;
+ if(!x.tail&&!x.due&&!noTalk)return '';
  const c=x.tail?(x.tail.k==='wait'?'text-warning':'text-secondary'):'text-muted';
- let h='<div class="t2">';
+ let h='<div class="t2">', first=false;
  if(x.tail){
-  if(ic)h+=I(IC[x.tail.k][0],14,IC[x.tail.k][1]);
-  h+='<span class="s sf" style="color:var(--'+c+');">'+esc(x.tail.x)+'</span>';
- }
- if(x.due)h+='<span class="s" style="color:var(--'+(overdue(x.due)&&!x.done?'text-danger':'text-muted')+');">'+(x.tail?'· ':'')+esc(fmtDue(x.due))+'</span>';
+  h+='<span class="s sf" style="color:var(--'+c+');">'+esc(x.tail.x)+'</span>'; first=true;
+ } else if(noTalk){h+='<span class="s sf" style="color:var(--text-muted);">без диалога</span>'; first=true;}
+ if(x.due)h+='<span class="s" style="color:var(--'+(overdue(x.due)&&!x.done?'text-danger':'text-muted')+');">'+(first?'· ':'')+esc(fmtDue(x.due))+'</span>';
+ else if(noDue)h+='<span class="s" style="color:var(--text-muted);">'+(first?'· ':'')+'без срока</span>';
  return h+'</div>';
 }
-function taskRow(x,ic,sm){
+function taskRow(x,sm){
  const d=document.createElement('div'), s=S.cur.k==='t'&&S.cur.id===x.id;
  d.className='row'+(sm?' sm':''); d.tabIndex=0; d.dataset.id=x.id;
  d.setAttribute('aria-current',s?'true':'false');
  if(s)d.style.background='var(--fill-ghost-selected)';
- const b=document.createElement('div'); b.className='cel';
- b.innerHTML='<div class="t1" style="color:var(--text-'+(x.done?'muted':'primary')+');'+(x.done?'text-decoration:line-through;':'')+'">'+esc(x.t)+'</div>'+sub(x,ic);
+ const b=document.createElement('div'); b.className='cel'+(sm?'':' k');
+ /* в основном списке слева от названия иконка типа; у шагов внутри чата проекта её нет — там все строки шаги */
+ const kd=kindOf(x); d.dataset.kind=kd;
+ b.innerHTML=(sm?'':'<span class="sr-only">'+KIND[kd]+': </span>')+'<div class="t1" style="color:var(--text-'+(x.done?'muted':'primary')+');">'+(sm?'':kindIcon(kd))+
+  '<span class="tt"'+(x.done?' style="text-decoration:line-through;"':'')+'>'+esc(x.t)+'</span></div>'+sub(x,!sm);
  d.appendChild(b); d.appendChild(hit(x,d,sm,0));
  const go=()=>{if(suppressRow)return; S.cur={k:'t',id:x.id};save();open();};
  d.onclick=go; d.onkeydown=key(go);
@@ -216,9 +317,21 @@ function menuRoot(){
  document.body.appendChild(menuEl);
  return menuEl;
 }
+/* Закрытие плавное: панель уезжает вниз, подложка гаснет. Если за время ухода меню
+   открыли снова, таймер видит menuFor и ничего не прячет */
+let menuClosing=0;
+/* Анимация ухода держит конечный кадр (fill:forwards) — перед следующим показом её надо снять */
+const stopAnims=(...els)=>els.forEach(e=>e&&e.getAnimations&&e.getAnimations().forEach(x=>x.cancel()));
 function closeMenu(){
  menuFor=null; menuArmed=false;
- if(menuEl){menuEl.hidden=true; menuEl.querySelector('.sheet-body').innerHTML='';}
+ if(!menuEl||menuEl.hidden)return;
+ const body=menuEl.querySelector('.sheet-body'), bk=menuEl.querySelector('.sheet-back');
+ const done=()=>{menuClosing=0; menuEl.hidden=true; body.innerHTML=''; stopAnims(body,bk);};
+ const a=anim(body,[{opacity:1,transform:'none'},{opacity:0,transform:'translateY(16px) scale(.97)'}],{duration:200,easing:EASE.in,fill:'forwards'});
+ if(!a){done();return;}
+ anim(bk,[{opacity:1},{opacity:0}],{duration:220,easing:EASE.out,fill:'forwards'});
+ const my=++menuClosing;
+ setTimeout(()=>{if(my===menuClosing&&!menuFor)done();},210);
 }
 function showMenu(kind,id){
  if(!(kind==='p'?prById(id):byId(id)))return;
@@ -230,14 +343,20 @@ function tapMenu(){
  if(!it)return closeMenu();
  const r=menuRoot(), body=r.querySelector('.sheet-body');
  const mi=(a,icon,label,val)=>'<button class="mi'+(a==='del'?' danger':'')+'" type="button" data-a="'+a+'">'+
-   I(icon,20)+'<span>'+esc(label)+'</span>'+(val?'<span class="val">'+esc(val)+'</span>':'')+
+   I(icon,16)+'<span>'+esc(label)+'</span>'+(val?'<span class="val">'+esc(val)+'</span>':'')+
    (a==='due'?'<input type="date" aria-label="Срок" value="'+(it.due||'')+'">':'')+'</button>';
  let h='<div class="sheet-title">'+esc(isP?it.n:it.t)+'</div>';
  h+=mi('due','calendar','Срок',fmtDue(it.due)||'не задан');
  if(isP)h+=mi('step','plus','Добавить шаг');
  else if(it.pj===null)h+=mi('proj','list-check','Сделать проектом');
  h+=mi('del','trash',menuArmed?'Точно удалить?':(isP?'Удалить проект':'Удалить'));
+ const appear=r.hidden||menuClosing;
+ if(appear){menuClosing=0; stopAnims(body,r.querySelector('.sheet-back'));}
  body.innerHTML=h; r.hidden=false;
+ if(appear){
+  anim(r.querySelector('.sheet-back'),[{opacity:0},{opacity:1}],{duration:240,easing:EASE.out});
+  anim(body,[{opacity:0,transform:'translateY(28px) scale(.95)'},{opacity:1,transform:'none'}],{duration:520,easing:EASE.bounce});
+ }
  const fresh=()=>Date.now()-menuAt>400;
  body.querySelector('input[type=date]').onchange=e=>{it.due=e.target.value||null; save(); closeMenu(); paint();};
  body.querySelectorAll('.mi').forEach(b=>{const a=b.dataset.a;
@@ -279,8 +398,10 @@ function makeProject(){
 }
 function addStep(title){
  if(S.cur.k!=='p')return;
- S.ts.push({id:S.seq++,t:title,due:null,pj:S.cur.id,done:0,doneAt:null,tail:null,n:0,a:'Разговора ещё не было.',chat:[]});
+ const id=S.seq++;
+ S.ts.push({id,t:title,due:null,pj:S.cur.id,done:0,doneAt:null,tail:null,n:0,a:'Разговора ещё не было.',chat:[]});
  save(); paint();
+ popIn(thread.querySelector('.steps .row[data-id="'+id+'"]'));
 }
 
 /* ---------- чат ----------
@@ -319,11 +440,22 @@ let addingFor=null;
 const closeStep=()=>{addingFor=null;paint()};
 /* Меню действий по долгому нажатию на строку */
 let menuEl=null, menuFor=null, menuArmed=false, menuAt=0, suppressRow=false;
+/* Нажатие на «Входящие» переключает список на выполненные и обратно (S.showDone) */
+let listMode=null, threadKey=null;
 function paint(){
- const openT=S.ts.filter(x=>!x.done);
- $('cnt').textContent=openT.length;
+ const openT=S.ts.filter(x=>!x.done), dn=S.ts.filter(x=>x.done);
+ const switched=listMode!==null&&listMode!==!!S.showDone; listMode=!!S.showDone;
+ const ttl=$('inbox').querySelector('.ttl');
+ ttl.textContent=S.showDone?'Выполненные':'Входящие';
+ ttl.setAttribute('aria-pressed',S.showDone?'true':'false');
+ ttl.setAttribute('aria-label',S.showDone?'Выполненные. Вернуться к входящим':'Входящие. Показать выполненные');
+ $('cnt').textContent=S.showDone?dn.length:openT.length;
  list.innerHTML='';
- openT.filter(x=>x.pj===null).forEach(x=>list.appendChild(taskRow(x,0,0)));
+ if(S.showDone){
+  dn.forEach(x=>list.appendChild(taskRow(x,0)));
+  if(!dn.length)list.innerHTML='<div class="empty">Выполненных пока нет.</div>';
+ } else {
+ openT.filter(x=>x.pj===null).forEach(x=>list.appendChild(taskRow(x,0)));
  S.pr.forEach(p=>{
   const all=inPj(p.id),op=openIn(p.id);
   if(!op.length)return;
@@ -331,8 +463,8 @@ function paint(){
   const d=document.createElement('div'); d.className='row'; d.tabIndex=0; d.dataset.pj=p.id;
   d.setAttribute('aria-current',s?'true':'false');
   if(s)d.style.background='var(--fill-ghost-selected)';
-  const b=document.createElement('div'); b.className='cel';
-  b.innerHTML='<div class="t1" style="font-weight:600;">'+esc(p.n)+'</div><div class="t2">'+
+  const b=document.createElement('div'); b.className='cel k'; d.dataset.kind='project';
+  b.innerHTML='<span class="sr-only">Проект: </span><div class="t1">'+kindIcon('project')+'<span class="tt">'+esc(p.n)+'</span></div><div class="t2">'+
    '<span class="s sf" style="color:var(--text-secondary);">→ '+esc(nx.t)+'</span>'+
    '<span class="s" style="color:var(--text-muted);">· '+esc(fmtDue(nx.due||p.due)||'без срока')+'</span></div>';
   d.appendChild(b); d.appendChild(ringEl(all.length-op.length,all.length,nx,d));
@@ -342,14 +474,13 @@ function paint(){
   list.appendChild(d);
  });
  if(!list.children.length)list.innerHTML='<div class="empty">Задач нет. Добавьте первую внизу.</div>';
- const dn=S.ts.filter(x=>x.done);
- const sec=document.createElement('div'); sec.className='sec'; sec.tabIndex=0; sec.setAttribute('role','button'); sec.setAttribute('aria-expanded',S.showDone?'true':'false');
- sec.innerHTML='<span>Выполненные</span><span style="width:var(--ctl); text-align:center;">'+dn.length+'</span>';
- const tog=()=>{S.showDone=!S.showDone;save();paint();};
- sec.onclick=tog; sec.onkeydown=key(tog);
- list.appendChild(sec);
- if(S.showDone)dn.forEach(x=>list.appendChild(taskRow(x,0,0)));
+ }
 
+ /* Входящие ↔ выполненные: строки въезжают лесенкой с отскоком */
+ if(switched){
+  popIn(ttl);
+  [...list.children].slice(0,14).forEach((r,i)=>popIn(r,i));
+ }
  paintDetail();
  const selRow=list.querySelector('[aria-current="true"]');
  if(selRow&&selRow.scrollIntoView)selRow.scrollIntoView({block:'nearest'});
@@ -362,8 +493,8 @@ function paintDetail(){
  }
  const isP=S.cur.k==='p', p=isP?prById(S.cur.id):null, x=isP?null:byId(S.cur.id);
  const par=!isP&&x.pj!==null?prById(x.pj):null;
- $('crumb').innerHTML=isP?I('folder',16)+'<span>проект</span>'
-  :(par?I('corner-down-right',16)+'<span>'+esc(par.n)+'</span>':I('inbox',16)+'<span>без проекта</span>');
+ $('crumb').innerHTML=isP?I('folder',12)+'<span>проект</span>'
+  :(par?I('corner-down-right',12)+'<span>'+esc(par.n)+'</span>':I('inbox',12)+'<span>без проекта</span>');
  const ct=$('ct');
  ct.value=isP?p.n:x.t;
  ct.style.color=(!isP&&x.done)?'var(--text-muted)':'var(--text-primary)';
@@ -378,6 +509,10 @@ function paintDetail(){
 
  const it=isP?p:x;
 
+ /* Новые реплики появляются с отскоком. Лента пересобирается целиком,
+    поэтому сравниваем с тем, что было в этой же карточке до перерисовки */
+ const k=curKey(), same=k===threadKey, prevN=thread.children.length, prevTyping=!!thread.querySelector('.typing');
+ threadKey=k;
  thread.innerHTML='';
  const add=h=>{const e=document.createElement('div'); e.innerHTML=h; thread.appendChild(e.firstChild);};
  add('<div class="bub">'+(isP?'Что мешает?':'Как продвинулись?')+'</div>');
@@ -385,7 +520,7 @@ function paintDetail(){
  const adding=isP&&addingFor===curKey();
  if(isP&&(op.length||adding)){
   const w=document.createElement('div'); w.className='steps';
-  op.forEach((t,i)=>{const r=taskRow(t,1,1); if(i===op.length-1&&!adding)r.style.borderBottom='none'; w.appendChild(r);});
+  op.forEach((t,i)=>{const r=taskRow(t,1); if(i===op.length-1&&!adding)r.style.borderBottom='none'; w.appendChild(r);});
   if(adding){
    const r=document.createElement('div'); r.className='row sm addstep'; r.style.borderBottom='none';
    r.innerHTML='<input class="stepin" placeholder="Название шага" aria-label="Название шага">';
@@ -393,9 +528,14 @@ function paintDetail(){
   }
   thread.appendChild(w);
  }
- if(!isP&&x.file)add('<div class="card">'+I('file-text',20,'text-accent')+'<div style="min-width:0; flex:1;"><div class="f1">'+esc(x.file)+'</div><div class="f2">вложение задачи · открыть</div></div></div>');
- it.chat.forEach(m=>add(m.u?'<div class="bub">'+esc(m.u)+'</div>':(m.typing?'<div class="ans typing"><i></i><i></i><i></i></div>':'<div class="ans">'+esc(m.a)+'</div>')));
+ if(!isP&&x.file)add('<div class="card">'+I('file-text',16,'text-accent')+'<div style="min-width:0; flex:1;"><div class="f1">'+esc(x.file)+'</div><div class="f2">вложение задачи · открыть</div></div></div>');
+ it.chat.forEach(m=>add(m.u?'<div class="bub mine">'+esc(m.u)+'</div>':(m.typing?'<div class="ans typing"><i></i><i></i><i></i></div>':'<div class="ans">'+esc(m.a)+'</div>')));
  thread.scrollTop=thread.scrollHeight;
+ if(same){
+  const kids=thread.children;
+  for(let i=prevN;i<kids.length;i++){kids[i].style.transformOrigin=kids[i].classList.contains('bub')?'100% 100%':'0 100%'; popIn(kids[i],i-prevN);}
+  if(prevTyping&&kids.length===prevN&&!thread.querySelector('.typing')){const l=kids[kids.length-1]; l.style.transformOrigin='0 100%'; popIn(l);}
+ }
  /* Поле шага: Enter добавляет и остаётся открытым — шаги обычно вносят пачкой.
     Проверка isConnected нужна, потому что paint() сносит старое поле и это тоже blur. */
  const si=thread.querySelector('.stepin');
@@ -414,7 +554,22 @@ let view='list', open, back;
 /* Видимая высота окна в --vh. На телефоне клавиатура ужимает область просмотра,
    а 100dvh про это не знает — без этого композер уезжает под клавиатуру. */
 function trackVH(){
- const set=()=>{const vv=window.visualViewport;document.documentElement.style.setProperty('--vh',(vv?vv.height:window.innerHeight)+'px');};
+ const root=document.documentElement; let kb0=0;
+ const set=()=>{
+  const vv=window.visualViewport;
+  if(MODE==='nav'){
+   /* index.html: панель под клавиатуру не ужимается и не едет. Высота экрана — полная (layout viewport),
+      а высота клавиатуры — в --kb: на неё поднимаются только поле ввода (плашка «+» и поле чата)
+      и содержимое панели — к списку и ленте снизу добавляется запас, прокрутка сдвигается на ту же величину.
+      Меньше 80 px — это панели браузера, а не клавиатура */
+   root.style.setProperty('--vh',innerHeight+'px');
+   let kb=vv?Math.round(innerHeight-vv.height-(vv.offsetTop||0)):0; if(kb<80)kb=0;
+   root.style.setProperty('--kb',kb+'px');
+   if(kb!==kb0){const box=view==='detail'?thread:list; if(box)box.scrollTop+=kb-kb0; kb0=kb;}
+   return;
+  }
+  root.style.setProperty('--vh',(vv?vv.height:window.innerHeight)+'px');
+ };
  set();
  if(window.visualViewport){visualViewport.addEventListener('resize',set);visualViewport.addEventListener('scroll',set);}
  addEventListener('resize',set);
@@ -437,13 +592,57 @@ function shellTwo(){
  });
  open=paint; back=()=>{};
 }
+/* index.html: экраны лежат друг над другом, переход — CSS-трансформ по классу .on (см. app.css).
+   Фокус ставим без прокрутки: экран ещё за краем, и браузер иначе сдвинул бы .grid вбок */
 function shellNav(){
  const show=v=>{view=v;$('scr-list').classList.toggle('on',v==='list');$('scr-detail').classList.toggle('on',v==='detail');};
- open=()=>{show('detail');paint();const f=$('back');if(f)f.focus();};
- back=()=>{show('list');paint();const r=list.querySelector('[aria-current="true"]');if(r)r.focus();};
- $('back').innerHTML=I('chevron-left',24);
+ open=()=>{show('detail');paint();const f=$('back');if(f)f.focus({preventScroll:true});};
+ back=()=>{show('list');paint();const r=list.querySelector('[aria-current="true"]');if(r)r.focus({preventScroll:true});};
+ $('back').innerHTML=I('chevron-left',16);
+ /* iOS при фокусе на поле пытается прокрутить страницу к нему — возвращаем: поле и так поднято на --kb */
+ document.addEventListener('focusin',e=>{if(e.target instanceof HTMLInputElement&&e.target.type!=='date')setTimeout(()=>window.scrollTo(0,0),50);});
  $('back').onclick=back;
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menuFor&&view==='detail')back();});
+ armSwipeBack();
+}
+/* Свайп вправо от левого края экрана чата возвращает к списку, как на iPhone.
+   Пока палец ведёт, оба экрана двигаются за ним (класс .drag выключает CSS-переход).
+   Отпустили дальше трети ширины или быстрым движением — back(); иначе чат возвращается на место.
+   Инлайновые трансформы снимаются в тот же кадр, что и .drag, поэтому переход доигрывает от текущего положения. */
+const EDGE=28;
+function armSwipeBack(){
+ const d=$('scr-detail'), l=$('scr-list');
+ let x0=null,y0=0,dx=0,w=1,t0=0,drag=false;
+ const reset=()=>{
+  d.classList.remove('drag'); l.classList.remove('drag');
+  d.style.transform=''; l.style.transform=''; l.style.visibility=''; l.style.removeProperty('--scrim-o');
+ };
+ d.addEventListener('touchstart',e=>{
+  if(view!=='detail'||e.touches.length!==1||menuFor)return;
+  const t=e.touches[0]; if(t.clientX>EDGE)return;
+  x0=t.clientX; y0=t.clientY; dx=0; drag=false; t0=Date.now(); w=d.offsetWidth||innerWidth;
+ },{passive:true});
+ d.addEventListener('touchmove',e=>{
+  if(x0===null)return;
+  const t=e.touches[0]; dx=t.clientX-x0; const dy=t.clientY-y0;
+  if(!drag){
+   if(Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)){x0=null;return;}   // это прокрутка ленты
+   if(dx<=10)return;
+   drag=true; d.classList.add('drag'); l.classList.add('drag'); l.style.visibility='visible';
+  }
+  const p=Math.max(0,Math.min(1,dx/w));
+  d.style.transform='translateX('+(p*100).toFixed(2)+'%)';
+  l.style.transform='translateX('+(-24*(1-p)).toFixed(2)+'%)';
+  l.style.setProperty('--scrim-o',(1-p).toFixed(3));
+ },{passive:true});
+ const end=()=>{
+  if(x0===null)return; x0=null;
+  if(!drag)return; drag=false;
+  const fast=dx/Math.max(1,Date.now()-t0)>0.5;
+  reset();
+  if(dx>w/3||fast)back();
+ };
+ d.addEventListener('touchend',end); d.addEventListener('touchcancel',end);
 }
 
 /* ---------- старт ---------- */
@@ -452,12 +651,33 @@ list=$('list'); thread=$('thread'); hctl=$('hctl');
 trackVH();
 (MODE==='nav'?shellNav:shellTwo)();
 const nt=$('nt'),err=$('err'),msg=$('msg'),ct=$('ct');
-$('add').innerHTML=I('plus',20); $('send').innerHTML=I('arrow-right',20);
+/* iOS сдвигает всю страницу вверх, если в момент фокуса поле оказывается там, где встанет клавиатура,
+   и position:fixed на body от этого не спасает. Поэтому на время фокуса поле (вместе с его строкой)
+   невидимо переносим к верху экрана — прятать его не от чего, iOS ничего не двигает. Когда клавиатура
+   открылась и --kb посчитан, перенос снимаем, и поле встаёт над клавиатурой. Только index.html и только
+   не в iframe: в превью страница клавиатуру не видит, и поле осталось бы под ней. */
+const IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function focusNoPan(inp){
+ const host=inp.closest('.ft');
+ if(MODE!=='nav'||!IOS||window.top!==window||!window.visualViewport||!host){inp.focus({preventScroll:true});return;}
+ host.style.transition='none'; host.style.opacity='0';
+ host.style.transform='translateY('+Math.round(80-host.getBoundingClientRect().top)+'px)';
+ inp.focus({preventScroll:true});
+ let done=false;
+ const fin=()=>{if(done)return; done=true; visualViewport.removeEventListener('resize',onRs);
+  host.style.transform=''; host.style.opacity=''; requestAnimationFrame(()=>{host.style.transition='';});};
+ const onRs=()=>setTimeout(fin,30);
+ visualViewport.addEventListener('resize',onRs); setTimeout(fin,800);
+}
+$('add').innerHTML=I('plus',16); $('send').innerHTML=I('arrow-right',16);
+$('brand-ic').innerHTML=I('inbox',12);   // иконка над логотипом — та же, что «без проекта» в шапке чата
 nt.oninput=()=>{err.style.display='none';};
 function submitTask(){
  if(!nt.value.trim()){err.style.display='block';nt.focus();return;}
  err.style.display='none';
- addTask(nt.value.trim()); nt.value=''; paint(); nt.focus();
+ const was=S.showDone, t=addTask(nt.value.trim()); nt.value=''; S.showDone=0; paint();
+ nt.focus();
+ if(!was)popIn(list.querySelector('.row[data-id="'+t.id+'"]'));
 }
 function sendMsg(){
  const v=msg.value.trim(); if(!v)return;
@@ -468,13 +688,18 @@ ct.oninput=()=>{const it=curItem(); if(!it)return; if(S.cur.k==='p')it.n=ct.valu
 ct.onblur=()=>{const it=curItem(); if(!it)return; const v=ct.value.trim();
  if(!v){if(S.cur.k==='p')it.n='Без названия'; else it.t='Без названия';} save(); paint();};
 ct.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ct.blur();}};
-$('add').onclick=submitTask; nt.onkeydown=e=>{if(e.key==='Enter')submitTask();};
-$('send').onclick=sendMsg; msg.onkeydown=e=>{if(e.key==='Enter')sendMsg();};
+$('add').onclick=submitTask;
+nt.onkeydown=e=>{if(e.key==='Enter')submitTask();};
+$('send').onclick=sendMsg;
+/* по тапу поле фокусируется само, до нашего кода — поэтому на iOS перехватываем касание и фокусируем через focusNoPan */
+[nt,msg].forEach(f=>f.addEventListener('touchend',e=>{if(IOS&&MODE==='nav'&&window.top===window&&document.activeElement!==f){e.preventDefault();focusNoPan(f);}})); msg.onkeydown=e=>{if(e.key==='Enter')sendMsg();};
+const tog=()=>{S.showDone=S.showDone?0:1;save();paint();};
+$('inbox').onclick=e=>{if(!e.target.closest('.logo'))tog();};   // логотип список не переключает $('inbox').querySelector('.ttl').onkeydown=key(tog);
 addEventListener('keydown',e=>{if(e.key==='Escape'&&menuFor)closeMenu();});
 addEventListener('pagehide',flush); addEventListener('beforeunload',flush);
 paint();
 /* Поверхность для тестов и отладки из консоли браузера. S переприсваивается при загрузке,
    поэтому отдаётся геттером, иначе снаружи виден устаревший объект. */
-window.app={get S(){return S},byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu};
+window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu};
 
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));

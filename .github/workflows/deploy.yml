@@ -24,7 +24,7 @@ jobs:
       - name: Собрать сайт
         run: |
           mkdir _site
-          cp index.html screens.html app.css app.js sw.js manifest.webmanifest icon-192.png icon-512.png _site/
+          cp index.html panels.html Pixelizer.ttf app.css app.js sw.js manifest.webmanifest icon-192.png icon-512.png _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

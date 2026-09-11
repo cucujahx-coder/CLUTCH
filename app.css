@@ -2,8 +2,9 @@
   --surface-0:#f6f6f4; --surface-1:#ffffff; --surface-2:#fbfbfa;
   --border:#d9d9d4; --border-stronger:#b4b4ad;
   --text-primary:#1f1f1c; --text-secondary:#5a5a55; --text-muted:#8b8b85;
-  --text-accent:#3b6fd9; --text-warning:#b8720a; --text-success:#2f8f5b; --text-danger:#c53c3c;
-  --fill-success:#2f8f5b; --on-success:#ffffff; --fill-ghost-selected:rgba(31,31,28,.06);
+  --text-accent:#0000ff;   /* фирменный акцент, одинаковый в обеих темах */
+  --text-warning:#b8720a; --text-success:#2f8f5b; --text-danger:#c53c3c;
+  --fill-success:#2f8f5b; --on-success:#ffffff; --fill-ghost-selected:rgba(31,31,28,.06); --on-accent:#ffffff;
   --fill-btn:#ffffff; --fill-btn-hover:#f0f0ed;
 
   /* сетка 8px */
@@ -13,84 +14,152 @@
   --fs-sm:14px; --lh-sm:20px;
   --fs-md:16px; --lh-md:24px;
   --fs-lg:20px; --lh-lg:28px;
+  --fs-logo:24px;
+  --fs-card:24px;   /* название задачи в шапке чата */
+  /* два шрифта: текст — системный (на iPhone и Mac это SF Pro Text, файла в приложении нет — лицензия Apple
+     не разрешает выкладывать его на сайт), заголовки — пиксельный Pixelizer */
+  --font-text:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-pixel:"Pixelizer",var(--font-text);
+  --ki-w:calc(var(--fs-md) * .4375);   /* ширина знака «>» в Pixelizer — 7 пикселей шрифта из 16 */
   /* размеры контролов */
   --row:64px;        /* строка списка */
   --row-sm:56px;     /* строка шага в чате */
-  --hd:56px;         /* шапка списка */
+  /* шапка панели — одна высота у «Входящих» и у карточки чата: три строки карточки
+     (крошка 16 + название 28 + мета 20 и два зазора по 4) плюс отступы сверху и снизу */
+  --hd-in:calc(var(--lh-xs) + var(--lh-lg) + var(--lh-sm) + var(--s1) * 2);
+  --hd:calc(var(--hd-in) + var(--s4) * 2);
   --ctl:48px;        /* зона нажатия чекбокса/кольца */
   --ck:28px;         /* сам кружок */
   --ck-sm:24px;
   --ring:32px;
   --input:44px;
   --btn:36px;
-  --icon:16px; --icon-lg:20px;
+  --icon:12px; --icon-lg:16px;   /* пиксельные иконки: в подписях и строках / в кнопках и меню */
   --r:12px; --r-sm:8px;
   --max:720px;
+  /* движение: bounce — с перелётом, out — плавное торможение (те же кривые — EASE в app.js) */
+  --ease-bounce:cubic-bezier(.34,1.56,.64,1);
+  --ease-out:cubic-bezier(.22,1,.36,1);
+  /* переход между экранами: притенение списка и тень у края чата */
+  --scrim:rgba(0,0,0,.08); --shadow-edge:-8px 0 24px rgba(0,0,0,.08);
 }
+/* на экранах ×3 логотип 26⅔ px — 5 точек на пиксель шрифта, на ×1 и ×2 — 24 px */
+@media (min-resolution:2.5dppx){:root{--fs-logo:26.667px}}
 @media (prefers-color-scheme:dark){
+  /* Максимально тёмная: фон — чистый чёрный (на OLED пиксели выключены), панели и плашки
+     чуть светлее, чтобы читались их границы; поля ввода и пузыри — ещё на ступень светлее */
   :root{
-    --surface-0:#171716; --surface-1:#262624; --surface-2:#1f1f1e;
-    --border:#3a3a37; --border-stronger:#5c5c57;
-    --text-primary:#ececea; --text-secondary:#b3b3ae; --text-muted:#82827d;
-    --text-accent:#7ea3f0; --text-warning:#e0a44a; --text-success:#5cc088; --text-danger:#e5706a;
-    --fill-success:#2f8f5b; --on-success:#ffffff; --fill-ghost-selected:rgba(255,255,255,.08);
-    --fill-btn:#2b2b29; --fill-btn-hover:#383836;
+    --surface-0:#000000; --surface-1:#141414; --surface-2:#0a0a0a;
+    --border:#222222; --border-stronger:#444444;
+    --text-primary:#ededed; --text-secondary:#a8a8a8; --text-muted:#7c7c7c;
+    --text-accent:#0000ff;
+    --text-warning:#e0a44a; --text-success:#5cc088; --text-danger:#e5706a;
+    --fill-success:#2f8f5b; --on-success:#ffffff; --fill-ghost-selected:rgba(255,255,255,.07);
+    --fill-btn:#141414; --fill-btn-hover:#1f1f1f;
+    --scrim:rgba(0,0,0,.6); --shadow-edge:-1px 0 0 #222222;
   }
 }
+/* Пиксельный Pixelizer — для заголовков (есть кириллица, одно начертание Bold). Диапазон 100–900, чтобы браузер
+   брал этот же файл для любой жирности и не рисовал поддельный полужирный. Каких знаков нет (→ … — « » №),
+   те подставляются из системного шрифта следующим в списке */
+@font-face{font-family:"Pixelizer";src:url("Pixelizer.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
 *,*::before,*::after{box-sizing:border-box}
 *{-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}          /* Safari иначе раздувает текст в альбомной */
 html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
 /* Страница целиком — экран, прокручиваются только .bd. position:fixed убирает
    резинку всей страницы на iOS и pull-to-refresh */
-body{position:fixed;inset:0;background:var(--surface-0);color:var(--text-primary);font:var(--fs-sm)/var(--lh-sm) -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{position:fixed;inset:0;background:var(--surface-0);color:var(--text-primary);font:var(--fs-sm)/var(--lh-sm) var(--font-text);-webkit-font-smoothing:antialiased}
 /* Долгое нажатие по строке не должно выделять текст и звать меню iOS.
    Поля ввода и текст переписки из этого исключены — оттуда копируют */
-.row,.sec,.ck,button,.ttl,.cnt,.crumb,.cm{touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.row,.hd-list,.ck,button,.ttl,.cnt,.crumb,.cm{touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 input{-webkit-user-select:text;user-select:text}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
 
-/* ---------- оболочка: две панели (index.html) ---------- */
+/* ---------- оболочка: две панели (panels.html) ---------- */
 .two .app{max-width:1080px;margin:0 auto;height:var(--vh,100dvh);
   padding:max(var(--s4),env(safe-area-inset-top)) max(var(--s4),env(safe-area-inset-right)) max(var(--s4),env(safe-area-inset-bottom)) max(var(--s4),env(safe-area-inset-left))}
 .two .grid{display:grid;grid-template-columns:minmax(300px,400px) minmax(0,1fr);gap:var(--s4);align-items:stretch;height:100%;min-height:0}
 .two .pnl{border:0.5px solid var(--border);border-radius:var(--r)}
+/* Поля ввода вынесены из панелей: отдельная плашка под своей панелью, с зазором */
+.two .scr{gap:var(--s3)}
+.two .ft{border:0.5px solid var(--border);border-radius:var(--r);background:var(--surface-2)}
 @media (max-width:760px){
   .two .app{padding:max(var(--s2),env(safe-area-inset-top)) max(var(--s2),env(safe-area-inset-right)) max(var(--s2),env(safe-area-inset-bottom)) max(var(--s2),env(safe-area-inset-left))}
-  .two .grid{grid-template-columns:minmax(0,1fr);grid-template-rows:1fr 1fr;gap:var(--s2);transition:grid-template-rows .2s}
+  .two .grid{grid-template-columns:minmax(0,1fr);grid-template-rows:1fr 1fr;gap:var(--s2);transition:grid-template-rows .36s var(--ease-out)}
   .two .grid.kb-list{grid-template-rows:0fr 1fr;gap:0}
   .two .grid.kb-detail{grid-template-rows:1fr 0fr;gap:0}
   .two .grid.kb-list #scr-detail,.two .grid.kb-detail #scr-list{visibility:hidden;overflow:hidden}
   .two .scr{min-height:0;height:100%}
   .two #scr-detail{order:-1}
   .two .pnl{min-height:0;height:100%}
+  :root{--hd:calc(var(--hd-in) + var(--s3) * 2)}   /* на телефоне отступы шапки 12 */
   .two .hd{padding:var(--s3) var(--s4)}
   .two .ft{padding:var(--s2) var(--s4)}
+  .two .scr{gap:var(--s2)}
 }
 
-/* ---------- оболочка: полноэкранные переходы (screens.html) ---------- */
-.nav .app{height:var(--vh,100dvh);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
-.nav .grid{height:100%}
-.nav .hd{padding-top:max(var(--s4),env(safe-area-inset-top))}
-.nav .ft{padding-bottom:max(var(--s3),env(safe-area-inset-bottom))}
-.nav .scr{display:none;height:100%}
-.nav .scr.on{display:flex;flex-direction:column}
-.nav .pnl{max-width:var(--max);margin:0 auto}
-@media (min-width:721px){.nav .pnl{border-left:0.5px solid var(--border);border-right:0.5px solid var(--border)}}
+/* ---------- оболочка: два экрана из панелей (index.html) ---------- */
+.nav .app{height:var(--vh,100dvh)}
+.nav .grid{height:100%;position:relative;overflow:hidden}
+/* Экраны друг над другом, каждый — панель и плашка ввода под ней с отступами от краёв (и выреза).
+   Чат выезжает справа налево поверх списка, список уходит чуть влево и притеняется. Ушедший экран
+   после перехода получает visibility:hidden, чтобы в него не попадал фокус: у открывающегося экрана
+   видимость включается сразу, у закрывающегося — по окончании движения */
+.nav .scr{position:absolute;inset:0;display:flex;flex-direction:column;gap:var(--s3);background:var(--surface-0);
+  padding:max(var(--s4),env(safe-area-inset-top)) max(var(--s4),env(safe-area-inset-right)) max(var(--s4),env(safe-area-inset-bottom)) max(var(--s4),env(safe-area-inset-left));
+  transition:transform .5s var(--ease-out),visibility 0s linear .5s}
+.nav .scr.on{transition:transform .5s var(--ease-out),visibility 0s linear 0s}
+.nav .scr.drag{transition:none}
+.nav #scr-detail{z-index:2;box-shadow:var(--shadow-edge)}
+.nav #scr-detail:not(.on){transform:translateX(100%);visibility:hidden}
+.nav #scr-list:not(.on){transform:translateX(-24%);visibility:hidden}
+.nav #scr-list::after{content:"";position:absolute;inset:0;background:var(--scrim);opacity:0;pointer-events:none;transition:opacity .5s var(--ease-out)}
+.nav #scr-list:not(.on)::after{opacity:var(--scrim-o,1)}
+.nav #scr-list.drag::after{transition:none}
+.nav .pnl,.nav .ft{width:100%;max-width:var(--max);margin:0 auto;border:0.5px solid var(--border);border-radius:var(--r)}
+.nav .ft{background:var(--surface-2)}
+/* поле чата — внутри панели, прилипает к низу поверх ленты; лента уходит под полупрозрачный фон с размытием,
+   поэтому снизу у неё запас на высоту поля */
+.nav .pnl{position:relative}
+.nav .pnl > .ft{position:absolute;left:0;right:0;bottom:0;z-index:2;max-width:none;margin:0;border:none;border-top:0.5px solid var(--border);border-radius:0;
+  background:color-mix(in srgb,var(--surface-2) 82%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.nav #thread{padding-bottom:calc(var(--input) + var(--s3) * 2 + var(--s4) + var(--kb,0px))}
+/* клавиатура открыта: панели на месте, над клавиатурой поднимаются только поля ввода и содержимое панелей */
+.nav .pnl > .ft{transform:translateY(calc(-1 * var(--kb,0px)));transition:transform .3s var(--ease-out)}
+.nav #list{padding-bottom:calc(var(--input) + var(--s3) * 2 + var(--kb,0px))}
+@media (max-width:760px){
+  .nav .scr{gap:var(--s2);padding:max(var(--s2),env(safe-area-inset-top)) max(var(--s2),env(safe-area-inset-right)) max(var(--s2),env(safe-area-inset-bottom)) max(var(--s2),env(safe-area-inset-left))}
+  .nav .hd{padding:var(--s3) var(--s4)}
+  .nav .ft{padding:var(--s2) var(--s4)}
+  .nav #thread{padding-bottom:calc(var(--input) + var(--s2) * 2 + var(--s4) + var(--kb,0px))}
+  .nav #list{padding-bottom:calc(var(--input) + var(--s2) * 2 + var(--kb,0px))}
+}
 
 /* ---------- общее ---------- */
 .scr{display:flex;flex-direction:column;min-height:0}
 .pnl{background:var(--surface-2);display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;width:100%}
+/* текст выполняемой задачи на миг белеет и светится (тряску добавляет zap в app.js) */
+.zap,.zap *{color:#fff!important;text-shadow:0 0 4px #fff,0 0 12px #fff}
 
-.hd{padding:var(--s4);border-bottom:0.5px solid var(--border);flex:none}
-.hd-list{display:flex;align-items:center;justify-content:space-between;height:var(--hd);padding-top:0;padding-bottom:0}
+.hd{padding:var(--s4);border-bottom:0.5px solid var(--border);flex:none;height:var(--hd)}
+.hd-list{display:flex;align-items:flex-end;justify-content:space-between;height:var(--hd);cursor:pointer}
+/* шапка списка повторяет строй шапки чата: сверху иконка входящих (как крошка), логотип CLUTCH на месте названия,
+   под ним «Входящие» на месте меты, счётчик на их линии у правого края. Логотип — пиксельным шрифтом,
+   Размер кратен пикселю шрифта (1/16 em) под плотность экрана, межбуквенный интервал — ровно один пиксель шрифта */
+.brand{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s1);min-width:0}
+.brand .ttl{line-height:var(--lh-sm)}
+.logo{font-family:var(--font-pixel);font-size:var(--fs-logo);line-height:var(--lh-lg);letter-spacing:.0625em;color:var(--text-primary);cursor:default;-webkit-user-select:none;user-select:none}
+.ttl:focus-visible{outline:none;box-shadow:0 0 0 2px var(--text-accent);border-radius:var(--r-sm)}
 .hd-row{display:flex;align-items:center;gap:var(--s2)}
-.ttl{font-size:var(--fs-md);line-height:var(--lh-md);font-weight:600}
-.crumb{font-size:var(--fs-xs);line-height:var(--lh-xs);color:var(--text-secondary);display:flex;align-items:center;gap:var(--s2)}
-.ct{font-size:var(--fs-lg);line-height:var(--lh-lg);font-weight:600;margin-top:var(--s1);width:100%;border:none;background:transparent;padding:0;font-family:inherit;height:auto}
+.ttl{font-size:var(--fs-md);line-height:var(--lh-md);font-weight:600;font-family:var(--font-pixel)}
+/* пиксельным шрифтом — заголовки (логотип, «Входящие», вся шапка чата: .crumb, .ct, .cm; названия в строках .t1) и поля ввода;
+   всё остальное — подписи, переписка, меню, счётчики — системным */
+.crumb{font-size:var(--fs-xs);line-height:var(--lh-xs);color:var(--text-secondary);display:flex;align-items:center;gap:var(--s2);font-family:var(--font-pixel)}
+.ct{font-size:var(--fs-card);line-height:var(--lh-lg);font-weight:600;margin-top:var(--s1);width:100%;border:none;background:transparent;padding:0;font-family:var(--font-pixel);height:auto}
 .ct:focus{outline:none;box-shadow:0 2px 0 -1px var(--text-accent)}
-.cm{font-size:var(--fs-sm);line-height:var(--lh-sm);color:var(--text-secondary);margin-top:var(--s1)}
-.cnt{font-size:var(--fs-sm);line-height:var(--lh-sm);color:var(--text-muted);width:var(--ctl);text-align:center}
+.cm{font-size:var(--fs-sm);line-height:var(--lh-sm);color:var(--text-secondary);margin-top:var(--s1);font-family:var(--font-pixel)}
+.cnt{font-size:var(--fs-sm);line-height:var(--lh-sm);color:var(--text-muted);width:var(--ctl);text-align:center;font-family:var(--font-pixel)}
 
 .bd{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 var(--s4);min-height:0}
 .bd>*{flex:none}
@@ -100,58 +169,89 @@ input{-webkit-user-select:text;user-select:text}
 .err{font-size:var(--fs-xs);line-height:var(--lh-xs);color:var(--text-danger);margin-top:var(--s2);display:none}
 .empty{font-size:var(--fs-sm);line-height:var(--lh-sm);color:var(--text-muted);padding:var(--s6) 0;text-align:center}
 
-.row{display:flex;align-items:center;gap:var(--s2);height:var(--row);border-bottom:0.5px solid var(--border);cursor:pointer;flex:none;outline:none}
+.row{display:flex;align-items:center;gap:var(--s2);height:var(--row);border-bottom:0.5px solid var(--border);cursor:pointer;flex:none;outline:none;transition:background-color .25s var(--ease-out)}
 .row.sm{height:var(--row-sm)}
 .row:focus-visible{box-shadow:inset 0 0 0 2px var(--text-accent)}
 .cel{min-width:0;flex:1}
-.t1{font-size:var(--fs-md);line-height:var(--lh-md);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t1{font-size:var(--fs-md);line-height:var(--lh-md);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-pixel)}
+/* Иконка типа слева от названия: монохромная, цвета подписи. Подпись под названием сдвинута на ширину
+   иконки, чтобы начиналась ровно под текстом названия */
+.cel.k .t1{display:flex;align-items:baseline;gap:var(--s2);overflow:visible}   /* знак «>» выходит левее строки — не обрезать; многоточие у названия делает .tt */   /* маркер «>» — текст, выравниваем по базовой линии названия */
+.cel.k .tt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ki{flex:none;width:var(--ki-w);font-size:var(--fs-md);color:var(--text-muted);position:relative;
+  /* знак «>» сдвинут влево так, чтобы его середина стояла ровно под серединой иконки в шапке списка
+     (иконка с отступа шапки 16, строка — с отступа 32; середина знака в шрифте — 3/16 em). Сдвиг relative
+     не меняет раскладку: название и подпись остаются на месте */
+  left:calc(var(--s4) + var(--hd-ic,12px) / 2 - var(--s4) * 2 - var(--fs-md) * .1875)}
+.ki::before{content:">"}
+/* на странице задач названия — системным жирным (SF Pro на Apple), знак «>» остаётся пиксельным; шаги в чате не трогаем — там .t1 пиксельный */
+#list .t1{font-family:var(--font-text)}
+#list .ki{font-family:var(--font-pixel)}
+/* строки основного списка с отступом слева, чтобы иконка не прилипала к краю подсветки выбранной строки */
+/* строки списка — на всю ширину панели: выходят за боковой отступ .bd, а содержимое возвращается
+   тем же отступом, так что подсветка выбранной строки идёт от края до края панели */
+#list .row{margin:0 calc(-1 * var(--s4));padding:0 var(--s4) 0 calc(var(--s4) * 2)}   /* слева отступ задач больше — 32 */
+.cel.k .t2{padding-left:calc(var(--ki-w) + var(--s2))}
 .t2{display:flex;align-items:center;gap:var(--s2);height:var(--lh-xs);margin-top:2px;min-width:0;overflow:hidden}
 .s{font-size:var(--fs-xs);line-height:var(--lh-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto}
 .sf{flex:0 1 auto;min-width:40px}
 
 .ck{flex:none;width:var(--ctl);height:var(--ctl);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;outline:none;border-radius:var(--r-sm)}
 .ck:focus-visible{box-shadow:inset 0 0 0 2px var(--text-accent)}
-.dot{width:var(--ck);height:var(--ck);border-radius:50%;border:2px solid var(--border-stronger);display:flex;align-items:center;justify-content:center;color:var(--on-success);font-size:var(--fs-sm);line-height:1;background:transparent}
+.dot{transition:transform .45s var(--ease-bounce),background-color .25s var(--ease-out),border-color .25s var(--ease-out);width:var(--ck);height:var(--ck);border-radius:50%;border:2px solid var(--border-stronger);display:flex;align-items:center;justify-content:center;color:var(--on-success);font-size:var(--fs-sm);line-height:1;background:transparent}
 .dot.sm{width:var(--ck-sm);height:var(--ck-sm);font-size:var(--fs-xs)}
 .dot.on{border-color:var(--text-success);background:var(--fill-success)}
-.ring{position:absolute;font-size:var(--fs-xs);line-height:1;color:var(--text-secondary)}
+.ring{position:absolute;font-size:var(--fs-xs);line-height:1;color:var(--text-secondary);font-family:var(--font-pixel)}
 
-.sec{display:flex;align-items:center;justify-content:space-between;height:40px;font-size:var(--fs-xs);line-height:var(--lh-xs);color:var(--text-muted);cursor:pointer;flex:none;outline:none;border-radius:var(--r-sm)}
-.sec:focus-visible{box-shadow:inset 0 0 0 2px var(--text-accent)}
 
 button{font:inherit;color:var(--text-primary);background:var(--fill-btn);border:0.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer}
+button{transition:background-color .2s var(--ease-out),transform .45s var(--ease-bounce)}
 button:hover{background:var(--fill-btn-hover)}
+/* нажатие: кнопка и кружок проседают и отпружинивают обратно */
+.ib:active,.back:active{transform:scale(.9);transition-duration:.1s}
+.ck:active .dot{transform:scale(.86);transition-duration:.1s}
+.mi:active{transform:scale(.98);transition-duration:.1s}
 button:focus-visible{outline:none;box-shadow:0 0 0 2px var(--text-accent)}
-.ib{height:var(--input);width:var(--input);padding:0;display:flex;align-items:center;justify-content:center;flex:none}
+.ib{height:var(--input);width:var(--input);padding:0;display:flex;align-items:center;justify-content:center;flex:none;border-radius:50%}
+/* пока в строке ввода фокус, её кнопка («+» или «→») залита акцентом */
+.ftr:focus-within .ib,.ftr:focus-within .ib:hover{background:var(--text-accent);border-color:var(--text-accent);color:var(--on-accent)}
 .back{height:40px;width:40px;padding:0;display:flex;align-items:center;justify-content:center;flex:none;background:transparent;border:none;margin-left:calc(-1 * var(--s2))}
-input{height:var(--input);font-size:var(--fs-md);flex:1;min-width:0;font-family:inherit;color:var(--text-primary);background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--r-sm);padding:0 var(--s3)}
+input{height:var(--input);font-size:var(--fs-md);flex:1;min-width:0;font-family:var(--font-pixel);color:var(--text-primary);background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--r-sm);padding:0 var(--s3)}
+input{transition:border-color .2s var(--ease-out),box-shadow .25s var(--ease-out)}
 input::placeholder{color:var(--text-muted)}
 input:focus{outline:none;border-color:var(--text-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--text-accent) 25%,transparent)}
 .ic{flex:none;display:inline-block;vertical-align:middle;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* пиксельные иконки — залитые квадраты, без обводки */
+.ic.px{fill:currentColor;stroke:none}
 
 .bub{align-self:flex-end;max-width:80%;background:var(--surface-1);border-radius:var(--r);padding:var(--s2) var(--s3);font-size:var(--fs-md);line-height:var(--lh-md)}
+/* свои сообщения — на акцентном фоне, правый верхний угол острый; вопрос-приглашение в начале ленты («Как продвинулись?») остаётся обычным */
+.bub.mine{background:var(--text-accent);color:var(--on-accent);border-top-right-radius:0}
 .ans{max-width:88%;font-size:var(--fs-md);line-height:var(--lh-md);white-space:pre-line}
 .card{display:flex;align-items:center;gap:var(--s3);background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--r);padding:var(--s4)}
 .card .f1{font-size:var(--fs-md);line-height:var(--lh-md)}
 .card .f2{font-size:var(--fs-xs);line-height:var(--lh-xs);color:var(--text-muted);margin-top:2px}
 .steps{background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--r);padding:0 var(--s4)}
 .typing{display:inline-flex;gap:var(--s1);align-items:center;height:var(--lh-md)}
-.typing i{width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:tp 1s infinite ease-in-out}
-.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
-@keyframes tp{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-2px)}}
-@media (prefers-reduced-motion:reduce){.typing i{animation:none;opacity:.6}}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:tp 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.14s}.typing i:nth-child(3){animation-delay:.28s}
+/* точки подпрыгивают: вверх с торможением, вниз с отскоком от «пола» */
+@keyframes tp{0%,60%,100%{opacity:.35;transform:translateY(0);animation-timing-function:var(--ease-out)}
+  25%{opacity:1;transform:translateY(-5px);animation-timing-function:var(--ease-bounce)}}
+@media (prefers-reduced-motion:reduce){.typing i{animation:none;opacity:.6}
+  *,*::before,*::after{transition-duration:0s!important;transition-delay:0s!important}
+  .ib:active,.back:active,.ck:active .dot,.mi:active{transform:none}}
 
 /* ---------- пальцем ---------- */
 /* На сенсорных экранах цель нажатия — минимум 44 px (рекомендация Apple).
    Мышью такие кнопки выглядели бы громоздко, поэтому только для coarse. */
 @media (pointer:coarse){
   .back{width:44px;height:44px}
-  .sec{height:44px}
 }
 /* Мышь есть — наводка подсказывает, что строка кликабельна */
 @media (hover:hover){
   .row:hover{background:var(--fill-ghost-selected)}
-  .sec:hover{color:var(--text-secondary)}
+  .hd-list:hover .ttl{color:var(--text-secondary)}
 }
 
 /* ---------- добавление шага и подтверждение удаления ---------- */
@@ -173,9 +273,7 @@ input:focus{outline:none;border-color:var(--text-accent);box-shadow:0 0 0 2px co
 .sheet-body{position:relative;width:100%;max-width:420px;margin:var(--s2);
   background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--r);
   padding:var(--s2);padding-bottom:max(var(--s2),env(safe-area-inset-bottom));
-  display:flex;flex-direction:column;animation:sheetin .18s ease-out}
-@keyframes sheetin{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
-@media (prefers-reduced-motion:reduce){.sheet-body{animation:none}}
+  display:flex;flex-direction:column}
 /* На большом экране меню посреди окна: снизу оно там выглядит случайным */
 @media (min-width:761px){.sheet{align-items:center}}
 .sheet-title{font-size:var(--fs-xs);line-height:var(--lh-xs);color:var(--text-muted);

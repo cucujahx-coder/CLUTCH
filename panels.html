@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Задачи</title>
 <meta name="theme-color" content="#f6f6f4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -14,19 +14,27 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preload" href="Pixelizer.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="stylesheet" href="app.css">
 </head>
-<body class="nav">
+<body class="two">
 <div class="app">
 <h2 class="sr-only">В строке проекта показан следующий шаг, тап по кольцу закрывает именно его; шаг также можно отметить в чате проекта</h2>
 <div class="grid">
 
   <div class="scr on" id="scr-list"><div class="pnl">
-    <div class="hd hd-list">
-      <span class="ttl">Входящие</span>
+    <div class="hd hd-list" id="inbox">
+      <!-- три строки, как в шапке чата: иконка входящих, логотип, заголовок списка; счётчик на линии заголовка -->
+      <div class="brand">
+        <div class="crumb" id="brand-ic" aria-hidden="true"></div>
+        <div class="logo">CLUTCH</div>
+        <span class="ttl" role="button" tabindex="0">Входящие</span>
+      </div>
       <span class="cnt" id="cnt"></span>
     </div>
     <div class="bd" id="list" style="display:flex; flex-direction:column;"></div>
+  </div>
+    <!-- поле ввода отдельной плашкой под панелью, а не внутри неё -->
     <div class="ft">
       <div class="ftr">
         <input type="text" id="nt" placeholder="Новая задача" aria-label="Новая задача" />
@@ -34,12 +42,11 @@
       </div>
       <div id="err" class="err" role="alert">Введите текст задачи</div>
     </div>
-  </div></div>
+  </div>
 
   <div class="scr" id="scr-detail"><div class="pnl">
     <div class="hd">
       <div class="hd-row">
-        <button id="back" class="back" aria-label="Назад к списку"></button>
         <div class="cel">
           <div id="crumb" class="crumb"></div>
           <input id="ct" class="ct" aria-label="Название" />
@@ -49,16 +56,17 @@
       </div>
     </div>
     <div class="bd thread" id="thread"></div>
+  </div>
     <div class="ft">
       <div class="ftr">
         <input type="text" id="msg" placeholder="Спросить Claude" aria-label="Сообщение" />
         <button id="send" class="ib" aria-label="Отправить"></button>
       </div>
     </div>
-  </div></div>
+  </div>
 </div>
 </div>
-<script>window.MODE="nav"</script>
+<script>window.MODE='two'</script>
 <script src="app.js"></script>
 </body>
 </html>
