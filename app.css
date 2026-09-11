@@ -77,7 +77,12 @@ input{-webkit-user-select:text;user-select:text}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
 
 /* ---------- оболочка: две панели (panels.html) ---------- */
-.two .app{max-width:1080px;margin:0 auto;height:var(--vh,100dvh);
+/* Приложение точно накрывает видимую область: высота и смещение сверху приходят из
+   visualViewport. Тогда композер лежит на дне видимой части и оказывается над клавиатурой
+   сам. Подгонять его под высоту клавиатуры бесполезно: iOS не ужимает слой раскладки,
+   а панорамирует видимую область внутри него, и сдвиг зависит ещё и от панорамирования. */
+.app{position:fixed;left:0;right:0;top:var(--vvtop,0px);height:var(--vh,100dvh)}
+.two .app{max-width:1080px;margin:0 auto;
   padding:max(var(--s4),env(safe-area-inset-top)) max(var(--s4),env(safe-area-inset-right)) max(var(--s4),env(safe-area-inset-bottom)) max(var(--s4),env(safe-area-inset-left))}
 .two .grid{display:grid;grid-template-columns:minmax(300px,400px) minmax(0,1fr);gap:var(--s4);align-items:stretch;height:100%;min-height:0}
 .two .pnl{border:0.5px solid var(--border);border-radius:var(--r)}
@@ -100,7 +105,7 @@ input{-webkit-user-select:text;user-select:text}
 }
 
 /* ---------- оболочка: два экрана из панелей (index.html) ---------- */
-.nav .app{height:var(--vh,100dvh)}
+.nav .app{}  /* высота и смещение — в общем правиле .app выше */
 .nav .grid{height:100%;position:relative;overflow:hidden}
 /* Экраны друг над другом, каждый — панель и плашка ввода под ней с отступами от краёв (и выреза).
    Чат выезжает справа налево поверх списка, список уходит чуть влево и притеняется. Ушедший экран
@@ -124,18 +129,14 @@ input{-webkit-user-select:text;user-select:text}
 .nav .pnl{position:relative}
 .nav .pnl > .ft{position:absolute;left:0;right:0;bottom:0;z-index:2;max-width:none;margin:0;border:none;border-top:0.5px solid var(--border);border-radius:0;
   background:color-mix(in srgb,var(--surface-2) 82%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-.nav #thread{padding-bottom:calc(var(--input) + var(--s3) * 2 + var(--s4) + var(--kb,0px))}
-/* клавиатура открыта: панели на месте, над клавиатурой поднимаются только поля ввода и содержимое панелей */
-/* Без перехода: --kb меняется на каждом событии visualViewport, и анимация
-   гналась бы за движущейся целью — поле ввода заметно плавало */
-.nav .pnl > .ft{transform:translateY(calc(-1 * var(--kb,0px)))}
-.nav #list{padding-bottom:calc(var(--input) + var(--s3) * 2 + var(--kb,0px))}
+.nav #thread{padding-bottom:calc(var(--input) + var(--s3) * 2 + var(--s4))}
+.nav #list{padding-bottom:calc(var(--input) + var(--s3) * 2)}
 @media (max-width:760px){
   .nav .scr{gap:var(--s2);padding:max(var(--s2),env(safe-area-inset-top)) max(var(--s2),env(safe-area-inset-right)) max(var(--s2),env(safe-area-inset-bottom)) max(var(--s2),env(safe-area-inset-left))}
   .nav .hd{padding:var(--s3) var(--s4)}
   .nav .ft{padding:var(--s2) var(--s4)}
-  .nav #thread{padding-bottom:calc(var(--input) + var(--s2) * 2 + var(--s4) + var(--kb,0px))}
-  .nav #list{padding-bottom:calc(var(--input) + var(--s2) * 2 + var(--kb,0px))}
+  .nav #thread{padding-bottom:calc(var(--input) + var(--s2) * 2 + var(--s4))}
+  .nav #list{padding-bottom:calc(var(--input) + var(--s2) * 2)}
 }
 
 /* ---------- общее ---------- */

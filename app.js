@@ -591,26 +591,17 @@ function paintDetail(){
 let view='list', open, back;
 /* Видимая высота окна в --vh. На телефоне клавиатура ужимает область просмотра,
    а 100dvh про это не знает — без этого композер уезжает под клавиатуру. */
+/* Контейнер приложения должен точно накрывать видимую область — у неё берём и высоту,
+   и смещение сверху. Ключевое: iOS при открытой клавиатуре не ужимает слой раскладки,
+   а панорамирует видимую область внутри него. Без --vvtop композер, прибитый к низу
+   раскладки, физически уезжает под клавиатуру, и догнать его подстройкой нельзя:
+   сдвиг зависит от панорамирования, о котором высота клавиатуры ничего не знает. */
 function trackVH(){
- const root=document.documentElement; let kb0=0, settle;
+ const root=document.documentElement;
  const set=()=>{
   const vv=window.visualViewport;
-  if(MODE==='nav'){
-   /* index.html: панель под клавиатуру не ужимается и не едет. Высота экрана — полная (layout viewport),
-      а высота клавиатуры — в --kb: на неё поднимаются только поле ввода (плашка «+» и поле чата)
-      и содержимое панели — к списку и ленте снизу добавляется запас, прокрутка сдвигается на ту же величину.
-      Меньше 80 px — это панели браузера, а не клавиатура */
-   root.style.setProperty('--vh',innerHeight+'px');
-   let kb=vv?Math.round(innerHeight-vv.height-(vv.offsetTop||0)):0; if(kb<80)kb=0;
-   root.style.setProperty('--kb',kb+'px');
-   /* Компенсацию прокрутки применяем один раз, когда клавиатура доехала:
-      на каждом кадре это давало ступенчатое подёргивание списка */
-   if(kb!==kb0){clearTimeout(settle);settle=setTimeout(()=>{
-    const box=view==='detail'?thread:list; if(box)box.scrollTop+=kb-kb0; kb0=kb;
-   },120);}
-   return;
-  }
-  root.style.setProperty('--vh',(vv?vv.height:window.innerHeight)+'px');
+  root.style.setProperty('--vh',(vv?vv.height:innerHeight)+'px');
+  root.style.setProperty('--vvtop',(vv?vv.offsetTop:0)+'px');
  };
  set();
  if(window.visualViewport){visualViewport.addEventListener('resize',set);visualViewport.addEventListener('scroll',set);}
@@ -641,8 +632,6 @@ function shellNav(){
  open=()=>{show('detail');paint();const f=$('back');if(f)f.focus({preventScroll:true});};
  back=()=>{show('list');paint();const r=list.querySelector('[aria-current="true"]');if(r)r.focus({preventScroll:true});};
  $('back').innerHTML=I('chevron-left',16);
- /* iOS при фокусе на поле пытается прокрутить страницу к нему — возвращаем: поле и так поднято на --kb */
- document.addEventListener('focusin',e=>{if(e.target instanceof HTMLInputElement&&e.target.type!=='date')setTimeout(()=>{if(window.scrollY)window.scrollTo(0,0);},50);});
  $('back').onclick=back;
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menuFor&&view==='detail')back();});
  armSwipeBack();
@@ -693,11 +682,6 @@ list=$('list'); thread=$('thread'); hctl=$('hctl');
 trackVH();
 (MODE==='nav'?shellNav:shellTwo)();
 const nt=$('nt'),err=$('err'),msg=$('msg'),ct=$('ct');
-/* iOS сдвигает всю страницу вверх, если в момент фокуса поле оказывается там, где встанет клавиатура,
-   и position:fixed на body от этого не спасает. Поэтому на время фокуса поле (вместе с его строкой)
-   невидимо переносим к верху экрана — прятать его не от чего, iOS ничего не двигает. Когда клавиатура
-   открылась и --kb посчитан, перенос снимаем, и поле встаёт над клавиатурой. Только index.html и только
-   не в iframe: в превью страница клавиатуру не видит, и поле осталось бы под ней. */
 $('add').innerHTML=I('plus',16); $('send').innerHTML=I('arrow-right',16);
 $('brand-ic').innerHTML=I('inbox',12);   // иконка над логотипом — та же, что «без проекта» в шапке чата
 nt.oninput=()=>{err.style.display='none';};
