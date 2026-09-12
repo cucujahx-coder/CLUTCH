@@ -19,8 +19,10 @@ cd worker && npx --yes wrangler secret put ANTHROPIC_API_KEY
 Ключ вводится в консоли и хранится у Cloudflare — в репозиторий он не попадает.
 
 ```bash
-cd worker && npx --yes wrangler deploy
+npm run deploy:worker
 ```
+
+Команду можно запускать из любой папки репозитория: npm выполняет скрипты из корня пакета. Запускать `wrangler deploy` вручную из корня **нельзя** — там нет конфига воркера, и wrangler примет репозиторий за статический сайт, создаст `wrangler.jsonc` и попробует выложить всё вместе с `node_modules`.
 
 В конце команда напечатает адрес вида `https://clutch-chat.ТВОЙ-САБДОМЕН.workers.dev`. Его надо вписать в `app.js`:
 

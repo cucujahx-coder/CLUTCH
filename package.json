@@ -7,7 +7,8 @@
     "start": "npx --yes serve .",
     "test": "node test/app.test.js && node worker/worker.test.mjs",
     "test:app": "node test/app.test.js",
-    "test:worker": "node worker/worker.test.mjs"
+    "test:worker": "node worker/worker.test.mjs",
+    "deploy:worker": "cd worker && npx --yes wrangler deploy"
   },
   "devDependencies": {
     "jsdom": "^24.0.0"
