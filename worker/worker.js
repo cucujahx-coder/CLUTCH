@@ -5,7 +5,8 @@
 import {buildSystem} from './prompt.js';
 import {TOOLS} from './tools.js';
 
-const DEFAULT_MODEL='claude-sonnet-5';   /* разговор; выжимки — Haiku, появятся с этапом 4 */
+const DEFAULT_MODEL='claude-sonnet-5';   /* разговор */
+const DEFAULT_SUM_MODEL='claude-haiku-4-5';  /* выжимки старой переписки — дешёвая модель */
 const MAX_TOKENS=4096;
 const EFFORT='low';                      /* чат должен отвечать быстро; поднять при поверхностных ответах */
 const MAX_BODY=256*1024;
@@ -47,6 +48,29 @@ export default {
   if(raw.length>MAX_BODY)return json({error:'слишком большой запрос'},413,h);
   let b; try{b=JSON.parse(raw)}catch(e){return json({error:'bad json'},400,h)}
 
+  /* Выжимка старой переписки — отдельный дешёвый вызов, не стрим: клиенту нужен
+     только текст, и он хранит его рядом с чатом до следующего сжатия. */
+  if(Array.isArray(b.summarize)){
+   const lines=b.summarize.slice(-200).map(x=>cut(x,2000)).join('\n').slice(0,60000);
+   if(!lines.trim())return json({summary:''},200,h);
+   try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+     method:'POST',
+     headers:{'content-type':'application/json','anthropic-version':'2023-06-01','x-api-key':env.ANTHROPIC_API_KEY},
+     body:JSON.stringify({
+      model:env.SUM_MODEL||DEFAULT_SUM_MODEL,
+      max_tokens:600,
+      system:'Сожми переписку по задаче в несколько строк по-русски. Оставь только то, что понадобится дальше: принятые решения, договорённости, обещанные сроки, имена людей, названия созданных файлов. Выбрось вежливость и рассуждения. Без вступления и заголовков.',
+      messages:[{role:'user',content:lines}]
+     })
+    });
+    if(!r.ok)return json({error:'anthropic '+r.status},502,h);
+    const d=await r.json();
+    const text=(d.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('\n').trim();
+    return json({summary:text},200,h);
+   }catch(e){return json({error:'сеть до Anthropic: '+cut(e&&e.message||e,200)},502,h)}
+  }
+
   /* Дата приходит от клиента: у него и у воркера сутки могут не совпасть.
      Проверяем только, что расхождение не больше суток — иначе календарь будет врать. */
   const today=ISO.test(b.today||'')?b.today:new Date().toISOString().slice(0,10);
@@ -60,6 +84,9 @@ export default {
    if(x.type==='text')return {type:'text',text:cut(x.text,8000)};
    if(x.type==='tool_use')return {type:'tool_use',id:cut(x.id,80),name:cut(x.name,60),input:x.input&&typeof x.input==='object'?x.input:{}};
    if(x.type==='tool_result')return {type:'tool_result',tool_use_id:cut(x.tool_use_id,80),content:cut(x.content,4000),...(x.is_error?{is_error:true}:{})};
+   /* Вложения пользователя: картинка и PDF идут как есть, base64 не режем */
+   if((x.type==='image'||x.type==='document')&&x.source&&x.source.type==='base64')
+    return {type:x.type,source:{type:'base64',media_type:cut(x.source.media_type,80),data:String(x.source.data||'')}};
    return null;
   };
   const hist=(Array.isArray(b.messages)?b.messages:[])

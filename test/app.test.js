@@ -173,7 +173,7 @@ async function actions(){
 }
 
 /* ---------- снимок задачи, уходящий модели ---------- */
-function payload(){
+async function payload(){
  console.log('снимок задачи');
  const {w,d}=load('index.html');
  const A=w.app;
@@ -182,7 +182,7 @@ function payload(){
  const task=A.S.ts.find(x=>x.pj===null);
  A.S.cur={k:'t',id:task.id};
  task.chat.push({u:'привет'},{a:'ответ'},{u:'второй вопрос'},{typing:1},{err:1,a:'сеть отвалилась'});
- let p=A.chatPayload(task,false);
+ let p=await A.chatPayload(task,false);
  assert(p.task.id==='t'+task.id,'у задачи короткий идентификатор');
  assert(p.task.title===task.t&&p.task.isProject===false,'название и признак проекта');
  assert(p.messages.length===3,'плейсхолдер «печатает» и строка ошибки на сервер не уходят');
@@ -196,13 +196,13 @@ function payload(){
 
  // шаг проекта несёт название родителя и строку «открыт из шага»
  const step=A.S.ts.find(x=>x.pj!==null);
- p=A.chatPayload(step,false);
+ p=await A.chatPayload(step,false);
  assert(p.task.project===A.prById(step.pj).n,'шаг передаёт название проекта');
  assert(p.task.fromStep==='s'+step.id,'и идентификатор шага, из которого открыт чат');
 
  // проект несёт свои шаги с идентификаторами и отметками
  const pr=A.S.pr[0];
- p=A.chatPayload(pr,true);
+ p=await A.chatPayload(pr,true);
  assert(p.task.id==='p'+pr.id&&p.task.isProject===true,'у проекта свой идентификатор и признак');
  assert(p.task.steps.length===A.inPj(pr.id).length,'переданы все шаги проекта');
  assert(p.task.steps.every(x=>/^s\d+$/.test(x.id)),'у каждого шага короткий идентификатор');
@@ -313,6 +313,62 @@ async function tools(){
  assert((await A.runTool({id:'x',name:'нет_такого',input:{}},pr,true)).err,'неизвестный инструмент — ошибка');
 }
 
+/* ---------- память, расход, настройки ---------- */
+async function memory(){
+ console.log('память и настройки');
+ const {w,d}=load('index.html');
+ const A=w.app;
+ const call=(name,input,item,isP)=>A.runTool({id:'u'+Math.random(),name,input},item,isP);
+ const t=A.S.ts.find(x=>x.pj===null);
+ A.S.cur={k:'t',id:t.id};
+
+ let r=await call('memory_write',{text:'Счета по хостингу присылает Марина'},t,false);
+ assert(A.S.mem.length===1&&r.card.includes('Марина'),'memory_write запоминает и даёт карточку');
+ assert((await call('memory_write',{text:'счета по хостингу присылает марина'},t,false)).out==='уже записано',
+  'дубль не записывается второй раз');
+ A.undoAct(r.undo);
+ assert(A.S.mem.length===0,'отмена убирает из памяти');
+
+ await call('memory_write',{text:'Сергей, Москва'},t,false);
+ await call('memory_write',{text:'Письма пишем без обращения'},t,false);
+ r=await call('memory_forget',{text:'Москва'},t,false);
+ assert(A.S.mem.length===1&&!A.S.mem.join().includes('Москва'),'memory_forget убирает по части фразы');
+ A.undoAct(r.undo);
+ assert(A.S.mem.length===2&&A.S.mem[0]==='Сергей, Москва','отмена возвращает факт на своё место');
+ assert((await call('memory_forget',{text:'чего тут нет'},t,false)).out==='такого в памяти нет','пропажа — словами');
+
+ // память уходит в запрос отдельным блоком
+ const p=await A.chatPayload(t,false);
+ assert(p.profile&&p.profile.includes('Сергей'),'память уходит профилем в запросе');
+ assert(!(await A.chatPayload(A.S.ts.find(x=>x.pj!==null),false)).summary,'выжимки нет, пока переписка короткая');
+
+ // расход считается в деньгах: у чтения кэша и выхода разные цены
+ A.addSpend({input_tokens:1000,output_tokens:1000,cache_read_input_tokens:1000,cache_creation_input_tokens:0});
+ const usd=A.spendUsd(A.S.spend);
+ assert(Math.abs(usd-(2+10+0.2)/1000)<1e-9,'цена складывается по четырём категориям');
+ A.addSpend(null);
+ assert(A.spendUsd(A.S.spend)===usd,'пустой расход ничего не ломает');
+
+ // экран настроек показывает память, корзину и расход
+ A.settings();
+ const box=d.querySelector('.sheet.set');
+ assert(box&&!box.hidden,'настройки открылись');
+ const txt=box.textContent;
+ assert(txt.includes('Сергей, Москва'),'в настройках видна память');
+ assert(txt.includes('Корзина')&&txt.includes('уходит в Anthropic'),'есть корзина и строка про приватность');
+ box.querySelector('[data-forget]').click();
+ assert(A.S.mem.length===1,'факт стирается из настроек');
+
+ // удалённое попадает в корзину настроек и возвращается оттуда
+ const victim=A.S.ts.find(x=>x.pj===null&&!x.del);
+ await call('task_delete',{id:'t'+victim.id},t,false);
+ A.settings();
+ const back=d.querySelector('.sheet.set [data-restore]');
+ assert(back,'удалённое видно в корзине');
+ back.click();
+ assert(!A.byId(victim.id).del,'из корзины возвращается');
+}
+
 /* ---------- файлы ---------- */
 async function files(){
  console.log('файлы');
@@ -344,7 +400,7 @@ async function files(){
  assert(t.files.some(f=>f.name==='......etc_passwd'||!f.name.includes('/')),'слеши из имени убраны');
 
  // снимок задачи несёт имена, размеры и содержимое только маленьких файлов
- const p=A.chatPayload(t,false);
+ const p=await A.chatPayload(t,false);
  assert(p.task.files.length===t.files.length,'файлы попали в снимок');
  assert(p.task.files[0].body!==undefined&&p.task.files[0].size>0,'у маленького файла в снимке есть содержимое');
 
@@ -359,7 +415,7 @@ async function files(){
 const bytesOf=t=>new TextEncoder().encode(t).length;
 
 /* ---------- переписка в формате блоков ---------- */
-function blocks(){
+async function blocks(){
  console.log('формат переписки');
  const {w,d}=load('index.html');
  const A=w.app;
@@ -370,14 +426,25 @@ function blocks(){
   {typing:1},
   {err:1,a:'нет сети'}
  ];
- const m=A.chatMessages(t);
+ const m=await A.chatMessages(t);
  assert(m.length===3,'плейсхолдер и ошибка в переписку не уходят');
  assert(m[0].role==='user'&&m[0].content==='перенеси на пятницу','вопрос пользователя строкой');
  assert(m[1].role==='assistant'&&m[1].content[0].type==='text'&&m[1].content[1].type==='tool_use','ход модели: текст и вызов одним сообщением');
  assert(m[1].content[1].id==='u1'&&m[1].content[1].name==='task_set_due','вызов несёт идентификатор и имя');
  assert(m[2].role==='user'&&m[2].content[0].type==='tool_result'&&m[2].content[0].tool_use_id==='u1','результат отдельным сообщением с тем же идентификатором');
+ /* Вложение старше пяти ходов уходит из контекста ссылкой: иначе его base64
+    уезжает заново каждый ход. Свежий путь требует IndexedDB — проверен в браузере. */
+ const t2=A.S.ts.find(x=>x.pj===null&&x.id!==t.id);
+ t2.chat=[{u:'вот счёт',att:[{name:'schet.pdf',mime:'application/pdf',size:1000,owner:'t'+t2.id}]}];
+ for(let i=0;i<6;i++)t2.chat.push({u:'ещё '+i},{a:'ответ '+i});
+ const old5=await A.chatMessages(t2);
+ const first=old5[0];
+ assert(Array.isArray(first.content),'сообщение с вложением идёт блоками');
+ assert(first.content[0].type==='text'&&first.content[0].text.includes('schet.pdf'),'старое вложение заменено ссылкой на имя');
+ assert(first.content.at(-1).text==='вот счёт','текст пользователя остаётся последним блоком');
+
  t.chat.push({a:'Готово.',tu:[{id:'u2',name:'task_search',input:{}}],res:[{id:'u2',out:'не найдено',err:1}]});
- const m2=A.chatMessages(t);
+ const m2=await A.chatMessages(t);
  assert(m2.at(-1).content[0].is_error===true,'ошибка инструмента помечена для модели');
 }
 
@@ -481,10 +548,11 @@ function markdown(){
 
  storage();
  await actions();
- payload();
+ await payload();
  markdown();
  await tools();
  await files();
- blocks();
+ await memory();
+ await blocks();
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
 })();

@@ -8,6 +8,8 @@ const MODE = window.MODE || 'two';
    Размер подгоняется под плотность экрана: пиксель иконки — целое число физических пикселей
    (на iPhone ×3 иконка 12 px выходит 13⅓ px = 5 точек на пиксель, на Retina ×2 — ровно 12 px). */
 const P={
+ 'clip':'....###.|...#...#|..#....#|..#....#|.#.....#|.#....#.|.#...#..|..###...',
+ 'x':'........|.#.....#|..#...#.|...#.#..|....#...|...#.#..|..#...#.|.#.....#',
  'plus':'........|...##...|...##...|.######.|.######.|...##...|...##...|........',
  'arrow-right':'........|....#...|....##..|#######.|#######.|....##..|....#...|........',
  'chevron-left':'........|....##..|...##...|..##....|..##....|...##...|....##..|........',
@@ -99,7 +101,7 @@ const overdue=s=>!!s&&days(s)<0;
 /* ---------- хранилище ---------- */
 const KEY='tasks:v1';
 const OLD_KEYS=['clutch:v5','clutch-plan:v1','everyday:v4']; /* приложения-предшественники */
-let S={seq:1,ts:[],pr:[],showDone:0,cur:null};
+let S={seq:1,ts:[],pr:[],showDone:0,cur:null,mem:[],spend:null};
 let saveT;
 function save(){clearTimeout(saveT);saveT=setTimeout(flush,120)}
 function flush(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -141,7 +143,7 @@ function importOld(){
  return null;
 }
 function seed(){
- const st={seq:1,ts:[],pr:[],showDone:0,cur:null};
+ const st={seq:1,ts:[],pr:[],showDone:0,cur:null,mem:[],spend:null};
  const mk=(n,due,why)=>{const id=st.seq++;st.pr.push({id,n,due,why,chat:[]});return id};
  const p1=mk('Запуск лендинга',plus(4),'Три шага из пяти готовы. Всё упирается в оффер — без него вычитка и выкладка не двинутся.');
  const p2=mk('Переезд офиса',plus(30),'Список неполный: нет пункта про интернет и вывоз старой мебели.');
@@ -503,6 +505,46 @@ async function fileBody(item,f){
  if(f.body!==undefined)return f.body;
  try{const b=await bodyGet(f.owner,f.name); return b===undefined?null:b}catch(e){return null}
 }
+/* ---------- вложения от пользователя ----------
+   Картинка и PDF уходят модели как есть, но это base64 в переписке, и без мер он
+   уезжает заново каждый ход. Поэтому: картинки сжимаем до IMG_PX мегапикселя и в JPEG,
+   PDF ограничен PDF_MAX, а вложение старше ATT_TURNS ходов заменяется в истории
+   ссылкой — сам файл остаётся в задаче, из контекста уходит. */
+const IMG_PX=1e6, IMG_Q=0.82, PDF_MAX=5*1024*1024, ATT_TURNS=5;
+let pending=[];
+
+const readAs=(f,how)=>new Promise((ok,no)=>{
+ const r=new FileReader();
+ r.onload=()=>ok(r.result); r.onerror=()=>no(r.error);
+ how==='url'?r.readAsDataURL(f):r.readAsArrayBuffer(f);
+});
+const b64of=u=>String(u).slice(String(u).indexOf(',')+1);
+
+async function shrink(file){
+ const url=await readAs(file,'url');
+ if(typeof document==='undefined'||!document.createElement('canvas').getContext)return {mime:file.type,data:b64of(url)};
+ const img=await new Promise((ok,no)=>{const i=new Image(); i.onload=()=>ok(i); i.onerror=no; i.src=url;});
+ const k=Math.min(1,Math.sqrt(IMG_PX/Math.max(1,img.width*img.height)));
+ const c=document.createElement('canvas');
+ c.width=Math.max(1,Math.round(img.width*k)); c.height=Math.max(1,Math.round(img.height*k));
+ c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+ return {mime:'image/jpeg',data:b64of(c.toDataURL('image/jpeg',IMG_Q))};
+}
+
+async function attach(file,item,isP){
+ const isImg=/^image\//.test(file.type);
+ const isPdf=file.type==='application/pdf';
+ if(!isImg&&!isPdf)return {err:'можно приложить картинку или PDF'};
+ if(isPdf&&file.size>PDF_MAX)return {err:'PDF больше '+fmtSize(PDF_MAX)};
+ let mime,data;
+ if(isImg){const r=await shrink(file); mime=r.mime; data=r.data;}
+ else {mime='application/pdf'; data=b64of(await readAs(file,'url'));}
+ const owner=shortId(item,isP), name=String(file.name||'файл').replace(/[\/\\]/g,'_');
+ try{await bodyPut(owner,'att:'+name,data)}catch(e){return {err:'не удалось сохранить вложение'}}
+ return {name,mime,size:Math.round(data.length*3/4),owner,user:1};
+}
+const attBody=a=>bodyGet(a.owner,'att:'+a.name).catch(()=>null);
+
 const fmtSize=n=>n<1024?n+' Б':n<1024*1024?(n/1024).toFixed(n<10240?1:0)+' КБ':(n/1048576).toFixed(1)+' МБ';
 
 /* Скачивание через Blob: файла на сервере нет, он живёт только в браузере */
@@ -674,6 +716,22 @@ const ACT={
     else {o.files=o.files.filter(x=>x.name!==name); bodyDel(owner,name).catch(()=>{});}
    });
  },
+ /* Память о пользователе: общая на все задачи, живёт в браузере, видна и стирается
+    в настройках. Хвостовые вызовы — круга не стоят. */
+ memory_write(a){
+  const t=String(a.text||'').trim(); if(!t)return {out:'пустая запись',err:1};
+  S.mem=S.mem||[];
+  if(S.mem.some(x=>x.toLowerCase()===t.toLowerCase()))return {out:'уже записано'};
+  if(S.mem.length>=40)return {out:'память переполнена, попроси пользователя почистить',err:1};
+  return act('Запомнил: '+t,()=>{S.mem.push(t)},()=>{S.mem=S.mem.filter(x=>x!==t)});
+ },
+ memory_forget(a){
+  const t=String(a.text||'').trim(); S.mem=S.mem||[];
+  const i=S.mem.findIndex(x=>x.toLowerCase().includes(t.toLowerCase()));
+  if(!t||i<0)return {out:'такого в памяти нет'};
+  const was=S.mem[i];
+  return act('Забыл: '+was,()=>{S.mem.splice(i,1)},()=>{S.mem.splice(i,0,was)});
+ },
  async file_read(a,c){
   const name=String(a.name||'').trim();
   const f=(c.item.files||[]).find(x=>x.name===name);
@@ -719,11 +777,45 @@ const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
    результатами — два соседних сообщения; строка ошибки и «печатает» не уходят. */
-function chatMessages(item){
+/* Сколько сообщений держим целиком и после какой длины сжимаем старое */
+const SUM_AFTER=24, SUM_KEEP=10;
+
+/* Расход считаем в деньгах, а не в токенах: у чтения кэша, записи кэша, входа и
+   выхода разные цены. Цены Sonnet 5 за миллион токенов; поменяется модель — поменять тут. */
+const PRICE={in:2,out:10,cr:0.2,cw:2.5};
+function addSpend(u){
+ if(!u)return;
+ const sp=S.spend||(S.spend={in:0,out:0,cr:0,cw:0,at:Date.now()});
+ sp.in+=u.input_tokens||0; sp.out+=u.output_tokens||0;
+ sp.cr+=u.cache_read_input_tokens||0; sp.cw+=u.cache_creation_input_tokens||0;
+ save();
+}
+const spendUsd=sp=>!sp?0:(sp.in*PRICE.in+sp.out*PRICE.out+sp.cr*PRICE.cr+sp.cw*PRICE.cw)/1e6;
+
+async function chatMessages(item){
  const out=[];
- for(const m of item.chat){
+ const from=item.sumTo||0;
+ /* Ходы пользователя считаем с конца: вложение старше ATT_TURNS уходит из контекста
+    ссылкой — иначе его base64 уезжает заново каждый ход и быстро съедает окно. */
+ const turns=item.chat.slice(from).filter(m=>m.u!==undefined).length;
+ let seen=0;
+ for(const m of item.chat.slice(from)){
   if(m.err||m.typing)continue;
-  if(m.u!==undefined){out.push({role:'user',content:m.u}); continue}
+  if(m.u!==undefined){
+   seen++;
+   if(m.att&&m.att.length){
+    const fresh=turns-seen<ATT_TURNS, blocks=[];
+    for(const a of m.att){
+     const body=fresh?await attBody(a):null;
+     if(body)blocks.push({type:/^image\//.test(a.mime)?'image':'document',
+      source:{type:'base64',media_type:a.mime,data:body}});
+     else blocks.push({type:'text',text:'[вложение '+a.name+' — приложено раньше, сейчас не в контексте]'});
+    }
+    blocks.push({type:'text',text:m.u});
+    out.push({role:'user',content:blocks});
+   }else out.push({role:'user',content:m.u});
+   continue;
+  }
   const blocks=[];
   if(m.a)blocks.push({type:'text',text:m.a});
   if(m.tu)for(const t of m.tu)blocks.push({type:'tool_use',id:t.id,name:t.name,input:t.input||{}});
@@ -736,7 +828,7 @@ function chatMessages(item){
 
 /* Снимок задачи пересобирается на каждый запрос, поэтому чат всегда говорит о том,
    что человек видит на экране. Идентификаторы короткие и стабильные. */
-function chatPayload(item,isP){
+async function chatPayload(item,isP){
  const task={
   id:shortId(item,isP),
   title:isP?item.n:item.t,
@@ -761,7 +853,9 @@ function chatPayload(item,isP){
   .sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'))
   .slice(0,20);
  let tz='UTC'; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch(e){}
- return {task,others,messages:chatMessages(item),today:today(),tz};
+ const profile=(S.mem||[]).join('\n');
+ return {task,others,messages:await chatMessages(item),today:today(),tz,
+  ...(profile?{profile}:{}),...(item.sum?{summary:item.sum}:{})};
 }
 
 /* Один проход потока. Текст отдаётся кусками через onDelta — лента дорисовывается
@@ -790,6 +884,7 @@ async function streamOnce(body,onDelta){
    let d; try{d=JSON.parse(dl)}catch(e){continue}
    if(ev==='text'){out+=d; got=true; onDelta&&onDelta(out);}
    else if(ev==='tool_use'){tools.push(d); got=true;}
+   else if(ev==='done'){addSpend(d&&d.usage);}
    else if(ev==='error'){
     const e=new Error(d.error||'ошибка потока');
     e.retry=!got;                       /* повторяем только если ничего не успели показать */
@@ -802,7 +897,7 @@ async function streamOnce(body,onDelta){
 }
 
 async function askOnce(item,isP,onDelta){
- const body=chatPayload(item,isP);
+ const body=await chatPayload(item,isP);
  let pause=600;
  for(let n=0;n<3;n++){
   try{return await streamOnce(body,onDelta);}
@@ -836,7 +931,9 @@ function ask(text){
  /* Пометка об отмене уходит в начале сообщения: снимок задачи покажет правду,
     но без пометки модель удивится расхождению и повторит действие. */
  const note=undoNote; undoNote='';
- item.chat.push({u:(note?note+' ':'')+text});
+ const att=pending.length?pending.slice():null;
+ pending=[]; paintPending();
+ item.chat.push({u:(note?note+' ':'')+text,...(att?{att}:{})});
  if(!isP)item.n++;
  turn(item,isP);
 }
@@ -868,7 +965,7 @@ async function turn(item,isP){
   ph.typing=0; ph.a=res.text;
   if(!res.tools.length){
    if(!res.text)item.chat.pop();
-   paint(); save(); return;
+   paint(); save(); squeeze(item); return;
   }
   ph.tu=res.tools; ph.res=[];
   let read=false;
@@ -883,8 +980,82 @@ async function turn(item,isP){
   }
   paint(); save();
   /* Хвостовые вызовы: результат модели не нужен — не тратим круг */
-  if(!read)return;
+  if(!read){squeeze(item); return;}
  }
+}
+
+/* Длинную переписку сжимаем: старую часть заменяет выжимка, её делает дешёвая
+   модель на сервере. Иначе каждый круг тащит всю историю целиком. */
+async function squeeze(item){
+ if(!API)return;
+ const from=item.sumTo||0, len=item.chat.length;
+ if(len-from<=SUM_AFTER)return;
+ const upto=len-SUM_KEEP;
+ const lines=item.chat.slice(from,upto).filter(m=>!m.typing&&!m.err)
+  .map(m=>m.u!==undefined?'Пользователь: '+m.u:'Ассистент: '+(m.a||''))
+  .filter(x=>x.length>12);
+ if(!lines.length)return;
+ if(item.sum)lines.unshift('Ранее: '+item.sum);
+ try{
+  const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({summarize:lines})});
+  if(!r.ok)return;
+  const d=await r.json();
+  if(!d.summary)return;
+  item.sum=d.summary; item.sumTo=upto; save();
+ }catch(e){/* выжимка не получилась — просто продолжаем слать историю целиком */}
+}
+
+/* ---------- настройки ----------
+   Отдельный экран, а не скрытый жест: без него некуда смотреть память и корзину.
+   Сделан накладкой, одинаковой в обеих оболочках, — иначе логика разъедется. */
+let setEl=null;
+function settings(){
+ if(!setEl){
+  setEl=document.createElement('div');
+  setEl.className='sheet set'; setEl.hidden=true;
+  setEl.innerHTML='<div class="sheet-back"></div><div class="sheet-body" role="dialog" aria-label="Настройки"></div>';
+  setEl.querySelector('.sheet-back').onclick=()=>{setEl.hidden=true};
+  document.body.appendChild(setEl);
+ }
+ const body=setEl.querySelector('.sheet-body');
+ const mem=S.mem||[];
+ const trash=[...S.ts.filter(x=>x.del).map(x=>({o:x,n:x.t,isP:0})),...S.pr.filter(x=>x.del).map(x=>({o:x,n:x.n,isP:1}))];
+ const sp=S.spend, usd=spendUsd(sp);
+ let h='<div class="sheet-title">Настройки</div>';
+
+ h+='<div class="sh">Память</div>';
+ h+=mem.length?mem.map((t,i)=>'<div class="si"><span>'+esc(t)+'</span>'+
+   '<button class="ax" type="button" data-forget="'+i+'" aria-label="Забыть">'+I('x',12)+'</button></div>').join('')
+  :'<div class="se">Пусто. Ассистент сам запоминает то, что пригодится в других задачах.</div>';
+
+ h+='<div class="sh">Расход</div>';
+ h+=sp?'<div class="si"><span>'+(usd<0.01?'меньше цента':'≈ $'+usd.toFixed(2))+'</span>'+
+   '<span class="as">'+((sp.in+sp.cr+sp.cw)/1000).toFixed(1)+'k вход · '+(sp.out/1000).toFixed(1)+'k выход</span></div>'
+  :'<div class="se">Запросов ещё не было.</div>';
+
+ h+='<div class="sh">Корзина</div>';
+ h+=trash.length?trash.map((x,i)=>'<div class="si"><span>'+esc(x.n)+'</span>'+
+   '<button class="au" type="button" data-restore="'+i+'">Вернуть</button></div>').join('')
+  :'<div class="se">Пусто. Удалённое лежит здесь 30 дней.</div>';
+
+ h+='<div class="sh">Данные</div>';
+ h+='<button class="mi danger" type="button" data-wipe="1">'+I('trash',16)+'<span>Стереть все данные</span></button>';
+ h+='<div class="se">Текст задачи уходит в Anthropic, у нас не хранится. Задачи, переписка и файлы лежат в этом браузере.</div>';
+ body.innerHTML=h;
+
+ body.querySelectorAll('[data-forget]').forEach(b=>b.onclick=()=>{S.mem.splice(+b.dataset.forget,1); save(); settings();});
+ body.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>{delete trash[+b.dataset.restore].o.del; save(); paint(); settings();});
+ body.querySelectorAll('[data-wipe]').forEach(b=>{
+  let armed=false;
+  b.onclick=()=>{
+   if(!armed){armed=true; b.querySelector('span').textContent='Точно стереть всё?'; return;}
+   try{localStorage.removeItem(KEY)}catch(e){}
+   try{indexedDB.deleteDatabase(DB_NAME)}catch(e){}
+   location.reload();
+  };
+ });
+ setEl.hidden=false;
 }
 
 /* ---------- отрисовка ---------- */
@@ -991,7 +1162,10 @@ function paintDetail(){
  (it.files||[]).forEach((f,i)=>add('<div class="card" data-file="'+i+'">'+I('file-text',16,'text-accent')+
   '<div style="min-width:0; flex:1;"><div class="f1">'+esc(f.name)+'</div><div class="f2">'+esc(fmtSize(f.size))+' · скачать</div></div></div>'));
   it.chat.forEach(m=>{
-  if(m.u!==undefined){add('<div class="bub mine">'+esc(m.u)+'</div>'); return;}
+  if(m.u!==undefined){
+   if(m.att)for(const a of m.att)add('<div class="att">'+I('clip',12)+'<span>'+esc(a.name)+'</span><span class="as">'+esc(fmtSize(a.size))+'</span></div>');
+   add('<div class="bub mine">'+esc(m.u)+'</div>'); return;
+  }
   if(m.typing){add('<div class="ans typing"><i></i><i></i><i></i></div>'); return;}
   if(m.err){add('<div class="ans err">'+esc(m.a)+'</div>'); return;}
   if(m.a)add('<div class="ans">'+md(m.a)+'</div>');
@@ -1156,7 +1330,8 @@ trackVH();
 (MODE==='nav'?shellNav:shellTwo)();
 const nt=$('nt'),err=$('err'),msg=$('msg'),ct=$('ct');
 $('add').innerHTML=I('plus',16); $('send').innerHTML=I('arrow-right',16);
-$('brand-ic').innerHTML=I('inbox',12);   // иконка над логотипом — та же, что «без проекта» в шапке чата
+$('brand-ic').innerHTML=I('inbox',12);
+$('brand-ic').onclick=e=>{e.stopPropagation(); settings();};   // иконка над логотипом — та же, что «без проекта» в шапке чата
 nt.oninput=()=>{err.style.display='none';};
 function submitTask(){
  if(!nt.value.trim()){err.style.display='block';nt.focus();return;}
@@ -1184,11 +1359,34 @@ msg.onkeydown=e=>{if(e.key==='Enter')sendMsg();};
 const tog=()=>{S.showDone=S.showDone?0:1;save();paint();};
 $('inbox').onclick=e=>{if(!e.target.closest('.logo'))tog();};   // логотип список не переключает $('inbox').querySelector('.ttl').onkeydown=key(tog);
 addEventListener('keydown',e=>{if(e.key==='Escape'&&menuFor)closeMenu();});
+/* Отложенные вложения: показываем чипами над полем, пока не отправили */
+function paintPending(){
+ const box=$('pend'); if(!box)return;
+ box.hidden=!pending.length;
+ box.innerHTML=pending.map((a,i)=>'<span class="att">'+I('clip',12)+'<span>'+esc(a.name)+'</span>'+
+  '<button class="ax" type="button" data-drop="'+i+'" aria-label="Убрать вложение">'+I('x',12)+'</button></span>').join('');
+ box.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{pending.splice(+b.dataset.drop,1); paintPending();});
+}
+const clip=$('clip'), pick=$('pick');
+if(clip&&pick){
+ clip.innerHTML=I('clip',16);
+ clip.onclick=()=>pick.click();
+ pick.onchange=async()=>{
+  const item=curItem(); const isP=S.cur&&S.cur.k==='p';
+  for(const f of [...pick.files].slice(0,4)){
+   const a=await attach(f,item,isP);
+   if(a.err){item.chat.push({err:1,a:a.err}); paint(); save();}
+   else pending.push(a);
+  }
+  pick.value=''; paintPending();
+ };
+}
+
 addEventListener('pagehide',flush); addEventListener('beforeunload',flush);
 paint();
 /* Поверхность для тестов и отладки из консоли браузера. S переприсваивается при загрузке,
    поэтому отдаётся геттером, иначе снаружи виден устаревший объект. */
-window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload,chatMessages,md,runTool,undoAct,byShort,shortId,fileBody,fmtSize,get undos(){return undos},get undoNote(){return undoNote}};
+window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload,chatMessages,md,runTool,undoAct,byShort,shortId,fileBody,fmtSize,attach,get pending(){return pending},settings,squeeze,spendUsd,addSpend,get undos(){return undos},get undoNote(){return undoNote}};
 
 /* Обновление установленного приложения. Новый service worker забирает управление сам
    (skipWaiting + clients.claim), но страница продолжает исполнять старый код до перезагрузки —

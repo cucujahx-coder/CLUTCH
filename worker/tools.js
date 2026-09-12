@@ -52,6 +52,12 @@ export const TOOLS=[
    overwrite:{type:'boolean',description:'Перезаписать существующий файл'}
   },required:['name','content'],additionalProperties:false}},
 
+ {name:'memory_write',description:'Запомнить факт о пользователе — то, что пригодится в других задачах: имя, занятие, город, устойчивые предпочтения. Не запоминай разовые обстоятельства, чужие данные и ничего чувствительного.',
+  input_schema:{type:'object',properties:{text:str('Короткая фраза, например: счета по хостингу присылает Марина')},required:['text'],additionalProperties:false}},
+
+ {name:'memory_forget',description:'Убрать факт из памяти о пользователе.',
+  input_schema:{type:'object',properties:{text:str('Что забыть — достаточно узнаваемой части')},required:['text'],additionalProperties:false}},
+
  {name:'file_read',description:'Прочитать сохранённый файл текущей записи по имени. Маленькие файлы уже вложены в снимок — их читать не нужно.',
   input_schema:{type:'object',properties:{name:str('Имя файла')},required:['name'],additionalProperties:false}}
 ];

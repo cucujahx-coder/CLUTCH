@@ -325,3 +325,27 @@ input:focus{outline:none;border-color:var(--text-accent);box-shadow:0 0 0 2px co
 .act .au{flex:none;border:none;background:none;color:var(--text-accent);
   font-family:inherit;font-size:var(--fs-sm);padding:0;cursor:pointer}
 .act .au.off{color:var(--text-muted);cursor:default}
+
+/* ---------- вложения ---------- */
+.pend{display:flex;flex-wrap:wrap;gap:var(--s2);padding:0 0 var(--s2)}
+.att{display:inline-flex;align-items:center;gap:var(--s1);max-width:100%;
+  padding:var(--s1) var(--s2);background:var(--surface-1);border:0.5px solid var(--border);
+  border-radius:var(--r-sm);font-size:var(--fs-xs);line-height:var(--lh-xs);color:var(--text-secondary)}
+.att>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att .as{color:var(--text-muted);flex:none}
+.att .ax{display:flex;align-items:center;border:none;background:none;padding:0 0 0 var(--s1);
+  color:var(--text-muted);cursor:pointer}
+.thread .att{align-self:flex-end}
+
+/* ---------- настройки ---------- */
+.set .sheet-body{max-height:80%;overflow-y:auto;overscroll-behavior:contain}
+.sh{font-size:var(--fs-xs);line-height:var(--lh-xs);color:var(--text-muted);
+  padding:var(--s4) var(--s3) var(--s1)}
+.si{display:flex;align-items:center;gap:var(--s2);min-height:40px;padding:var(--s1) var(--s3);
+  font-size:var(--fs-sm);line-height:var(--lh-sm)}
+.si>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si .as{color:var(--text-muted);font-size:var(--fs-xs);flex:none}
+.si .ax{display:flex;border:none;background:none;color:var(--text-muted);padding:0;cursor:pointer;flex:none}
+.si .au{border:none;background:none;color:var(--text-accent);font:inherit;font-size:var(--fs-sm);padding:0;cursor:pointer;flex:none}
+.se{font-size:var(--fs-xs);line-height:var(--lh-xs);color:var(--text-muted);padding:var(--s1) var(--s3) var(--s2)}
+#brand-ic{cursor:pointer}
