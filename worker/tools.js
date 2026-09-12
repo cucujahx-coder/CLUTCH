@@ -42,8 +42,19 @@ export const TOOLS=[
   input_schema:{type:'object',properties:{query:str('Что искать'),scope:{type:'string',enum:['open','done','all'],description:'По умолчанию open'}},required:['query'],additionalProperties:false}},
 
  {name:'chat_search',description:'Найти упоминание в прошлых переписках по всем задачам.',
-  input_schema:{type:'object',properties:{query:str('Что искать')},required:['query'],additionalProperties:false}}
+  input_schema:{type:'object',properties:{query:str('Что искать')},required:['query'],additionalProperties:false}},
+
+ {name:'file_write',description:'Сохранить текст файлом во вложения текущей записи. Существующий файл не перезаписывай без подтверждения пользователя.',
+  input_schema:{type:'object',properties:{
+   name:str('Имя с расширением, например pismo-marine.md'),
+   mime:str('Тип содержимого, например text/markdown или text/csv'),
+   content:str('Содержимое файла'),
+   overwrite:{type:'boolean',description:'Перезаписать существующий файл'}
+  },required:['name','content'],additionalProperties:false}},
+
+ {name:'file_read',description:'Прочитать сохранённый файл текущей записи по имени. Маленькие файлы уже вложены в снимок — их читать не нужно.',
+  input_schema:{type:'object',properties:{name:str('Имя файла')},required:['name'],additionalProperties:false}}
 ];
 
 /* Чтение не считается в лимит действий: иначе разведка съедает бюджет на изменения */
-export const READ=new Set(['task_search','chat_search']);
+export const READ=new Set(['task_search','chat_search','file_read']);

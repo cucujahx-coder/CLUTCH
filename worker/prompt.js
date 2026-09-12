@@ -76,6 +76,7 @@ export function longDate(today){
 }
 
 const cut=(s,n)=>String(s==null?'':s).slice(0,n);
+const size=n=>!n?'0 Б':n<1024?n+' Б':n<1048576?(n/1024).toFixed(n<10240?1:0)+' КБ':(n/1048576).toFixed(1)+' МБ';
 
 /* Снимок задачи пересобирается на каждый запрос — чат всегда говорит о том,
    что человек видит на экране. Формат описан в PROMPT.md, блок 3. */
@@ -102,7 +103,13 @@ export function taskBlock(t){
    if(open)firstOpen=false;
   }
  }
- L.push('файлы: нет');
+ /* Содержимое в промт не уходит — только имена и размеры; читает модель по требованию.
+    Исключение: маленькие файлы вкладываются целиком блоком <file> сразу после снимка. */
+ const files=Array.isArray(t.files)?t.files.slice(0,20):[];
+ if(files.length){
+  L.push('файлы:');
+  for(const f of files)L.push('  '+cut(f.name,200)+' — '+size(f.size)+(f.body!==undefined?', содержимое ниже':''));
+ }else L.push('файлы: нет');
  L.push('</task>');
  return L.join('\n');
 }
@@ -126,6 +133,8 @@ export function buildSystem(b){
  if(b.profile)sys.push({type:'text',text:'<profile>\n'+cut(b.profile,4000)+'\n</profile>',cache_control:{type:'ephemeral'}});
  if(b.summary)sys.push({type:'text',text:'<summary>\n'+cut(b.summary,4000)+'\n</summary>'});
  sys.push({type:'text',text:taskBlock(b.task||{})});
+ for(const f of (b.task&&Array.isArray(b.task.files)?b.task.files:[]))
+  if(f&&f.body!==undefined)sys.push({type:'text',text:'<file name="'+cut(f.name,200)+'">\n'+cut(f.body,4000)+'\n</file>'});
  sys.push({type:'text',text:envBlock(b.today,b.tz,b.others)});
  return sys;
 }

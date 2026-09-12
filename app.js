@@ -146,13 +146,13 @@ function seed(){
  const p1=mk('Запуск лендинга',plus(4),'Три шага из пяти готовы. Всё упирается в оффер — без него вычитка и выкладка не двинутся.');
  const p2=mk('Переезд офиса',plus(30),'Список неполный: нет пункта про интернет и вывоз старой мебели.');
  [
-  {t:'Оплатить хостинг',due:plus(1),pj:null,done:0,tail:{k:'art',x:'черновик письма'},file:'Письмо об отсрочке — 3 версии',n:4,a:'Черновик письма готов — три версии на выбор.'},
+  {t:'Оплатить хостинг',due:plus(1),pj:null,done:0,tail:{k:'art',x:'черновик письма'},files:[{name:'pismo-ob-otsrochke.md',mime:'text/markdown',size:182,body:'Здравствуйте!\n\nПрошу отсрочить оплату хостинга до пятницы — счёт от Марины придёт в среду.\n\nСпасибо.'}],n:4,a:'Черновик письма готов — три версии на выбор.'},
   {t:'Дозвониться до Марины',due:today(),pj:null,done:0,tail:{k:'wait',x:'жду Марину'},n:6,a:'Вопросы к звонку собраны, но она не ответила со вторника.'},
   {t:'Записаться к врачу',due:plus(5),pj:null,done:0,tail:{k:'dec',x:'выбрали клинику'},n:3,a:'Клиника в двух кварталах, приём по будням до 20:00.'},
   {t:'Разобрать фото с поездки',due:null,pj:null,done:0,tail:null,n:0,a:'Ни срока, ни разговора — в списке только название.'},
   {t:'Купить лампочки',due:null,pj:null,done:0,tail:null,n:0,a:'Мелочь без срока.'},
   {t:'Собрать структуру экранов',due:plus(-3),pj:p1,done:1,doneAt:Date.now()-3*864e5,tail:{k:'dec',x:'три экрана'},n:5,a:'Проблема, оффер, тариф.'},
-  {t:'Написать текст оффера',due:plus(2),pj:p1,done:0,tail:{k:'art',x:'нужен выбор'},file:'Оффер — три версии текста',n:8,a:'Три версии написаны. Пока не выберете — два шага стоят.'},
+  {t:'Написать текст оффера',due:plus(2),pj:p1,done:0,tail:{k:'art',x:'нужен выбор'},files:[{name:'offer.md',mime:'text/markdown',size:64,body:'# Оффер\n\nВариант А — про скорость.\nВариант Б — про цену.'}],n:8,a:'Три версии написаны. Пока не выберете — два шага стоят.'},
   {t:'Вычитка',due:plus(3),pj:p1,done:0,tail:null,n:0,a:'Ждёт текст.'},
   {t:'Залить на прод',due:null,pj:p1,done:0,tail:null,n:0,a:'Срок появится после вычитки.'},
   {t:'Найти грузчиков',due:plus(26),pj:p2,done:0,tail:{k:'wait',x:'ждём смету'},n:3,a:'Три предложения, разброс вдвое.'},
@@ -462,13 +462,73 @@ function addStep(title){
  popIn(thread.querySelector('.steps .row[data-id="'+id+'"]'));
 }
 
+/* ---------- файлы ----------
+   Задачи остаются в localStorage: они маленькие и нужны мгновенно при старте.
+   Тела файлов туда не помещаются (лимит около 5 МБ и синхронный доступ), поэтому
+   уезжают в IndexedDB. В состоянии задачи остаётся только список имён с размерами —
+   благодаря этому снимок задачи собирается синхронно и не тянет за собой весь код.
+   Файлы до INLINE байт держим прямо в состоянии: они уходят в промт целиком,
+   и «поправь второй абзац» не стоит лишнего круга. */
+const INLINE=2048, MAX_FILE=512*1024, MAX_FILES=20;
+const DB_NAME='clutch', DB_STORE='files';
+let dbp=null;
+function db(){
+ if(dbp)return dbp;
+ dbp=new Promise((ok,no)=>{
+  if(!self.indexedDB)return no(new Error('нет IndexedDB'));
+  const r=indexedDB.open(DB_NAME,1);
+  r.onupgradeneeded=()=>{const d=r.result; if(!d.objectStoreNames.contains(DB_STORE))d.createObjectStore(DB_STORE)};
+  r.onsuccess=()=>ok(r.result); r.onerror=()=>no(r.error);
+ });
+ return dbp;
+}
+const fileKey=(owner,name)=>owner+'/'+name;
+async function bodyPut(owner,name,body){
+ const d=await db();
+ return new Promise((ok,no)=>{const tx=d.transaction(DB_STORE,'readwrite');
+  tx.objectStore(DB_STORE).put(body,fileKey(owner,name)); tx.oncomplete=ok; tx.onerror=()=>no(tx.error)});
+}
+async function bodyGet(owner,name){
+ const d=await db();
+ return new Promise((ok,no)=>{const tx=d.transaction(DB_STORE,'readonly');
+  const q=tx.objectStore(DB_STORE).get(fileKey(owner,name)); q.onsuccess=()=>ok(q.result); q.onerror=()=>no(q.error)});
+}
+async function bodyDel(owner,name){
+ const d=await db();
+ return new Promise((ok,no)=>{const tx=d.transaction(DB_STORE,'readwrite');
+  tx.objectStore(DB_STORE).delete(fileKey(owner,name)); tx.oncomplete=ok; tx.onerror=()=>no(tx.error)});
+}
+/* Маленькое тело лежит в состоянии, большое — в IndexedDB */
+async function fileBody(item,f){
+ if(f.body!==undefined)return f.body;
+ try{const b=await bodyGet(f.owner,f.name); return b===undefined?null:b}catch(e){return null}
+}
+const fmtSize=n=>n<1024?n+' Б':n<1024*1024?(n/1024).toFixed(n<10240?1:0)+' КБ':(n/1048576).toFixed(1)+' МБ';
+
+/* Скачивание через Blob: файла на сервере нет, он живёт только в браузере */
+async function fileOpen(item,f){
+ const body=await fileBody(item,f);
+ if(body==null)return;
+ const url=URL.createObjectURL(new Blob([body],{type:f.mime||'text/plain;charset=utf-8'}));
+ const a=document.createElement('a');
+ a.href=url; a.download=f.name; document.body.appendChild(a); a.click(); a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
 /* ---------- инструменты ----------
    Исполняет их браузер, а не сервер: изменения идут теми же функциями и по тем же
    правилам, что и кнопки, поэтому сохранение, анимации и тесты работают без изменений,
    а сервер не может ничего испортить в задачах. Описания для модели — в worker/tools.js. */
 const MAX_ACTS=5;            /* изменяющих вызовов на один ответ; чтение не в счёт */
 const TRASH_DAYS=30;         /* сколько удалённое лежит в корзине */
-const READ_TOOLS={task_search:1,chat_search:1};
+const READ_TOOLS={task_search:1,chat_search:1,file_read:1};
+/* Размер именно в байтах: кириллица в UTF-8 занимает по два, и счёт по символам
+   врал бы вдвое — а по нему решается, вкладывать файл в промт или нет. */
+const bytes=t=>{const v=String(t);
+ try{return new TextEncoder().encode(v).length}catch(e){}
+ try{return new Blob([v]).size}catch(e){}
+ return v.length;
+};
 
 const shortId=(x,isP)=>(isP?'p':(x.pj!==null&&x.pj!==undefined)?'s':'t')+x.id;
 function byShort(sid){
@@ -589,6 +649,38 @@ const ACT={
   const isP=/^p/.test(String(a.id));
   return act('В корзину: '+(isP?o.n:o.t),()=>{o.del=Date.now()},()=>{delete o.del});
  },
+ /* Файл сохраняется в задачу: маленький прямо в состоянии, большой в IndexedDB.
+    Хвостовой вызов — результат модели не нужен, круг не тратим. */
+ async file_write(a,c){
+  const name=String(a.name||'').trim().replace(/[\/\\]/g,'_');
+  if(!name)return {out:'нет имени файла',err:1};
+  const content=String(a.content==null?'':a.content);
+  const size=bytes(content);
+  if(size>MAX_FILE)return {out:'файл больше '+fmtSize(MAX_FILE),err:1};
+  const o=c.item; o.files=o.files||[];
+  const i=o.files.findIndex(f=>f.name===name);
+  /* Существующий файл не перезаписываем без спроса — так же, как удаление */
+  if(i>=0&&!a.overwrite)return {out:'файл существует, нужен overwrite',err:1};
+  if(i<0&&o.files.length>=MAX_FILES)return {out:'слишком много файлов у задачи',err:1};
+  const owner=shortId(o,c.isP);
+  const was=i>=0?{...o.files[i]}:null;
+  const wasBody=i>=0?await fileBody(o,o.files[i]):null;
+  const f={name,mime:String(a.mime||'text/plain'),size,owner};
+  if(size<=INLINE)f.body=content; else {try{await bodyPut(owner,name,content)}catch(e){return {out:'не удалось сохранить файл',err:1}}}
+  return act('Файл: '+name+' · '+fmtSize(size),
+   ()=>{if(i>=0)o.files[i]=f; else o.files.push(f)},
+   ()=>{
+    if(was){o.files[i]=was; if(wasBody!=null&&was.body===undefined)bodyPut(owner,name,wasBody).catch(()=>{});}
+    else {o.files=o.files.filter(x=>x.name!==name); bodyDel(owner,name).catch(()=>{});}
+   });
+ },
+ async file_read(a,c){
+  const name=String(a.name||'').trim();
+  const f=(c.item.files||[]).find(x=>x.name===name);
+  if(!f)return {out:'файл не найден'};
+  const body=await fileBody(c.item,f);
+  return {out:body==null?'файл не читается':body};
+ },
  /* Чтение: в лимит действий не входит и карточки не рисует */
  task_search(a){
   const q=String(a.query||'').toLowerCase().trim(); if(!q)return {out:'пустой запрос'};
@@ -612,10 +704,11 @@ const ACT={
 };
 const mkStep=(id,t,pid)=>({id,t,due:null,pj:pid,done:0,doneAt:null,tail:null,n:0,a:'Разговора ещё не было.',chat:[]});
 
-function runTool(tu,item,isP){
+/* Часть инструментов асинхронна (файлы), поэтому результат всегда обещание */
+async function runTool(tu,item,isP){
  const f=ACT[tu.name];
  if(!f)return {out:'неизвестный инструмент',err:1};
- try{return f(tu.input||{},{item,isP})}
+ try{return await f(tu.input||{},{item,isP})}
  catch(e){return {out:'ошибка: '+((e&&e.message)||e),err:1}}
 }
 
@@ -650,7 +743,10 @@ function chatPayload(item,isP){
   kind:(KIND[kindOf(item,isP)]||'Задача').toLowerCase(),
   due:item.due||null, dueWord:fmtDue(item.due)||'',
   done:isP?false:!!item.done, isProject:!!isP,
-  steps:isP?inPj(item.id).map(x=>({id:'s'+x.id,t:x.t,done:!!x.done})):[]
+  steps:isP?inPj(item.id).map(x=>({id:'s'+x.id,t:x.t,done:!!x.done})):[],
+  /* Содержимое в промт не уходит: только имена и размеры. Исключение — маленькие
+     файлы, они вкладываются целиком, чтобы правка абзаца не стоила лишнего круга. */
+  files:(item.files||[]).map(f=>({name:f.name,size:f.size,...(f.body!==undefined?{body:f.body}:{})}))
  };
  if(!isP&&item.pj!==null&&item.pj!==undefined){
   const pr=prById(item.pj);
@@ -781,7 +877,7 @@ async function turn(item,isP){
    if(isRead)read=true;
    if(!isRead&&acts>=MAX_ACTS){ph.res.push({id:tu.id,out:'лимит действий, спроси пользователя',err:1}); continue}
    if(!isRead)acts++;
-   const r=runTool(tu,item,isP);
+   const r=await runTool(tu,item,isP);
    ph.res.push({id:tu.id,out:r.out,err:r.err});
    if(r.card!==undefined)(ph.cards=ph.cards||[]).push({label:r.card,undo:r.undo});
   }
@@ -890,7 +986,10 @@ function paintDetail(){
   }
   thread.appendChild(w);
  }
- if(!isP&&x.file)add('<div class="card">'+I('file-text',16,'text-accent')+'<div style="min-width:0; flex:1;"><div class="f1">'+esc(x.file)+'</div><div class="f2">вложение задачи · открыть</div></div></div>');
+ /* Вложения задачи. Файла на сервере нет — он живёт только в браузере,
+    поэтому скачивание идёт через Blob. */
+ (it.files||[]).forEach((f,i)=>add('<div class="card" data-file="'+i+'">'+I('file-text',16,'text-accent')+
+  '<div style="min-width:0; flex:1;"><div class="f1">'+esc(f.name)+'</div><div class="f2">'+esc(fmtSize(f.size))+' · скачать</div></div></div>'));
   it.chat.forEach(m=>{
   if(m.u!==undefined){add('<div class="bub mine">'+esc(m.u)+'</div>'); return;}
   if(m.typing){add('<div class="ans typing"><i></i><i></i><i></i></div>'); return;}
@@ -906,6 +1005,7 @@ function paintDetail(){
   }
  });
  thread.querySelectorAll('[data-undo]').forEach(b=>b.onclick=()=>undoAct(+b.dataset.undo));
+ thread.querySelectorAll('[data-file]').forEach(el=>el.onclick=()=>fileOpen(it,(it.files||[])[+el.dataset.file]));
  thread.scrollTop=thread.scrollHeight;
  if(same){
   const kids=thread.children;
@@ -1088,7 +1188,7 @@ addEventListener('pagehide',flush); addEventListener('beforeunload',flush);
 paint();
 /* Поверхность для тестов и отладки из консоли браузера. S переприсваивается при загрузке,
    поэтому отдаётся геттером, иначе снаружи виден устаревший объект. */
-window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload,chatMessages,md,runTool,undoAct,byShort,shortId,get undos(){return undos},get undoNote(){return undoNote}};
+window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload,chatMessages,md,runTool,undoAct,byShort,shortId,fileBody,fmtSize,get undos(){return undos},get undoNote(){return undoNote}};
 
 /* Обновление установленного приложения. Новый service worker забирает управление сам
    (skipWaiting + clients.claim), но страница продолжает исполнять старый код до перезагрузки —

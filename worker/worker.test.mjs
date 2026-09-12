@@ -44,6 +44,19 @@ ok(sys[0].text.includes('ассистент задачника CLUTCH')&&!sys[0]
 ok(sys[1].text.includes('<profile>'),'профиль отдельным блоком');
 ok(buildSystem(base())[1].text.includes('<task'),'без профиля блоков на один меньше');
 
+/* ---------- файлы в снимке ---------- */
+const tf=taskBlock({id:'t12',title:'Оплатить хостинг',kind:'оплата',isProject:false,
+ files:[{name:'schet.pdf',size:48213},{name:'zametka.md',size:29,body:'Марина обещала счёт до среды.'}]});
+ok(tf.includes('schet.pdf — 47 КБ'),'в снимке имя и размер файла');
+ok(tf.includes('zametka.md — 29 Б, содержимое ниже'),'маленький файл помечен как вложенный');
+ok(!tf.includes('Марина обещала'),'содержимое в сам снимок не попадает');
+const sysF=buildSystem({...base(),task:{id:'t12',title:'x',isProject:false,
+ files:[{name:'zametka.md',size:29,body:'Марина обещала счёт до среды.'},{name:'schet.pdf',size:48213}]}});
+const fileBlocks=sysF.filter(b=>b.text.startsWith('<file'));
+ok(fileBlocks.length===1,'блоком <file> уходит только маленький файл');
+ok(fileBlocks[0].text.includes('name="zametka.md"')&&fileBlocks[0].text.includes('Марина обещала'),'и он несёт содержимое');
+ok(taskBlock({id:'t1',title:'x',isProject:false}).includes('файлы: нет'),'без файлов так и написано');
+
 /* ---------- поток ---------- */
 upstream(текст('Ближайший шаг — '),текст('позвонить в банк.'),{type:'message_delta',delta:{stop_reason:'end_turn'},usage:{output_tokens:9}});
 let r=await post(base());

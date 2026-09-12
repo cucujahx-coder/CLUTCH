@@ -210,7 +210,7 @@ function payload(){
 }
 
 /* ---------- инструменты: изменения из чата ---------- */
-function tools(){
+async function tools(){
  console.log('инструменты');
  const {w,d}=load('index.html');
  const A=w.app;
@@ -222,7 +222,7 @@ function tools(){
 
  // переименование и отмена
  const was=task.t;
- let r=call('task_rename',{title:'Новое имя'},task,false);
+ let r=await await call('task_rename',{title:'Новое имя'},task,false);
  assert(task.t==='Новое имя'&&r.card.includes('Новое имя'),'task_rename меняет название и даёт карточку');
  A.undoAct(r.undo);
  assert(task.t===was,'отмена возвращает прежнее название');
@@ -233,29 +233,29 @@ function tools(){
  assert(task.t===before,'повторное нажатие ничего не делает');
 
  // срок: только правильный формат
- assert(call('task_set_due',{date:'завтра'},task,false).err,'срок словами отклоняется');
- call('task_set_due',{date:'2030-03-05'},task,false);
+ assert((await call('task_set_due',{date:'завтра'},task,false)).err,'срок словами отклоняется');
+ await call('task_set_due',{date:'2030-03-05'},task,false);
  assert(task.due==='2030-03-05','срок поставлен');
- r=call('task_set_due',{date:null},task,false);
+ r=await await call('task_set_due',{date:null},task,false);
  assert(task.due===null,'срок снят');
  A.undoAct(r.undo);
  assert(task.due==='2030-03-05','отмена вернула срок');
 
  // закрытие задачи идёт через mark: doneAt проставляется, как от кнопки
- r=call('task_complete',{done:true},task,false);
+ r=await await call('task_complete',{done:true},task,false);
  assert(task.done===1&&task.doneAt,'task_complete закрывает и ставит время');
  A.undoAct(r.undo);
  assert(task.done===0&&!task.doneAt,'отмена возвращает в работу');
 
  // подпись под задачей: состояние угадывается по тексту
- call('task_set_tail',{tail:'жду счёт'},task,false);
+ await call('task_set_tail',{tail:'жду счёт'},task,false);
  assert(task.tail.x==='жду счёт'&&task.tail.k==='wait','подпись «жду» помечена ожиданием');
- call('task_set_tail',{tail:'выбрали клинику'},task,false);
+ await call('task_set_tail',{tail:'выбрали клинику'},task,false);
  assert(task.tail.k==='dec','подпись о решении помечена решением');
 
  // задача становится проектом
  const n0=A.S.pr.length;
- r=call('task_make_project',{steps:['второй','третий']},task,false);
+ r=await await call('task_make_project',{steps:['второй','третий']},task,false);
  assert(A.S.pr.length===n0+1,'создан проект');
  const pid=A.S.cur.id;
  assert(A.openIn(pid).length===3,'исходная задача стала первым шагом, плюс два новых');
@@ -266,20 +266,20 @@ function tools(){
  const pr=A.S.pr[0];
  A.S.cur={k:'p',id:pr.id};
  const s0=A.inPj(pr.id).length;
- r=call('task_add_step',{title:'Свежий шаг'},pr,true);
+ r=await await call('task_add_step',{title:'Свежий шаг'},pr,true);
  assert(A.inPj(pr.id).length===s0+1,'шаг добавлен');
  const step=A.inPj(pr.id).find(x=>x.t==='Свежий шаг');
- assert(call('task_add_step',{title:'x'},A.S.ts[0],false).err,'шаг нельзя добавить к обычной задаче');
+ assert((await call('task_add_step',{title:'x'},A.S.ts[0],false)).err,'шаг нельзя добавить к обычной задаче');
 
  // вставка после конкретного шага
- call('task_add_step',{title:'После первого',after:'s'+A.inPj(pr.id)[0].id},pr,true);
+ await call('task_add_step',{title:'После первого',after:'s'+A.inPj(pr.id)[0].id},pr,true);
  assert(A.inPj(pr.id)[1].t==='После первого','after ставит шаг на нужное место');
 
- call('task_complete_step',{step:'s'+step.id,done:true},pr,true);
+ await call('task_complete_step',{step:'s'+step.id,done:true},pr,true);
  assert(step.done===1,'шаг закрыт по идентификатору');
- assert(call('task_complete_step',{step:'s99999',done:true},pr,true).err,'несуществующий шаг — ошибка, а не молчание');
+ assert((await call('task_complete_step',{step:'s99999',done:true},pr,true)).err,'несуществующий шаг — ошибка, а не молчание');
 
- r=call('task_delete_step',{step:'s'+step.id},pr,true);
+ r=await await call('task_delete_step',{step:'s'+step.id},pr,true);
  assert(!A.inPj(pr.id).some(x=>x.id===step.id),'шаг ушёл из проекта');
  assert(A.byId(step.id),'но найти его ещё можно — иначе не сработала бы отмена');
  A.undoAct(r.undo);
@@ -287,16 +287,16 @@ function tools(){
 
  // создание другой задачи
  const t0=A.S.ts.length;
- r=call('task_create',{title:'Из чата',due:'2030-04-01'},pr,true);
+ r=await await call('task_create',{title:'Из чата',due:'2030-04-01'},pr,true);
  assert(A.S.ts.some(x=>x.t==='Из чата'&&x.due==='2030-04-01'),'task_create заводит задачу со сроком');
  A.undoAct(r.undo);
  assert(A.S.ts.length===t0,'отмена убирает созданную задачу');
- call('task_create',{title:'Сразу проект',steps:['раз','два']},pr,true);
+ await call('task_create',{title:'Сразу проект',steps:['раз','два']},pr,true);
  assert(A.S.pr.some(x=>x.n==='Сразу проект'),'со списком шагов создаётся проект');
 
  // корзина
  const victim=A.S.ts.find(x=>x.pj===null&&!x.del);
- r=call('task_delete',{id:'t'+victim.id},pr,true);
+ r=await await call('task_delete',{id:'t'+victim.id},pr,true);
  A.paint();
  assert(!rows().some(x=>x.dataset.id===String(victim.id)),'удалённая задача исчезла из списка');
  assert(A.byId(victim.id)&&A.byId(victim.id).del,'но лежит в корзине с отметкой времени');
@@ -304,14 +304,59 @@ function tools(){
  assert(!A.byId(victim.id).del,'отмена достаёт из корзины');
 
  // поиск не меняет состояние и возвращает идентификаторы
- const found=call('task_search',{query:'офис'},pr,true);
+ const found=await call('task_search',{query:'офис'},pr,true);
  assert(!found.card&&!found.undo,'поиск карточку не рисует');
  assert(/^[tps]\d+ /m.test(found.out)||found.out==='ничего не нашлось','поиск отдаёт идентификаторы');
- assert(call('task_search',{query:'этого точно нет'},pr,true).out==='ничего не нашлось','пустой результат — словами');
+ assert((await call('task_search',{query:'этого точно нет'},pr,true)).out==='ничего не нашлось','пустой результат — словами');
 
  // неизвестный инструмент не роняет приложение
- assert(A.runTool({id:'x',name:'нет_такого',input:{}},pr,true).err,'неизвестный инструмент — ошибка');
+ assert((await A.runTool({id:'x',name:'нет_такого',input:{}},pr,true)).err,'неизвестный инструмент — ошибка');
 }
+
+/* ---------- файлы ---------- */
+async function files(){
+ console.log('файлы');
+ const {w,d}=load('index.html');
+ const A=w.app;
+ const call=(name,input,item,isP)=>A.runTool({id:'u'+Math.random(),name,input},item,isP);
+ const t=A.S.ts.find(x=>x.pj===null&&!x.files);
+ A.S.cur={k:'t',id:t.id};
+
+ let r=await call('file_write',{name:'zametka.md',mime:'text/markdown',content:'Марина обещала счёт до среды.'},t,false);
+ assert(!r.err&&t.files.length===1,'file_write сохраняет файл в задачу');
+ assert(t.files[0].body==='Марина обещала счёт до среды.','маленький файл лежит прямо в состоянии');
+ assert(t.files[0].size===bytesOf('Марина обещала счёт до среды.'),'размер в байтах, а не в символах');
+ assert(r.card.includes('zametka.md'),'карточка называет файл');
+
+ assert((await call('file_write',{name:'zametka.md',content:'другое'},t,false)).out.includes('overwrite'),
+  'существующий файл не перезаписывается без спроса');
+ const r2=await call('file_write',{name:'zametka.md',content:'новое содержимое',overwrite:true},t,false);
+ assert(t.files[0].body==='новое содержимое'&&t.files.length===1,'с overwrite файл заменяется, а не добавляется');
+ A.undoAct(r2.undo);
+ assert(t.files[0].body==='Марина обещала счёт до среды.','отмена вернула прежнее содержимое');
+
+ assert((await call('file_read',{name:'zametka.md'},t,false)).out==='Марина обещала счёт до среды.','file_read отдаёт содержимое');
+ assert((await call('file_read',{name:'нет-такого.md'},t,false)).out==='файл не найден','пропавший файл — словами, а не молчанием');
+ assert((await call('file_write',{name:'',content:'x'},t,false)).err,'файл без имени отклоняется');
+
+ // путь в имени не должен уводить из задачи
+ await call('file_write',{name:'../../etc/passwd',content:'x'},t,false);
+ assert(t.files.some(f=>f.name==='......etc_passwd'||!f.name.includes('/')),'слеши из имени убраны');
+
+ // снимок задачи несёт имена, размеры и содержимое только маленьких файлов
+ const p=A.chatPayload(t,false);
+ assert(p.task.files.length===t.files.length,'файлы попали в снимок');
+ assert(p.task.files[0].body!==undefined&&p.task.files[0].size>0,'у маленького файла в снимке есть содержимое');
+
+ // большой файл без IndexedDB (в jsdom её нет) — ошибка, а не падение
+ const big=await call('file_write',{name:'big.txt',content:'x'.repeat(5000)},t,false);
+ assert(big.err&&!t.files.some(f=>f.name==='big.txt'),'файл, который некуда положить, не попадает в список');
+
+ // file_read не тратит лимит действий и не рисует карточку
+ const rd=await call('file_read',{name:'zametka.md'},t,false);
+ assert(!rd.card&&rd.undo===undefined,'чтение файла карточку не рисует');
+}
+const bytesOf=t=>new TextEncoder().encode(t).length;
 
 /* ---------- переписка в формате блоков ---------- */
 function blocks(){
@@ -438,7 +483,8 @@ function markdown(){
  await actions();
  payload();
  markdown();
- tools();
+ await tools();
+ await files();
  blocks();
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
 })();
