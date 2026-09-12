@@ -69,6 +69,38 @@ ok((await read(await post(base()))).includes('event: error'),'отказ мод�
 upstream({type:'error',error:{type:'overloaded_error',message:'Overloaded'}});
 ok((await read(await post(base()))).includes('overloaded_error'),'ошибка посреди потока доходит с кодом');
 
+/* ---------- инструменты ---------- */
+upstream(текст('Переношу.'),
+ {type:'content_block_start',index:1,content_block:{type:'tool_use',id:'tu_1',name:'task_set_due'}},
+ {type:'content_block_delta',index:1,delta:{type:'input_json_delta',partial_json:'{"date":'}},
+ {type:'content_block_delta',index:1,delta:{type:'input_json_delta',partial_json:'"2026-09-18"}'}},
+ {type:'content_block_stop',index:1},
+ {type:'message_delta',delta:{stop_reason:'tool_use'}});
+out=await read(await post(base()));
+ok(out.includes('event: tool_use'),'вызов инструмента доходит до клиента');
+const tu=JSON.parse(out.split('event: tool_use\ndata: ')[1].split('\n')[0]);
+ok(tu.name==='task_set_due'&&tu.input.date==='2026-09-18','аргументы собраны из кусков в готовый JSON');
+ok(tu.id==='tu_1','идентификатор вызова сохранён — по нему вернётся результат');
+ok(out.includes('"stop":"tool_use"'),'в done видно, что ход закончился вызовом');
+ok(Array.isArray(sent.body.tools)&&sent.body.tools.length>=12,'описания инструментов уходят модели');
+ok(sent.body.tools.every(t=>t.name&&t.input_schema),'у каждого инструмента имя и схема');
+
+/* ход с вызовом и ответ с результатом — блочные сообщения, пробрасываются как есть */
+upstream(текст('Готово.'));
+await post({...base(),messages:[
+ {role:'user',content:'перенеси на пятницу'},
+ {role:'assistant',content:[{type:'text',text:'Переношу.'},{type:'tool_use',id:'tu_1',name:'task_set_due',input:{date:'2026-09-18'}}]},
+ {role:'user',content:[{type:'tool_result',tool_use_id:'tu_1',content:'ok'}]}
+]});
+const m=sent.body.messages;
+ok(m.length===3&&m[1].content[1].type==='tool_use','ход модели с вызовом дошёл блоками');
+ok(m[2].content[0].type==='tool_result'&&m[2].content[0].tool_use_id==='tu_1','результат дошёл с тем же идентификатором');
+
+/* мусор внутри блоков отбрасывается, а не ломает запрос */
+upstream(текст('x'));
+await post({...base(),messages:[{role:'user',content:[{type:'нет_такого'},{type:'text',text:'привет'}]}]});
+ok(sent.body.messages[0].content.length===1&&sent.body.messages[0].content[0].text==='привет','неизвестные блоки отброшены');
+
 /* ---------- проверки запроса ---------- */
 ok((await post({...base(),messages:[]})).status===400,'пустая переписка отклоняется');
 ok((await post({...base(),messages:[{role:'user',content:'а'},{role:'assistant',content:'б'}]})).status===400,'запрос без вопроса пользователя отклоняется');

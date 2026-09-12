@@ -103,8 +103,17 @@ let S={seq:1,ts:[],pr:[],showDone:0,cur:null};
 let saveT;
 function save(){clearTimeout(saveT);saveT=setTimeout(flush,120)}
 function flush(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+/* Корзина чистится при загрузке: удалённое старше TRASH_DAYS стирается физически */
+function purge(st){
+ const edge=Date.now()-TRASH_DAYS*864e5;
+ const dead=x=>x.del&&x.del<edge;
+ const gone=st.pr.filter(dead).map(x=>x.id);
+ st.pr=st.pr.filter(x=>!dead(x));
+ st.ts=st.ts.filter(x=>!dead(x)&&!gone.includes(x.pj));
+ return st;
+}
 function load(){
- try{const v=localStorage.getItem(KEY);if(v){const p=JSON.parse(v);if(p&&Array.isArray(p.ts))return p}}catch(e){}
+ try{const v=localStorage.getItem(KEY);if(v){const p=JSON.parse(v);if(p&&Array.isArray(p.ts))return purge(p)}}catch(e){}
  const imported=importOld();
  return imported||seed();
 }
@@ -187,8 +196,10 @@ const kindIcon=()=>'<span class="ki" aria-hidden="true"></span>';   // сам з
 /* ---------- выборки ---------- */
 const byId=i=>S.ts.find(x=>x.id===i);
 const prById=i=>S.pr.find(p=>p.id===i);
-const inPj=p=>S.ts.filter(x=>x.pj===p);
-const openIn=p=>S.ts.filter(x=>x.pj===p&&!x.done);
+/* Удалённое лежит в корзине с отметкой del и из списков исчезает; byId и prById
+   его по-прежнему находят — иначе не сработала бы отмена. */
+const inPj=p=>S.ts.filter(x=>x.pj===p&&!x.del);
+const openIn=p=>S.ts.filter(x=>x.pj===p&&!x.done&&!x.del);
 const curItem=()=>S.cur&&(S.cur.k==='p'?prById(S.cur.id):byId(S.cur.id));
 
 /* ---------- анимации ---------- */
@@ -451,21 +462,190 @@ function addStep(title){
  popIn(thread.querySelector('.steps .row[data-id="'+id+'"]'));
 }
 
+/* ---------- инструменты ----------
+   Исполняет их браузер, а не сервер: изменения идут теми же функциями и по тем же
+   правилам, что и кнопки, поэтому сохранение, анимации и тесты работают без изменений,
+   а сервер не может ничего испортить в задачах. Описания для модели — в worker/tools.js. */
+const MAX_ACTS=5;            /* изменяющих вызовов на один ответ; чтение не в счёт */
+const TRASH_DAYS=30;         /* сколько удалённое лежит в корзине */
+const READ_TOOLS={task_search:1,chat_search:1};
+
+const shortId=(x,isP)=>(isP?'p':(x.pj!==null&&x.pj!==undefined)?'s':'t')+x.id;
+function byShort(sid){
+ const m=/^([tps])(\d+)$/.exec(String(sid==null?'':sid));
+ if(!m)return null;
+ return m[1]==='p'?prById(+m[2]):byId(+m[2]);
+}
+
+/* Стек отмены живёт только до перезагрузки страницы, и это честно показано:
+   после неё кнопки в старых карточках гаснут. */
+let undos=[], undoNote='';
+function act(label,apply,revert){
+ undos.push({label,revert,live:1});
+ apply();
+ return {out:'ok',card:label,undo:undos.length-1};
+}
+function undoAct(i){
+ const u=undos[i];
+ if(!u||!u.live)return;
+ u.live=0; u.revert();
+ /* Отмена расходится с историей модели: там уже лежит «сделал». Пометка в начале
+    следующего сообщения объясняет расхождение, чтобы она не повторяла действие. */
+ undoNote='[отменено: '+u.label.toLowerCase()+']';
+ save(); paint();
+}
+
+/* Состояние подписи по её тексту: ждём кого-то — оранжевым, появился результат —
+   синим, решили — зелёным. Без \b: он не работает с кириллицей. */
+const TAIL_K=t=>/^жд[уёеа]/i.test(t)?'wait':/^(черновик|письмо|текст|файл|набросок)/i.test(t)?'art':'dec';
+
+const ACT={
+ task_rename(a,c){
+  const t=String(a.title||'').trim(); if(!t)return {out:'пустое название',err:1};
+  const o=c.item, was=c.isP?o.n:o.t;
+  return act('Название → '+t,()=>{if(c.isP)o.n=t; else o.t=t},()=>{if(c.isP)o.n=was; else o.t=was});
+ },
+ task_set_due(a,c){
+  const d=a.date==null?null:String(a.date);
+  if(d!==null&&!/^\d{4}-\d{2}-\d{2}$/.test(d))return {out:'дата должна быть YYYY-MM-DD',err:1};
+  const o=c.item, was=o.due;
+  return act('Срок → '+(d?fmtDue(d):'снят'),()=>{o.due=d},()=>{o.due=was});
+ },
+ task_complete(a,c){
+  if(c.isP)return {out:'у проекта нет своей отметки, закрывай шаги',err:1};
+  const o=c.item, was={done:o.done,doneAt:o.doneAt};
+  return act(a.done?'Задача закрыта':'Задача снова в работе',
+   ()=>mark(o,!!a.done),()=>{o.done=was.done;o.doneAt=was.doneAt});
+ },
+ task_set_tail(a,c){
+  const t=String(a.tail||'').trim(); if(!t)return {out:'пустая подпись',err:1};
+  const o=c.item, was=o.tail;
+  return act('Подпись → '+t,()=>{o.tail={k:TAIL_K(t),x:t}},()=>{o.tail=was});
+ },
+ task_make_project(a,c){
+  if(c.isP)return {out:'это уже проект',err:1};
+  const o=c.item;
+  if(o.pj!==null&&o.pj!==undefined)return {out:'это шаг проекта',err:1};
+  const steps=(Array.isArray(a.steps)?a.steps:[]).map(x=>String(x||'').trim()).filter(Boolean).slice(0,30);
+  const pid=S.seq++, was={n:o.n,chat:o.chat};
+  const made=[];
+  return act('Проект из задачи, шагов: '+(steps.length+1),()=>{
+   S.pr.push({id:pid,n:o.t,due:o.due,why:'Проект создан из задачи.',chat:o.chat.slice()});
+   o.pj=pid; o.chat=[]; o.n=0;
+   for(const t of steps){const id=S.seq++; made.push(id); S.ts.push(mkStep(id,t,pid));}
+   S.cur={k:'p',id:pid};
+  },()=>{
+   S.pr=S.pr.filter(x=>x.id!==pid);
+   S.ts=S.ts.filter(x=>!made.includes(x.id));
+   o.pj=null; o.chat=was.chat; o.n=was.chat.length;
+   S.cur={k:'t',id:o.id};
+  });
+ },
+ task_add_step(a,c){
+  if(!c.isP)return {out:'шаги есть только у проекта',err:1};
+  const t=String(a.title||'').trim(); if(!t)return {out:'пустое название',err:1};
+  const id=S.seq++, pid=c.item.id;
+  const after=a.after?byShort(a.after):null;
+  return act('Шаг: '+t,()=>{
+   const st=mkStep(id,t,pid);
+   const i=after?S.ts.indexOf(after):-1;
+   if(i>=0)S.ts.splice(i+1,0,st); else S.ts.push(st);
+  },()=>{S.ts=S.ts.filter(x=>x.id!==id)});
+ },
+ task_complete_step(a,c){
+  const st=byShort(a.step);
+  if(!st||st.pj===null||st.pj===undefined)return {out:'шаг не найден',err:1};
+  const was={done:st.done,doneAt:st.doneAt};
+  return act((a.done?'Шаг закрыт: ':'Шаг открыт: ')+st.t,
+   ()=>mark(st,!!a.done),()=>{st.done=was.done;st.doneAt=was.doneAt});
+ },
+ task_delete_step(a,c){
+  const st=byShort(a.step);
+  if(!st||st.pj===null||st.pj===undefined)return {out:'шаг не найден',err:1};
+  return act('Шаг удалён: '+st.t,()=>{st.del=Date.now()},()=>{delete st.del});
+ },
+ task_create(a){
+  const t=String(a.title||'').trim(); if(!t)return {out:'пустое название',err:1};
+  const d=a.due==null?null:String(a.due);
+  if(d!==null&&!/^\d{4}-\d{2}-\d{2}$/.test(d))return {out:'дата должна быть YYYY-MM-DD',err:1};
+  const id=S.seq++, steps=(Array.isArray(a.steps)?a.steps:[]).map(x=>String(x||'').trim()).filter(Boolean).slice(0,30);
+  const made=[]; let pid=null;
+  return act('Новая задача: '+t,()=>{
+   if(steps.length){
+    pid=S.seq++;
+    S.pr.push({id:pid,n:t,due:d,why:'Проект создан ассистентом.',chat:[]});
+    for(const x of steps){const sid=S.seq++; made.push(sid); S.ts.push(mkStep(sid,x,pid));}
+   }else{
+    S.ts.push({id,t,due:d,pj:null,done:0,doneAt:null,tail:null,n:0,a:'Разговора ещё не было.',chat:[]});
+   }
+  },()=>{
+   S.ts=S.ts.filter(x=>x.id!==id&&!made.includes(x.id));
+   if(pid!==null)S.pr=S.pr.filter(x=>x.id!==pid);
+  });
+ },
+ task_delete(a){
+  const o=byShort(a.id);
+  if(!o)return {out:'не найдено',err:1};
+  const isP=/^p/.test(String(a.id));
+  return act('В корзину: '+(isP?o.n:o.t),()=>{o.del=Date.now()},()=>{delete o.del});
+ },
+ /* Чтение: в лимит действий не входит и карточки не рисует */
+ task_search(a){
+  const q=String(a.query||'').toLowerCase().trim(); if(!q)return {out:'пустой запрос'};
+  const scope=a.scope||'open';
+  const hit=x=>(x.t||x.n||'').toLowerCase().includes(q)||((x.tail&&x.tail.x)||'').toLowerCase().includes(q);
+  const ok=x=>scope==='all'?1:scope==='done'?x.done:!x.done;
+  const r=[...S.ts.filter(x=>!x.del&&hit(x)&&ok(x)).map(x=>shortId(x,0)+' '+x.t),
+           ...S.pr.filter(x=>!x.del&&hit(x)).map(x=>shortId(x,1)+' '+x.n)].slice(0,20);
+  return {out:r.length?r.join('\n'):'ничего не нашлось'};
+ },
+ chat_search(a){
+  const q=String(a.query||'').toLowerCase().trim(); if(!q)return {out:'пустой запрос'};
+  const r=[];
+  const scan=(o,isP)=>{for(const m of (o.chat||[])){
+   const t=m.u||m.a||''; if(t&&t.toLowerCase().includes(q))r.push(shortId(o,isP)+' «'+(isP?o.n:o.t)+'»: '+t.slice(0,160));
+  }};
+  S.ts.filter(x=>!x.del).forEach(x=>scan(x,0));
+  S.pr.filter(x=>!x.del).forEach(x=>scan(x,1));
+  return {out:r.length?r.slice(0,10).join('\n'):'ничего не нашлось'};
+ }
+};
+const mkStep=(id,t,pid)=>({id,t,due:null,pj:pid,done:0,doneAt:null,tail:null,n:0,a:'Разговора ещё не было.',chat:[]});
+
+function runTool(tu,item,isP){
+ const f=ACT[tu.name];
+ if(!f)return {out:'неизвестный инструмент',err:1};
+ try{return f(tu.input||{},{item,isP})}
+ catch(e){return {out:'ошибка: '+((e&&e.message)||e),err:1}}
+}
+
 /* ---------- чат ----------
-   API — адрес серверной функции из worker/. Ключ Anthropic в статике держать
-   нельзя: бандл публичный. Поэтому запрос уходит в воркер, а ключ и системный
-   промпт живут там. Пока адрес пуст, отвечает локальная заглушка — приложение
-   остаётся рабочим и без сервера. */
+   API — адрес серверной функции из worker/. Ключ Anthropic в статике держать нельзя:
+   бандл публичный. Пока адрес пуст, отвечает локальная заглушка. */
 const API='https://clutch.gloomnotgloom.com';
 
-/* Снимок задачи: пересобирается на каждый запрос, поэтому чат всегда говорит о том,
-   что человек видит на экране. Идентификаторы короткие и стабильные — модель ссылается
-   только на них. Формат блоков промта описан в PROMPT.md. */
+/* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
+   результатами — два соседних сообщения; строка ошибки и «печатает» не уходят. */
+function chatMessages(item){
+ const out=[];
+ for(const m of item.chat){
+  if(m.err||m.typing)continue;
+  if(m.u!==undefined){out.push({role:'user',content:m.u}); continue}
+  const blocks=[];
+  if(m.a)blocks.push({type:'text',text:m.a});
+  if(m.tu)for(const t of m.tu)blocks.push({type:'tool_use',id:t.id,name:t.name,input:t.input||{}});
+  if(blocks.length)out.push({role:'assistant',content:blocks});
+  if(m.res&&m.res.length)out.push({role:'user',
+   content:m.res.map(r=>({type:'tool_result',tool_use_id:r.id,content:r.out,...(r.err?{is_error:true}:{})}))});
+ }
+ return out;
+}
+
+/* Снимок задачи пересобирается на каждый запрос, поэтому чат всегда говорит о том,
+   что человек видит на экране. Идентификаторы короткие и стабильные. */
 function chatPayload(item,isP){
- const hist=item.chat.filter(m=>!m.typing&&!m.err)
-  .map(m=>m.u!==undefined?{role:'user',content:m.u}:{role:'assistant',content:m.a});
  const task={
-  id:(isP?'p':'t')+item.id,
+  id:shortId(item,isP),
   title:isP?item.n:item.t,
   kind:(KIND[kindOf(item,isP)]||'Задача').toLowerCase(),
   due:item.due||null, dueWord:fmtDue(item.due)||'',
@@ -479,17 +659,18 @@ function chatPayload(item,isP){
   if(pr){task.project=pr.n; task.fromStep='s'+item.id;}
  }
  const cur=task.id;
- const others=S.ts.filter(x=>!x.done&&(x.pj===null||x.pj===undefined)).map(x=>({id:'t'+x.id,t:x.t,due:x.due||null,isProject:false}))
-  .concat(S.pr.filter(x=>openIn(x.id).length).map(x=>({id:'p'+x.id,t:x.n,due:x.due||null,isProject:true})))
+ const others=S.ts.filter(x=>!x.done&&!x.del&&(x.pj===null||x.pj===undefined)).map(x=>({id:'t'+x.id,t:x.t,due:x.due||null,isProject:false}))
+  .concat(S.pr.filter(x=>!x.del&&openIn(x.id).length).map(x=>({id:'p'+x.id,t:x.n,due:x.due||null,isProject:true})))
   .filter(x=>x.id!==cur)
   .sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'))
   .slice(0,20);
  let tz='UTC'; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch(e){}
- return {task,others,messages:hist,today:today(),tz};
+ return {task,others,messages:chatMessages(item),today:today(),tz};
 }
 
 /* Один проход потока. Текст отдаётся кусками через onDelta — лента дорисовывается
-   на ходу, как в приложении Claude, а не появляется целиком в конце. */
+   на ходу, а не появляется целиком в конце. Вызовы инструментов копятся и отдаются
+   в конце: их аргументы приходят кусками и собираются воркером. */
 async function streamOnce(body,onDelta){
  const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
  if(!r.ok){
@@ -500,7 +681,7 @@ async function streamOnce(body,onDelta){
  }
  if(!r.body)throw new Error('поток недоступен');
  const rd=r.body.getReader(), dec=new TextDecoder();
- let buf='', out='', got=false;
+ let buf='', out='', got=false; const tools=[];
  for(;;){
   const {value,done}=await rd.read();
   if(done)break;
@@ -512,6 +693,7 @@ async function streamOnce(body,onDelta){
    if(!ev||dl===undefined)continue;
    let d; try{d=JSON.parse(dl)}catch(e){continue}
    if(ev==='text'){out+=d; got=true; onDelta&&onDelta(out);}
+   else if(ev==='tool_use'){tools.push(d); got=true;}
    else if(ev==='error'){
     const e=new Error(d.error||'ошибка потока');
     e.retry=!got;                       /* повторяем только если ничего не успели показать */
@@ -520,11 +702,10 @@ async function streamOnce(body,onDelta){
   }
  }
  if(!got){const e=new Error('пустой ответ'); e.retry=true; throw e;}
- return out.trim();
+ return {text:out.trim(),tools};
 }
 
-async function askAssistant(text,item,isP,onDelta){
- if(!API)return stubReply(text,item,isP);
+async function askOnce(item,isP,onDelta){
  const body=chatPayload(item,isP);
  let pause=600;
  for(let n=0;n<3;n++){
@@ -534,8 +715,7 @@ async function askAssistant(text,item,isP,onDelta){
       показываем сразу: смысла ждать нет, а молчание хуже понятной ошибки. */
    if(e&&e.retry&&n<2){await new Promise(r=>setTimeout(r,pause)); pause*=2; continue;}
    let host=API; try{host=new URL(API).host}catch(_){}
-   const err=new Error('Не получилось связаться с моделью ('+host+'): '+((e&&e.message)||e)+'.');
-   err.shown=true; throw err;
+   throw new Error('Не получилось связаться с моделью ('+host+'): '+((e&&e.message)||e)+'.');
   }
  }
 }
@@ -550,31 +730,65 @@ async function stubReply(text,item,isP){
   if(t.includes('блокир'))return item.why;
   return 'По проекту «'+item.n+'»: осталось '+op.length+' шаг(ов), срок — '+(fmtDue(item.due)||'не задан')+'.';
  }
- if(t.includes('разбить'))return 'Предлагаю три шага: уточнить детали, сделать основную часть, проверить результат. Нажмите «Сделать проектом», чтобы добавить их.';
+ if(t.includes('разбить'))return 'Предлагаю три шага: уточнить детали, сделать основную часть, проверить результат.';
  if(t.includes('перенести'))return 'На какую дату перенести «'+item.t+'»? Сейчас: '+(fmtDue(item.due)||'без срока')+'.';
- if(t.includes('письмо'))return 'Набросал письмо по задаче «'+item.t+'». Кому отправить?';
  return item.a;
 }
+
 function ask(text){
  const isP=S.cur.k==='p', item=curItem(); if(!item)return;
- const ph={typing:1};
- item.chat.push({u:text},ph);
+ /* Пометка об отмене уходит в начале сообщения: снимок задачи покажет правду,
+    но без пометки модель удивится расхождению и повторит действие. */
+ const note=undoNote; undoNote='';
+ item.chat.push({u:(note?note+' ':'')+text});
  if(!isP)item.n++;
- paint(); save();
+ turn(item,isP);
+}
+
+/* Круг «ответ → вызовы → результаты → продолжение». Каждый круг — новый запрос,
+   поэтому лишних кругов избегаем: если модель закончила ход только изменениями,
+   их результаты уйдут вместе со следующим сообщением пользователя. */
+async function turn(item,isP){
+ if(!API){
+  const ph={typing:1}; item.chat.push(ph); paint(); save();
+  const last=[...item.chat].reverse().find(m=>m.u!==undefined);
+  ph.typing=0; ph.a=await stubReply((last&&last.u)||'',item,isP); paint(); save(); return;
+ }
  const key=curKey();
- /* Ответ дорисовывается прямо в последнем элементе ленты. Пересобирать её целиком
-    на каждый кусок нельзя — слетят прокрутка и анимации появления. */
- const live=t=>{
-  ph.typing=0; ph.a=t;
-  if(curKey()!==key)return;
-  const el=thread.lastElementChild;
-  if(el&&el.classList.contains('ans')){
-   el.classList.remove('typing'); el.innerHTML=md(t); thread.scrollTop=thread.scrollHeight;
+ let acts=0;
+ for(let round=0;round<6;round++){
+  const ph={typing:1}; item.chat.push(ph); paint(); save();
+  let res;
+  try{
+   res=await askOnce(item,isP,t=>{
+    ph.typing=0; ph.a=t;
+    if(curKey()!==key)return;
+    const el=thread.lastElementChild;
+    if(el&&el.classList.contains('ans')){el.classList.remove('typing'); el.innerHTML=md(t); thread.scrollTop=thread.scrollHeight;}
+   });
+  }catch(e){
+   ph.typing=0; ph.err=1; ph.a=(e&&e.message)||String(e); paint(); save(); return;
   }
- };
- askAssistant(text,item,isP,live)
-  .then(a=>{ph.typing=0; ph.a=a; paint(); save();})
-  .catch(e=>{ph.typing=0; ph.err=1; ph.a=(e&&e.message)||String(e); paint(); save();});
+  ph.typing=0; ph.a=res.text;
+  if(!res.tools.length){
+   if(!res.text)item.chat.pop();
+   paint(); save(); return;
+  }
+  ph.tu=res.tools; ph.res=[];
+  let read=false;
+  for(const tu of res.tools){
+   const isRead=!!READ_TOOLS[tu.name];
+   if(isRead)read=true;
+   if(!isRead&&acts>=MAX_ACTS){ph.res.push({id:tu.id,out:'лимит действий, спроси пользователя',err:1}); continue}
+   if(!isRead)acts++;
+   const r=runTool(tu,item,isP);
+   ph.res.push({id:tu.id,out:r.out,err:r.err});
+   if(r.card!==undefined)(ph.cards=ph.cards||[]).push({label:r.card,undo:r.undo});
+  }
+  paint(); save();
+  /* Хвостовые вызовы: результат модели не нужен — не тратим круг */
+  if(!read)return;
+ }
 }
 
 /* ---------- отрисовка ---------- */
@@ -590,7 +804,7 @@ let menuEl=null, menuFor=null, menuArmed=false, menuAt=0, suppressRow=false;
 /* Нажатие на «Входящие» переключает список на выполненные и обратно (S.showDone) */
 let listMode=null, threadKey=null;
 function paint(){
- const openT=S.ts.filter(x=>!x.done), dn=S.ts.filter(x=>x.done);
+ const openT=S.ts.filter(x=>!x.done&&!x.del), dn=S.ts.filter(x=>x.done&&!x.del);
  const switched=listMode!==null&&listMode!==!!S.showDone; listMode=!!S.showDone;
  const ttl=$('inbox').querySelector('.ttl');
  ttl.textContent=S.showDone?'Выполненные':'Входящие';
@@ -604,6 +818,7 @@ function paint(){
  } else {
  openT.filter(x=>x.pj===null).forEach(x=>list.appendChild(taskRow(x,0)));
  S.pr.forEach(p=>{
+  if(p.del)return;
   const all=inPj(p.id),op=openIn(p.id);
   if(!op.length)return;
   const nx=op[0], s=S.cur&&S.cur.k==='p'&&S.cur.id===p.id;
@@ -676,7 +891,21 @@ function paintDetail(){
   thread.appendChild(w);
  }
  if(!isP&&x.file)add('<div class="card">'+I('file-text',16,'text-accent')+'<div style="min-width:0; flex:1;"><div class="f1">'+esc(x.file)+'</div><div class="f2">вложение задачи · открыть</div></div></div>');
- it.chat.forEach(m=>add(m.u?'<div class="bub mine">'+esc(m.u)+'</div>':(m.typing?'<div class="ans typing"><i></i><i></i><i></i></div>':m.err?'<div class="ans err">'+esc(m.a)+'</div>':'<div class="ans">'+md(m.a)+'</div>')));
+  it.chat.forEach(m=>{
+  if(m.u!==undefined){add('<div class="bub mine">'+esc(m.u)+'</div>'); return;}
+  if(m.typing){add('<div class="ans typing"><i></i><i></i><i></i></div>'); return;}
+  if(m.err){add('<div class="ans err">'+esc(m.a)+'</div>'); return;}
+  if(m.a)add('<div class="ans">'+md(m.a)+'</div>');
+  /* Карточка каждого изменения с отменой. Стек живёт до перезагрузки: после неё
+     записи о вызове нет, и кнопка просто не рисуется — так честнее, чем мёртвая. */
+  if(m.cards)for(const c of m.cards){
+   const u=undos[c.undo];
+   add('<div class="act">'+I('list-check',12)+'<span class="al">'+esc(c.label)+'</span>'+
+    (u&&u.live?'<button class="au" type="button" data-undo="'+c.undo+'">Отменить</button>'
+      :u?'<span class="au off">отменено</span>':'')+'</div>');
+  }
+ });
+ thread.querySelectorAll('[data-undo]').forEach(b=>b.onclick=()=>undoAct(+b.dataset.undo));
  thread.scrollTop=thread.scrollHeight;
  if(same){
   const kids=thread.children;
@@ -859,7 +1088,7 @@ addEventListener('pagehide',flush); addEventListener('beforeunload',flush);
 paint();
 /* Поверхность для тестов и отладки из консоли браузера. S переприсваивается при загрузке,
    поэтому отдаётся геттером, иначе снаружи виден устаревший объект. */
-window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload,md};
+window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload,chatMessages,md,runTool,undoAct,byShort,shortId,get undos(){return undos},get undoNote(){return undoNote}};
 
 /* Обновление установленного приложения. Новый service worker забирает управление сам
    (skipWaiting + clients.claim), но страница продолжает исполнять старый код до перезагрузки —

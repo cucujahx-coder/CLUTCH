@@ -209,6 +209,133 @@ function payload(){
  assert(p.task.steps.some(x=>x.done)&&p.task.steps.some(x=>!x.done),'у шагов проставлены отметки');
 }
 
+/* ---------- инструменты: изменения из чата ---------- */
+function tools(){
+ console.log('инструменты');
+ const {w,d}=load('index.html');
+ const A=w.app;
+ const call=(name,input,item,isP)=>A.runTool({id:'u'+Math.random(),name,input},item,isP);
+ const rows=()=>[...d.querySelectorAll('#list .row')];
+
+ const task=A.S.ts.find(x=>x.pj===null&&!x.done);
+ A.S.cur={k:'t',id:task.id};
+
+ // переименование и отмена
+ const was=task.t;
+ let r=call('task_rename',{title:'Новое имя'},task,false);
+ assert(task.t==='Новое имя'&&r.card.includes('Новое имя'),'task_rename меняет название и даёт карточку');
+ A.undoAct(r.undo);
+ assert(task.t===was,'отмена возвращает прежнее название');
+ assert(A.undoNote.startsWith('[отменено:'),'после отмены готова пометка для модели');
+ assert(!A.undos[r.undo].live,'повторно ту же отмену не применить');
+ const before=task.t;
+ A.undoAct(r.undo);
+ assert(task.t===before,'повторное нажатие ничего не делает');
+
+ // срок: только правильный формат
+ assert(call('task_set_due',{date:'завтра'},task,false).err,'срок словами отклоняется');
+ call('task_set_due',{date:'2030-03-05'},task,false);
+ assert(task.due==='2030-03-05','срок поставлен');
+ r=call('task_set_due',{date:null},task,false);
+ assert(task.due===null,'срок снят');
+ A.undoAct(r.undo);
+ assert(task.due==='2030-03-05','отмена вернула срок');
+
+ // закрытие задачи идёт через mark: doneAt проставляется, как от кнопки
+ r=call('task_complete',{done:true},task,false);
+ assert(task.done===1&&task.doneAt,'task_complete закрывает и ставит время');
+ A.undoAct(r.undo);
+ assert(task.done===0&&!task.doneAt,'отмена возвращает в работу');
+
+ // подпись под задачей: состояние угадывается по тексту
+ call('task_set_tail',{tail:'жду счёт'},task,false);
+ assert(task.tail.x==='жду счёт'&&task.tail.k==='wait','подпись «жду» помечена ожиданием');
+ call('task_set_tail',{tail:'выбрали клинику'},task,false);
+ assert(task.tail.k==='dec','подпись о решении помечена решением');
+
+ // задача становится проектом
+ const n0=A.S.pr.length;
+ r=call('task_make_project',{steps:['второй','третий']},task,false);
+ assert(A.S.pr.length===n0+1,'создан проект');
+ const pid=A.S.cur.id;
+ assert(A.openIn(pid).length===3,'исходная задача стала первым шагом, плюс два новых');
+ A.undoAct(r.undo);
+ assert(A.S.pr.length===n0&&task.pj===null,'отмена разбирает проект обратно');
+
+ // шаги существующего проекта
+ const pr=A.S.pr[0];
+ A.S.cur={k:'p',id:pr.id};
+ const s0=A.inPj(pr.id).length;
+ r=call('task_add_step',{title:'Свежий шаг'},pr,true);
+ assert(A.inPj(pr.id).length===s0+1,'шаг добавлен');
+ const step=A.inPj(pr.id).find(x=>x.t==='Свежий шаг');
+ assert(call('task_add_step',{title:'x'},A.S.ts[0],false).err,'шаг нельзя добавить к обычной задаче');
+
+ // вставка после конкретного шага
+ call('task_add_step',{title:'После первого',after:'s'+A.inPj(pr.id)[0].id},pr,true);
+ assert(A.inPj(pr.id)[1].t==='После первого','after ставит шаг на нужное место');
+
+ call('task_complete_step',{step:'s'+step.id,done:true},pr,true);
+ assert(step.done===1,'шаг закрыт по идентификатору');
+ assert(call('task_complete_step',{step:'s99999',done:true},pr,true).err,'несуществующий шаг — ошибка, а не молчание');
+
+ r=call('task_delete_step',{step:'s'+step.id},pr,true);
+ assert(!A.inPj(pr.id).some(x=>x.id===step.id),'шаг ушёл из проекта');
+ assert(A.byId(step.id),'но найти его ещё можно — иначе не сработала бы отмена');
+ A.undoAct(r.undo);
+ assert(A.inPj(pr.id).some(x=>x.id===step.id),'отмена вернула шаг');
+
+ // создание другой задачи
+ const t0=A.S.ts.length;
+ r=call('task_create',{title:'Из чата',due:'2030-04-01'},pr,true);
+ assert(A.S.ts.some(x=>x.t==='Из чата'&&x.due==='2030-04-01'),'task_create заводит задачу со сроком');
+ A.undoAct(r.undo);
+ assert(A.S.ts.length===t0,'отмена убирает созданную задачу');
+ call('task_create',{title:'Сразу проект',steps:['раз','два']},pr,true);
+ assert(A.S.pr.some(x=>x.n==='Сразу проект'),'со списком шагов создаётся проект');
+
+ // корзина
+ const victim=A.S.ts.find(x=>x.pj===null&&!x.del);
+ r=call('task_delete',{id:'t'+victim.id},pr,true);
+ A.paint();
+ assert(!rows().some(x=>x.dataset.id===String(victim.id)),'удалённая задача исчезла из списка');
+ assert(A.byId(victim.id)&&A.byId(victim.id).del,'но лежит в корзине с отметкой времени');
+ A.undoAct(r.undo);
+ assert(!A.byId(victim.id).del,'отмена достаёт из корзины');
+
+ // поиск не меняет состояние и возвращает идентификаторы
+ const found=call('task_search',{query:'офис'},pr,true);
+ assert(!found.card&&!found.undo,'поиск карточку не рисует');
+ assert(/^[tps]\d+ /m.test(found.out)||found.out==='ничего не нашлось','поиск отдаёт идентификаторы');
+ assert(call('task_search',{query:'этого точно нет'},pr,true).out==='ничего не нашлось','пустой результат — словами');
+
+ // неизвестный инструмент не роняет приложение
+ assert(A.runTool({id:'x',name:'нет_такого',input:{}},pr,true).err,'неизвестный инструмент — ошибка');
+}
+
+/* ---------- переписка в формате блоков ---------- */
+function blocks(){
+ console.log('формат переписки');
+ const {w,d}=load('index.html');
+ const A=w.app;
+ const t=A.S.ts.find(x=>x.pj===null);
+ t.chat=[
+  {u:'перенеси на пятницу'},
+  {a:'Перенёс.',tu:[{id:'u1',name:'task_set_due',input:{date:'2030-03-08'}}],res:[{id:'u1',out:'ok'}],cards:[{label:'Срок → пятница',undo:0}]},
+  {typing:1},
+  {err:1,a:'нет сети'}
+ ];
+ const m=A.chatMessages(t);
+ assert(m.length===3,'плейсхолдер и ошибка в переписку не уходят');
+ assert(m[0].role==='user'&&m[0].content==='перенеси на пятницу','вопрос пользователя строкой');
+ assert(m[1].role==='assistant'&&m[1].content[0].type==='text'&&m[1].content[1].type==='tool_use','ход модели: текст и вызов одним сообщением');
+ assert(m[1].content[1].id==='u1'&&m[1].content[1].name==='task_set_due','вызов несёт идентификатор и имя');
+ assert(m[2].role==='user'&&m[2].content[0].type==='tool_result'&&m[2].content[0].tool_use_id==='u1','результат отдельным сообщением с тем же идентификатором');
+ t.chat.push({a:'Готово.',tu:[{id:'u2',name:'task_search',input:{}}],res:[{id:'u2',out:'не найдено',err:1}]});
+ const m2=A.chatMessages(t);
+ assert(m2.at(-1).content[0].is_error===true,'ошибка инструмента помечена для модели');
+}
+
 /* ---------- разметка в ленте ---------- */
 function markdown(){
  console.log('разметка');
@@ -311,5 +438,7 @@ function markdown(){
  await actions();
  payload();
  markdown();
+ tools();
+ blocks();
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
 })();

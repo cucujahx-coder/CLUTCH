@@ -3,6 +3,7 @@
    адрес воркера, который виден в бандле, нельзя использовать как универсальный прокси. */
 
 import {buildSystem} from './prompt.js';
+import {TOOLS} from './tools.js';
 
 const DEFAULT_MODEL='claude-sonnet-5';   /* разговор; выжимки — Haiku, появятся с этапом 4 */
 const MAX_TOKENS=4096;
@@ -52,10 +53,27 @@ export default {
   const drift=Math.abs(new Date(today+'T00:00:00Z')-new Date(new Date().toISOString().slice(0,10)+'T00:00:00Z'));
   if(drift>36e5*30)return json({error:'дата клиента разошлась с серверной'},400,h);
 
+  /* Содержимое — строка или массив блоков: ходы с tool_use и tool_result приходят
+     массивами. Блоки пропускаем как есть, обрезая только текст. */
+  const block=x=>{
+   if(!x||typeof x!=='object')return null;
+   if(x.type==='text')return {type:'text',text:cut(x.text,8000)};
+   if(x.type==='tool_use')return {type:'tool_use',id:cut(x.id,80),name:cut(x.name,60),input:x.input&&typeof x.input==='object'?x.input:{}};
+   if(x.type==='tool_result')return {type:'tool_result',tool_use_id:cut(x.tool_use_id,80),content:cut(x.content,4000),...(x.is_error?{is_error:true}:{})};
+   return null;
+  };
   const hist=(Array.isArray(b.messages)?b.messages:[])
    .slice(-MAX_MSGS)
-   .filter(m=>m&&m.content)
-   .map(m=>({role:m.role==='assistant'?'assistant':'user',content:cut(m.content,8000)}));
+   .map(m=>{
+    if(!m)return null;
+    const role=m.role==='assistant'?'assistant':'user';
+    if(Array.isArray(m.content)){
+     const cs=m.content.map(block).filter(Boolean);
+     return cs.length?{role,content:cs}:null;
+    }
+    return m.content?{role,content:cut(m.content,8000)}:null;
+   })
+   .filter(Boolean);
   if(!hist.length)return json({error:'empty history'},400,h);
   if(hist[hist.length-1].role!=='user')return json({error:'last message must be user'},400,h);
 
@@ -73,6 +91,7 @@ export default {
      max_tokens:MAX_TOKENS,
      stream:true,
      system:buildSystem({...b,today}),
+     tools:TOOLS,
      output_config:{effort:EFFORT},
      messages:hist
     })
@@ -92,7 +111,7 @@ export default {
    типов событий API и не ломался при их изменении. */
 function relay(body){
  const dec=new TextDecoder(), enc=new TextEncoder();
- let buf='', usage=null, stop=null;
+ let buf='', usage=null, stop=null, blocks={};
  const send=(c,ev,data)=>c.enqueue(enc.encode('event: '+ev+'\ndata: '+JSON.stringify(data)+'\n\n'));
  return body.pipeThrough(new TransformStream({
   transform(chunk,c){
@@ -102,7 +121,17 @@ function relay(body){
     const line=p.split('\n').find(x=>x.startsWith('data:'));
     if(!line)continue;
     let d; try{d=JSON.parse(line.slice(5).trim())}catch(e){continue}
-    if(d.type==='content_block_delta'&&d.delta&&d.delta.type==='text_delta')send(c,'text',d.delta.text);
+    if(d.type==='content_block_start'&&d.content_block&&d.content_block.type==='tool_use')
+     blocks[d.index]={id:d.content_block.id,name:d.content_block.name,json:''};
+    else if(d.type==='content_block_delta'&&d.delta&&d.delta.type==='text_delta')send(c,'text',d.delta.text);
+    else if(d.type==='content_block_delta'&&d.delta&&d.delta.type==='input_json_delta'&&blocks[d.index])
+     blocks[d.index].json+=d.delta.partial_json||'';
+    else if(d.type==='content_block_stop'&&blocks[d.index]){
+     /* Аргументы приходят кусками; клиенту отдаём одно событие с готовым JSON */
+     const b=blocks[d.index]; delete blocks[d.index];
+     let input={}; try{input=b.json?JSON.parse(b.json):{}}catch(e){}
+     send(c,'tool_use',{id:b.id,name:b.name,input});
+    }
     else if(d.type==='message_delta'){
      if(d.usage)usage=d.usage;
      if(d.delta&&d.delta.stop_reason)stop=d.delta.stop_reason;
@@ -112,7 +141,7 @@ function relay(body){
   },
   flush(c){
    if(stop==='refusal')send(c,'error',{error:'Модель отказалась отвечать на это.',code:'refusal'});
-   send(c,'done',{usage});
+   send(c,'done',{usage,stop});
   }
  }));
 }

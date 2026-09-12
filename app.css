@@ -316,3 +316,12 @@ input:focus{outline:none;border-color:var(--text-accent);box-shadow:0 0 0 2px co
 .ans th{font-weight:600}
 /* Ошибка — строка в ленте, а не всплывашка */
 .ans.err{color:var(--text-danger);font-size:var(--fs-sm);line-height:var(--lh-sm)}
+
+/* ---------- карточка изменения в ленте ---------- */
+.act{display:flex;align-items:center;gap:var(--s2);padding:var(--s2) var(--s3);
+  background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--r);
+  font-size:var(--fs-sm);line-height:var(--lh-sm)}
+.act .al{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act .au{flex:none;border:none;background:none;color:var(--text-accent);
+  font-family:inherit;font-size:var(--fs-sm);padding:0;cursor:pointer}
+.act .au.off{color:var(--text-muted);cursor:default}
