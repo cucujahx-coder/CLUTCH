@@ -172,35 +172,67 @@ async function actions(){
  assert(A.S.ts.length===steps-2,'шаги удалены вместе с проектом');
 }
 
-/* ---------- данные, уходящие модели ---------- */
+/* ---------- снимок задачи, уходящий модели ---------- */
 function payload(){
- console.log('запрос к модели');
+ console.log('снимок задачи');
  const {w,d}=load('index.html');
  const A=w.app;
 
  // задача: переписка без плейсхолдера «печатает», последнее слово за пользователем
  const task=A.S.ts.find(x=>x.pj===null);
  A.S.cur={k:'t',id:task.id};
- task.chat.push({u:'привет'},{a:'ответ'},{u:'второй вопрос'},{typing:1});
+ task.chat.push({u:'привет'},{a:'ответ'},{u:'второй вопрос'},{typing:1},{err:1,a:'сеть отвалилась'});
  let p=A.chatPayload(task,false);
- assert(p.kind==='task'&&p.title===task.t,'задача: вид и название');
- assert(p.messages.length===3,'плейсхолдер «печатает» не уходит на сервер');
+ assert(p.task.id==='t'+task.id,'у задачи короткий идентификатор');
+ assert(p.task.title===task.t&&p.task.isProject===false,'название и признак проекта');
+ assert(p.messages.length===3,'плейсхолдер «печатает» и строка ошибки на сервер не уходят');
  assert(p.messages.map(m=>m.role).join(',')==='user,assistant,user','роли расставлены по чередованию');
- assert(p.messages[2].text==='второй вопрос','последнее сообщение — вопрос пользователя');
- assert(!('steps' in p),'у одиночной задачи шагов нет');
+ assert(p.messages[2].content==='второй вопрос','последнее сообщение — вопрос пользователя');
+ assert(p.task.steps.length===0,'у одиночной задачи шагов нет');
+ assert(/^\d{4}-\d{2}-\d{2}$/.test(p.today),'дата клиента уходит в запросе');
+ assert(typeof p.tz==='string'&&p.tz.length>0,'часовой пояс тоже');
+ assert(!p.others.some(x=>x.id===p.task.id),'текущая задача не дублируется в списке остальных');
+ assert(p.others.length<=20,'остальных задач не больше двадцати');
 
- // шаг проекта несёт название родителя
+ // шаг проекта несёт название родителя и строку «открыт из шага»
  const step=A.S.ts.find(x=>x.pj!==null);
  p=A.chatPayload(step,false);
- assert(p.project===A.prById(step.pj).n,'шаг проекта передаёт название проекта');
+ assert(p.task.project===A.prById(step.pj).n,'шаг передаёт название проекта');
+ assert(p.task.fromStep==='s'+step.id,'и идентификатор шага, из которого открыт чат');
 
- // проект несёт свои шаги с отметками
+ // проект несёт свои шаги с идентификаторами и отметками
  const pr=A.S.pr[0];
  p=A.chatPayload(pr,true);
- assert(p.kind==='project'&&p.title===pr.n,'проект: вид и название');
- assert(p.steps.length===A.inPj(pr.id).length,'переданы все шаги проекта');
- assert(p.steps.some(x=>x.done)&&p.steps.some(x=>!x.done),'у шагов проставлены отметки');
- assert(p.note===pr.why,'заметка проекта — это «что мешает»');
+ assert(p.task.id==='p'+pr.id&&p.task.isProject===true,'у проекта свой идентификатор и признак');
+ assert(p.task.steps.length===A.inPj(pr.id).length,'переданы все шаги проекта');
+ assert(p.task.steps.every(x=>/^s\d+$/.test(x.id)),'у каждого шага короткий идентификатор');
+ assert(p.task.steps.some(x=>x.done)&&p.task.steps.some(x=>!x.done),'у шагов проставлены отметки');
+}
+
+/* ---------- разметка в ленте ---------- */
+function markdown(){
+ console.log('разметка');
+ const {w,d}=load('index.html');
+ const md=w.app.md;
+
+ assert(md('**жирный** и `код`').includes('<strong>жирный</strong>'),'жирный');
+ assert(md('**жирный** и `код`').includes('<code>код</code>'),'код в строке');
+ assert(md('# Заголовок').startsWith('<h3>'),'заголовок');
+ assert(md('- раз\n- два').includes('<ul><li>раз</li><li>два</li></ul>'),'список');
+ assert(md('1. раз\n2. два').startsWith('<ol>'),'нумерованный список');
+ assert(md('```\nкод\n```').includes('<pre><code>код</code></pre>'),'блок кода');
+ const t=md('| a | b |\n|---|---|\n| 1 | 2 |');
+ assert(t.includes('<div class="tw">')&&t.includes('<th>a</th>')&&t.includes('<td>2</td>'),'таблица в контейнере с прокруткой');
+
+ // ссылки: только http(s) и mailto, в новой вкладке
+ assert(md('[тут](https://a.ru)').includes('<a href="https://a.ru" target="_blank" rel="noopener">тут</a>'),'ссылка');
+ assert(!md('[тык](javascript:alert(1))').includes('<a '),'javascript: ссылкой не становится');
+ assert(!md('[тык](data:text/html,x)').includes('<a '),'data: тоже');
+
+ // главное: экранирование идёт до разметки
+ assert(!md('<img src=x onerror=alert(1)>').includes('<img'),'тег из ответа модели не исполняется');
+ assert(md('<b>x</b>').includes('&lt;b&gt;'),'угловые скобки экранированы');
+ assert(!md('[x](https://a.ru" onmouseover="alert(1))').includes('onmouseover="alert'),'кавычка не выходит из атрибута');
 }
 
 (async()=>{
@@ -278,5 +310,6 @@ function payload(){
  storage();
  await actions();
  payload();
+ markdown();
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
 })();

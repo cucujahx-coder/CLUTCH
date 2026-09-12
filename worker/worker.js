@@ -1,33 +1,20 @@
-/* Серверная часть чата: держит ключ Anthropic и системный промпт.
-   Клиент присылает только данные задачи, а не готовые сообщения модели, —
-   поэтому адрес воркера, который виден в бандле, нельзя использовать
-   как универсальный прокси к модели за твой счёт. */
+/* Серверная часть чата: держит ключ Anthropic, собирает системный промт и стримит ответ.
+   Клиент присылает снимок задачи и переписку, а не готовые сообщения модели, — поэтому
+   адрес воркера, который виден в бандле, нельзя использовать как универсальный прокси. */
 
-const MODEL='claude-opus-5';
-const MAX_TOKENS=2048;
-/* Короткие реплики важнее глубины: чат должен отвечать быстро.
-   Если ответы кажутся поверхностными — поднять до 'medium' или 'high'. */
-const EFFORT='low';
+import {buildSystem} from './prompt.js';
+
+const DEFAULT_MODEL='claude-sonnet-5';   /* разговор; выжимки — Haiku, появятся с этапом 4 */
+const MAX_TOKENS=4096;
+const EFFORT='low';                      /* чат должен отвечать быстро; поднять при поверхностных ответах */
+const MAX_BODY=256*1024;
+const MAX_MSGS=40;
 
 const ALLOW=[
  'https://cucujahx-coder.github.io',
  'http://localhost:5173',
  'http://localhost:5199'
 ];
-
-const SYSTEM=`Ты помощник внутри списка задач: у каждой задачи свой чат.
-
-Отвечай по-русски и коротко — обычно одна-три фразы. Без вступлений, без
-«конечно» и «отличный вопрос», без подписей.
-
-Не пересказывай пользователю его же задачу: он видит её на экране.
-Твоя работа — сдвинуть дело с места. Выбери одно: назови ближайший
-конкретный шаг, задай один уточняющий вопрос, если без него правда не
-обойтись, или прямо скажи, что мешает.
-
-Списком отвечай только если просят разбить на шаги. Если задача выглядит
-слишком крупной для одного захода, скажи об этом и предложи разбить.
-Если чего-то не знаешь — спроси, не выдумывай подробности.`;
 
 const cut=(s,n)=>String(s==null?'':s).slice(0,n);
 const json=(o,s,h)=>new Response(JSON.stringify(o),{status:s,headers:{...h,'content-type':'application/json'}});
@@ -37,49 +24,44 @@ const cors=o=>({
  'Access-Control-Allow-Methods':'POST, OPTIONS',
  'Vary':'Origin'
 });
-
-/* Контекст задачи отдельным первым сообщением, а не в system:
-   так системный промпт одинаков для всех задач и его можно кэшировать. */
-function context(b){
- const L=[(b.kind==='project'?'Проект: ':'Задача: ')+cut(b.title,200)];
- if(b.due)L.push('Срок: '+cut(b.due,20));
- if(b.project)L.push('Входит в проект: '+cut(b.project,200));
- if(b.note)L.push('Что известно: '+cut(b.note,600));
- if(Array.isArray(b.steps)&&b.steps.length)
-  L.push('Шаги:\n'+b.steps.slice(0,40).map(s=>(s.done?'[x] ':'[ ] ')+cut(s.t,200)).join('\n'));
- return L.join('\n');
-}
+const ISO=/^\d{4}-\d{2}-\d{2}$/;
 
 export default {
  async fetch(req,env){
   const o=req.headers.get('Origin')||'';
   const h=cors(o);
   if(req.method==='OPTIONS')return new Response(null,{headers:h});
-  /* GET — страница проверки: открыл адрес в браузере и сразу видишь, жив ли воркер.
-     Обязателен content-type: без него браузер не показывает текст, а скачивает файл,
-     и живой воркер выглядит как «сайт не открывается». */
+  const model=env.CHAT_MODEL||DEFAULT_MODEL;
   if(req.method==='GET')return new Response(
    'Чат-воркер работает.\n'+
-   'Модель: '+MODEL+'\n'+
+   'Модель: '+model+'\n'+
    'Ключ: '+(env.ANTHROPIC_API_KEY?'задан':'НЕ ЗАДАН — wrangler secret put ANTHROPIC_API_KEY')+'\n'+
-   'Отвечает на POST с данными задачи.\n',
+   'Отвечает на POST потоком SSE.\n',
    {status:200,headers:{...h,'content-type':'text/plain; charset=utf-8'}});
   if(req.method!=='POST')return new Response('Only POST',{status:405,headers:{...h,'content-type':'text/plain; charset=utf-8'}});
   if(o&&!ALLOW.includes(o))return json({error:'origin not allowed'},403,h);
   if(!env.ANTHROPIC_API_KEY)return json({error:'ANTHROPIC_API_KEY не задан'},500,h);
 
-  let b;
-  try{b=await req.json()}catch(e){return json({error:'bad json'},400,h)}
+  const raw=await req.text();
+  if(raw.length>MAX_BODY)return json({error:'слишком большой запрос'},413,h);
+  let b; try{b=JSON.parse(raw)}catch(e){return json({error:'bad json'},400,h)}
+
+  /* Дата приходит от клиента: у него и у воркера сутки могут не совпасть.
+     Проверяем только, что расхождение не больше суток — иначе календарь будет врать. */
+  const today=ISO.test(b.today||'')?b.today:new Date().toISOString().slice(0,10);
+  const drift=Math.abs(new Date(today+'T00:00:00Z')-new Date(new Date().toISOString().slice(0,10)+'T00:00:00Z'));
+  if(drift>36e5*30)return json({error:'дата клиента разошлась с серверной'},400,h);
 
   const hist=(Array.isArray(b.messages)?b.messages:[])
-   .slice(-40)
-   .filter(m=>m&&m.text)
-   .map(m=>({role:m.role==='assistant'?'assistant':'user',content:cut(m.text,4000)}));
+   .slice(-MAX_MSGS)
+   .filter(m=>m&&m.content)
+   .map(m=>({role:m.role==='assistant'?'assistant':'user',content:cut(m.content,8000)}));
   if(!hist.length)return json({error:'empty history'},400,h);
   if(hist[hist.length-1].role!=='user')return json({error:'last message must be user'},400,h);
 
+  let up;
   try{
-   const r=await fetch('https://api.anthropic.com/v1/messages',{
+   up=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{
      'content-type':'application/json',
@@ -87,21 +69,50 @@ export default {
      'x-api-key':env.ANTHROPIC_API_KEY
     },
     body:JSON.stringify({
-     model:MODEL,
+     model,
      max_tokens:MAX_TOKENS,
-     system:SYSTEM,
+     stream:true,
+     system:buildSystem({...b,today}),
      output_config:{effort:EFFORT},
-     messages:[{role:'user',content:context(b)},...hist]
+     messages:hist
     })
    });
-   if(!r.ok)return json({error:'anthropic '+r.status,detail:cut(await r.text(),500)},502,h);
-   const d=await r.json();
-   /* Модель может отказаться отвечать — это HTTP 200, а не ошибка */
-   if(d.stop_reason==='refusal')return json({text:'Не могу ответить на это.'},200,h);
-   const text=(d.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('\n').trim();
-   return json({text},200,h);
-  }catch(e){
-   return json({error:String(e&&e.message||e)},502,h);
-  }
+  }catch(e){return json({error:'сеть до Anthropic: '+cut(e&&e.message||e,200)},502,h);}
+
+  if(!up.ok)return json({error:'anthropic '+up.status,detail:cut(await up.text(),500)},502,h);
+
+  return new Response(relay(up.body),{
+   headers:{...h,'content-type':'text/event-stream; charset=utf-8','cache-control':'no-cache','connection':'keep-alive'}
+  });
  }
 };
+
+/* Пересобираем поток Anthropic в свой: клиенту нужны только text, error и done.
+   Свой формат, а не проброс как есть, — чтобы клиент не зависел от внутренних
+   типов событий API и не ломался при их изменении. */
+function relay(body){
+ const dec=new TextDecoder(), enc=new TextEncoder();
+ let buf='', usage=null, stop=null;
+ const send=(c,ev,data)=>c.enqueue(enc.encode('event: '+ev+'\ndata: '+JSON.stringify(data)+'\n\n'));
+ return body.pipeThrough(new TransformStream({
+  transform(chunk,c){
+   buf+=dec.decode(chunk,{stream:true});
+   const parts=buf.split('\n\n'); buf=parts.pop();
+   for(const p of parts){
+    const line=p.split('\n').find(x=>x.startsWith('data:'));
+    if(!line)continue;
+    let d; try{d=JSON.parse(line.slice(5).trim())}catch(e){continue}
+    if(d.type==='content_block_delta'&&d.delta&&d.delta.type==='text_delta')send(c,'text',d.delta.text);
+    else if(d.type==='message_delta'){
+     if(d.usage)usage=d.usage;
+     if(d.delta&&d.delta.stop_reason)stop=d.delta.stop_reason;
+    }
+    else if(d.type==='error')send(c,'error',{error:(d.error&&d.error.message)||'ошибка потока',code:(d.error&&d.error.type)||''});
+   }
+  },
+  flush(c){
+   if(stop==='refusal')send(c,'error',{error:'Модель отказалась отвечать на это.',code:'refusal'});
+   send(c,'done',{usage});
+  }
+ }));
+}

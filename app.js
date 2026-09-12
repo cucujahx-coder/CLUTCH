@@ -31,6 +31,53 @@ const I=(n,s,c)=>{
 };
 const esc=t=>String(t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
+/* Разметка в ленте. Порядок строгий: сначала экранируем весь текст, потом размечаем —
+   иначе ответ модели или вставленный пользователем текст становятся XSS. Ссылки только
+   http(s) и mailto, открываются в новой вкладке; таблица — в контейнере с прокруткой,
+   иначе на телефоне растянет всю ленту. */
+function md(src){
+ const lines=esc(String(src==null?'':src)).split('\n'), out=[];
+ let i=0;
+ const inline=t=>t
+  .replace(/`([^`]+)`/g,(m,c)=>'<code>'+c+'</code>')
+  .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+  .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,(m,txt,href)=>
+   /^(https?:|mailto:)/i.test(href)?'<a href="'+href+'" target="_blank" rel="noopener">'+txt+'</a>':txt);
+ const isBlock=l=>/^```/.test(l)||/^#{1,3}\s/.test(l)||/^\s*([-*]|\d+\.)\s/.test(l)||/^\s*\|.*\|\s*$/.test(l);
+ const cells=l=>l.trim().replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+ while(i<lines.length){
+  const l=lines[i];
+  if(/^```/.test(l)){
+   const buf=[]; i++;
+   while(i<lines.length&&!/^```/.test(lines[i]))buf.push(lines[i++]);
+   i++; out.push('<pre><code>'+buf.join('\n')+'</code></pre>'); continue;
+  }
+  const h=l.match(/^(#{1,3})\s+(.*)$/);
+  if(h){const n=h[1].length+2; out.push('<h'+n+'>'+inline(h[2])+'</h'+n+'>'); i++; continue;}
+  if(/^\s*\|.*\|\s*$/.test(l)&&/^\s*\|[-:\s|]+\|\s*$/.test(lines[i+1]||'')){
+   const head=cells(l); i+=2; const body=[];
+   while(i<lines.length&&/^\s*\|.*\|\s*$/.test(lines[i]))body.push(cells(lines[i++]));
+   out.push('<div class="tw"><table><thead><tr>'+head.map(c=>'<th>'+inline(c)+'</th>').join('')+
+    '</tr></thead><tbody>'+body.map(r=>'<tr>'+r.map(c=>'<td>'+inline(c)+'</td>').join('')+'</tr>').join('')+
+    '</tbody></table></div>'); continue;
+  }
+  const li=l.match(/^\s*([-*]|\d+\.)\s+(.*)$/);
+  if(li){
+   const ord=/\d/.test(li[1]), items=[];
+   while(i<lines.length){
+    const m=lines[i].match(/^\s*([-*]|\d+\.)\s+(.*)$/); if(!m)break;
+    items.push('<li>'+inline(m[2])+'</li>'); i++;
+   }
+   out.push((ord?'<ol>':'<ul>')+items.join('')+(ord?'</ol>':'</ul>')); continue;
+  }
+  if(!l.trim()){i++; continue;}
+  const para=[];
+  while(i<lines.length&&lines[i].trim()&&!isBlock(lines[i]))para.push(lines[i++]);
+  out.push('<p>'+inline(para.join('<br>'))+'</p>');
+ }
+ return out.join('');
+}
+
 /* ---------- даты ---------- */
 const MON=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
 const iso=d=>{const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,10)};
@@ -411,36 +458,85 @@ function addStep(title){
    остаётся рабочим и без сервера. */
 const API='https://clutch.gloomnotgloom.com';
 
-/* Модели уходят данные задачи, а не готовый промпт: воркер собирает его сам */
+/* Снимок задачи: пересобирается на каждый запрос, поэтому чат всегда говорит о том,
+   что человек видит на экране. Идентификаторы короткие и стабильные — модель ссылается
+   только на них. Формат блоков промта описан в PROMPT.md. */
 function chatPayload(item,isP){
- const hist=item.chat
-  .filter(m=>!m.typing)
-  .map(m=>m.u!==undefined?{role:'user',text:m.u}:{role:'assistant',text:m.a});
- const p={kind:isP?'project':'task',title:isP?item.n:item.t,due:item.due||null,
-  note:isP?item.why:item.a,messages:hist};
- if(isP)p.steps=inPj(item.id).map(x=>({t:x.t,done:!!x.done}));
- else if(item.pj!==null){const pr=prById(item.pj); if(pr)p.project=pr.n;}
- return p;
+ const hist=item.chat.filter(m=>!m.typing&&!m.err)
+  .map(m=>m.u!==undefined?{role:'user',content:m.u}:{role:'assistant',content:m.a});
+ const task={
+  id:(isP?'p':'t')+item.id,
+  title:isP?item.n:item.t,
+  kind:(KIND[kindOf(item,isP)]||'Задача').toLowerCase(),
+  due:item.due||null, dueWord:fmtDue(item.due)||'',
+  done:isP?false:!!item.done, isProject:!!isP,
+  steps:isP?inPj(item.id).map(x=>({id:'s'+x.id,t:x.t,done:!!x.done})):[]
+ };
+ if(!isP&&item.pj!==null&&item.pj!==undefined){
+  const pr=prById(item.pj);
+  /* Чат один на задачу; отдельного чата у шага нет. Строка «открыт из шага»
+     говорит модели, про какой именно шаг спрашивают в контексте проекта. */
+  if(pr){task.project=pr.n; task.fromStep='s'+item.id;}
+ }
+ const cur=task.id;
+ const others=S.ts.filter(x=>!x.done&&(x.pj===null||x.pj===undefined)).map(x=>({id:'t'+x.id,t:x.t,due:x.due||null,isProject:false}))
+  .concat(S.pr.filter(x=>openIn(x.id).length).map(x=>({id:'p'+x.id,t:x.n,due:x.due||null,isProject:true})))
+  .filter(x=>x.id!==cur)
+  .sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'))
+  .slice(0,20);
+ let tz='UTC'; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch(e){}
+ return {task,others,messages:hist,today:today(),tz};
 }
 
-async function askAssistant(text,item,isP){
- if(!API)return stubReply(text,item,isP);
- try{
-  const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},
-   body:JSON.stringify(chatPayload(item,isP))});
-  if(!r.ok){
-   let why=''; try{why=(await r.json()).error||''}catch(_){}
-   throw new Error('HTTP '+r.status+(why?' · '+why:''));
+/* Один проход потока. Текст отдаётся кусками через onDelta — лента дорисовывается
+   на ходу, как в приложении Claude, а не появляется целиком в конце. */
+async function streamOnce(body,onDelta){
+ const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+ if(!r.ok){
+  let why=''; try{why=(await r.json()).error||''}catch(e){}
+  const err=new Error('HTTP '+r.status+(why?' · '+why:''));
+  err.retry=r.status===529||r.status>=500;
+  throw err;
+ }
+ if(!r.body)throw new Error('поток недоступен');
+ const rd=r.body.getReader(), dec=new TextDecoder();
+ let buf='', out='', got=false;
+ for(;;){
+  const {value,done}=await rd.read();
+  if(done)break;
+  buf+=dec.decode(value,{stream:true});
+  const parts=buf.split('\n\n'); buf=parts.pop();
+  for(const part of parts){
+   const ev=(part.match(/^event: (.+)$/m)||[])[1];
+   const dl=(part.match(/^data: (.*)$/m)||[])[1];
+   if(!ev||dl===undefined)continue;
+   let d; try{d=JSON.parse(dl)}catch(e){continue}
+   if(ev==='text'){out+=d; got=true; onDelta&&onDelta(out);}
+   else if(ev==='error'){
+    const e=new Error(d.error||'ошибка потока');
+    e.retry=!got;                       /* повторяем только если ничего не успели показать */
+    throw e;
+   }
   }
-  const d=await r.json();
-  const t=(d.text||'').trim();
-  return t||'Пустой ответ. Попробуйте переспросить.';
- }catch(e){
-  /* Приложение офлайн-first: сеть отвалилась — говорим об этом в чате, а не роняем
-     интерфейс. Причину показываем вместе с адресом: без них истёкший ключ, чужой
-     origin, блокировка сети и старый закэшированный адрес выглядят одинаково. */
-  let host=API; try{host=new URL(API).host}catch(_){}
-  return 'Не получилось связаться с моделью ('+host+'): '+(e&&e.message||e)+'.';
+ }
+ if(!got){const e=new Error('пустой ответ'); e.retry=true; throw e;}
+ return out.trim();
+}
+
+async function askAssistant(text,item,isP,onDelta){
+ if(!API)return stubReply(text,item,isP);
+ const body=chatPayload(item,isP);
+ let pause=600;
+ for(let n=0;n<3;n++){
+  try{return await streamOnce(body,onDelta);}
+  catch(e){
+   /* Перегрузка модели и обрыв потока — повторяем с нарастающей паузой. Остальное
+      показываем сразу: смысла ждать нет, а молчание хуже понятной ошибки. */
+   if(e&&e.retry&&n<2){await new Promise(r=>setTimeout(r,pause)); pause*=2; continue;}
+   let host=API; try{host=new URL(API).host}catch(_){}
+   const err=new Error('Не получилось связаться с моделью ('+host+'): '+((e&&e.message)||e)+'.');
+   err.shown=true; throw err;
+  }
  }
 }
 
@@ -465,7 +561,20 @@ function ask(text){
  item.chat.push({u:text},ph);
  if(!isP)item.n++;
  paint(); save();
- askAssistant(text,item,isP).then(a=>{ph.typing=0; ph.a=a; paint(); save();});
+ const key=curKey();
+ /* Ответ дорисовывается прямо в последнем элементе ленты. Пересобирать её целиком
+    на каждый кусок нельзя — слетят прокрутка и анимации появления. */
+ const live=t=>{
+  ph.typing=0; ph.a=t;
+  if(curKey()!==key)return;
+  const el=thread.lastElementChild;
+  if(el&&el.classList.contains('ans')){
+   el.classList.remove('typing'); el.innerHTML=md(t); thread.scrollTop=thread.scrollHeight;
+  }
+ };
+ askAssistant(text,item,isP,live)
+  .then(a=>{ph.typing=0; ph.a=a; paint(); save();})
+  .catch(e=>{ph.typing=0; ph.err=1; ph.a=(e&&e.message)||String(e); paint(); save();});
 }
 
 /* ---------- отрисовка ---------- */
@@ -567,7 +676,7 @@ function paintDetail(){
   thread.appendChild(w);
  }
  if(!isP&&x.file)add('<div class="card">'+I('file-text',16,'text-accent')+'<div style="min-width:0; flex:1;"><div class="f1">'+esc(x.file)+'</div><div class="f2">вложение задачи · открыть</div></div></div>');
- it.chat.forEach(m=>add(m.u?'<div class="bub mine">'+esc(m.u)+'</div>':(m.typing?'<div class="ans typing"><i></i><i></i><i></i></div>':'<div class="ans">'+esc(m.a)+'</div>')));
+ it.chat.forEach(m=>add(m.u?'<div class="bub mine">'+esc(m.u)+'</div>':(m.typing?'<div class="ans typing"><i></i><i></i><i></i></div>':m.err?'<div class="ans err">'+esc(m.a)+'</div>':'<div class="ans">'+md(m.a)+'</div>')));
  thread.scrollTop=thread.scrollHeight;
  if(same){
   const kids=thread.children;
@@ -750,7 +859,7 @@ addEventListener('pagehide',flush); addEventListener('beforeunload',flush);
 paint();
 /* Поверхность для тестов и отладки из консоли браузера. S переприсваивается при загрузке,
    поэтому отдаётся геттером, иначе снаружи виден устаревший объект. */
-window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload};
+window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload,md};
 
 /* Обновление установленного приложения. Новый service worker забирает управление сам
    (skipWaiting + clients.claim), но страница продолжает исполнять старый код до перезагрузки —
