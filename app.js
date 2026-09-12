@@ -1006,6 +1006,35 @@ async function squeeze(item){
  }catch(e){/* выжимка не получилась — просто продолжаем слать историю целиком */}
 }
 
+/* ---------- короткие названия ----------
+   Пользователь пишет как придётся, а в списке имя должно читаться с одного взгляда.
+   Приводим к двум словам (три — только если двумя никак) дешёвой моделью на воркере.
+   Исходник сохраняется в t0: ничего не теряется, и видно, из чего получилось. */
+const TITLE_WORDS=3;
+const wordsOf=t=>String(t).trim().split(/\s+/).filter(Boolean);
+/* Модель иногда добавляет кавычки или точку — снимаем и режем до трёх слов */
+function tidyTitle(t){
+ const w=wordsOf(String(t).replace(/^[«"'`\s]+|[»"'`.\s]+$/g,''));
+ return w.slice(0,TITLE_WORDS).join(' ');
+}
+async function shortenTitle(x){
+ if(!API||!x||x.t0)return;
+ if(wordsOf(x.t).length<=2)return;      /* и так коротко — запрос не тратим */
+ const was=x.t;                         /* запоминаем ДО запроса: пока ходим, название могут поправить руками */
+ let title;
+ try{
+  const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({shorten:x.t})});
+  if(!r.ok)return;
+  title=tidyTitle((await r.json()).title||'');
+ }catch(e){return}                      /* нет сети — название остаётся как набрали */
+ if(!title||title===was)return;
+ const live=byId(x.id);
+ if(!live||live.t!==was)return;         /* название успели поправить руками — чужое не перетираем */
+ live.t0=was; live.t=title;
+ save(); paint();
+}
+
 /* ---------- настройки ----------
    Отдельный экран, а не скрытый жест: без него некуда смотреть память и корзину.
    Сделан накладкой, одинаковой в обеих оболочках, — иначе логика разъедется. */
@@ -1336,7 +1365,7 @@ nt.oninput=()=>{err.style.display='none';};
 function submitTask(){
  if(!nt.value.trim()){err.style.display='block';nt.focus();return;}
  err.style.display='none';
- const was=S.showDone, t=addTask(nt.value.trim()); nt.value=''; S.showDone=0; paint();
+ const was=S.showDone, t=addTask(nt.value.trim()); nt.value=''; S.showDone=0; paint(); shortenTitle(t);
  nt.focus();
  if(!was)popIn(list.querySelector('.row[data-id="'+t.id+'"]'));
 }
@@ -1386,7 +1415,7 @@ addEventListener('pagehide',flush); addEventListener('beforeunload',flush);
 paint();
 /* Поверхность для тестов и отладки из консоли браузера. S переприсваивается при загрузке,
    поэтому отдаётся геттером, иначе снаружи виден устаревший объект. */
-window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload,chatMessages,md,runTool,undoAct,byShort,shortId,fileBody,fmtSize,attach,get pending(){return pending},settings,squeeze,spendUsd,addSpend,get undos(){return undos},get undoNote(){return undoNote}};
+window.app={get S(){return S},kindOf,byId,prById,inPj,openIn,curItem,addTask,addStep,makeProject,delItem,fmtDue,flush,paint,showMenu,closeMenu,chatPayload,chatMessages,md,runTool,undoAct,byShort,shortId,fileBody,fmtSize,attach,get pending(){return pending},settings,squeeze,spendUsd,addSpend,shortenTitle,tidyTitle,get undos(){return undos},get undoNote(){return undoNote}};
 
 /* Обновление установленного приложения. Новый service worker забирает управление сам
    (skipWaiting + clients.claim), но страница продолжает исполнять старый код до перезагрузки —

@@ -313,6 +313,50 @@ async function tools(){
  assert((await A.runTool({id:'x',name:'нет_такого',input:{}},pr,true)).err,'неизвестный инструмент — ошибка');
 }
 
+/* ---------- короткие названия ---------- */
+async function titles(){
+ console.log('короткие названия');
+ const {w,d}=load('index.html');
+ const A=w.app;
+
+ assert(A.tidyTitle('«Оплатить хостинг»')==='Оплатить хостинг','кавычки снимаются');
+ assert(A.tidyTitle('Оплатить хостинг.')==='Оплатить хостинг','точка в конце снимается');
+ assert(A.tidyTitle('Позвонить Марине насчёт счёта за сентябрь')==='Позвонить Марине насчёт',
+  'ответ длиннее трёх слов режется — источник правды код, а не промт');
+ assert(A.tidyTitle('  оплатить   хостинг  ')==='оплатить хостинг','лишние пробелы убираются');
+
+ // запрос не тратится на то, что и так коротко
+ let calls=0;
+ w.fetch=async()=>{calls++; return {ok:true,json:async()=>({title:'что-то'})}};
+ const short=A.addTask('Купить лампочки');
+ await A.shortenTitle(short);
+ assert(calls===0&&short.t==='Купить лампочки','два слова не сокращаются');
+
+ const long=A.addTask('Позвонить Марине насчёт счёта за хостинг');
+ w.fetch=async()=>({ok:true,json:async()=>({title:'«Позвонить Марине».'})});
+ await A.shortenTitle(long);
+ assert(long.t==='Позвонить Марине','длинное название сокращено');
+ assert(long.t0==='Позвонить Марине насчёт счёта за хостинг','исходник сохранён — ничего не потеряно');
+
+ // повторно не трогаем
+ const again=long.t;
+ w.fetch=async()=>({ok:true,json:async()=>({title:'другое имя'})});
+ await A.shortenTitle(long);
+ assert(long.t===again,'уже сокращённое второй раз не переписывается');
+
+ // сеть отвалилась — название остаётся как набрали
+ const off=A.addTask('Разобрать документы в шкафу');
+ w.fetch=async()=>{throw new Error('нет сети')};
+ await A.shortenTitle(off);
+ assert(off.t==='Разобрать документы в шкафу'&&!off.t0,'без сети название не меняется');
+
+ // пока ходили на сервер, название поправили руками — чужое не перетираем
+ const race=A.addTask('Сделать что-то большое и длинное');
+ w.fetch=async()=>{race.t='Правка руками'; return {ok:true,json:async()=>({title:'Сделать что-то'})}};
+ await A.shortenTitle(race);
+ assert(race.t==='Правка руками','ручная правка во время запроса не перетирается');
+}
+
 /* ---------- память, расход, настройки ---------- */
 async function memory(){
  console.log('память и настройки');
@@ -553,6 +597,7 @@ function markdown(){
  await tools();
  await files();
  await memory();
+ await titles();
  await blocks();
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
 })();

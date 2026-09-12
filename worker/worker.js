@@ -48,6 +48,32 @@ export default {
   if(raw.length>MAX_BODY)return json({error:'слишком большой запрос'},413,h);
   let b; try{b=JSON.parse(raw)}catch(e){return json({error:'bad json'},400,h)}
 
+  /* Название задачи в два слова. Пользователь пишет как придётся, а в списке имя
+     должно читаться с одного взгляда. Дешёвая модель, ответ — одна строка. */
+  if(typeof b.shorten==='string'){
+   const src=cut(b.shorten,300).trim();
+   if(!src)return json({title:''},200,h);
+   try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+     method:'POST',
+     headers:{'content-type':'application/json','anthropic-version':'2023-06-01','x-api-key':env.ANTHROPIC_API_KEY},
+     body:JSON.stringify({
+      model:env.SUM_MODEL||DEFAULT_SUM_MODEL,
+      max_tokens:32,
+      system:'Сократи название задачи до двух слов. Три слова — только если двумя никак. '+
+       'Сохрани суть и узнаваемость: глагол и предмет, например «оплатить хостинг», «позвонить Марине». '+
+       'Тот же язык, что в исходнике. Не добавляй того, чего нет. '+
+       'Ответь только названием: без кавычек, без точки, без пояснений.',
+      messages:[{role:'user',content:src}]
+     })
+    });
+    if(!r.ok)return json({error:'anthropic '+r.status},502,h);
+    const d=await r.json();
+    const title=(d.content||[]).filter(x=>x.type==='text').map(x=>x.text).join(' ').trim();
+    return json({title},200,h);
+   }catch(e){return json({error:'сеть до Anthropic: '+cut(e&&e.message||e,200)},502,h)}
+  }
+
   /* Выжимка старой переписки — отдельный дешёвый вызов, не стрим: клиенту нужен
      только текст, и он хранит его рядом с чатом до следующего сжатия. */
   if(Array.isArray(b.summarize)){
