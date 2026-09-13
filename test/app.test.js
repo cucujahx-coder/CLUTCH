@@ -527,6 +527,36 @@ async function clips(file){
  assert(/\.pend\{/.test(css)&&/\.act\{/.test(css)&&/\.sheet-body\{/.test(css),'стили чипов, карточек изменений и настроек на месте');
 }
 
+
+/* ---------- тактильный щелчок не уводит фокус ----------
+   На iPhone отдача делается кликом по скрытому <label> с переключателем, а клик по label
+   в WebKit переводит на него фокус. Из-за этого клавиатура не открывалась: iOS считала,
+   что поле ввода больше не активно. Здесь поведение WebKit воспроизведено руками. */
+async function haptics(file){
+ console.log('отдача и фокус — '+file);
+ const {w,d}=load(file,w2=>{
+  w2.matchMedia=()=>({matches:false});        /* при prefers-reduced-motion отдачи нет вовсе */
+  Object.defineProperty(w2.HTMLInputElement.prototype,'switch',{value:false,configurable:true});
+  w2.HTMLLabelElement.prototype.click=function(){ const i=this.querySelector('input'); if(i)i.focus(); };
+ });
+ const $=i=>d.getElementById(i);
+
+ $('shutter').click();
+ assert(!!d.querySelector('.hapt input'),'скрытый переключатель появился');
+ assert(d.activeElement===$('nt'),'после разворота строки фокус в поле, а не в переключателе');
+
+ /* отправка в чате: отдача идёт при живом фокусе, и он должен остаться в поле */
+ w.app.S.cur={k:'t',id:w.app.S.ts[0].id};
+ w.app.paint();
+ d.querySelector('#list .row').click();
+ $('msg').focus();
+ $('msg').value='привет';
+ $('send').click();
+ assert(d.activeElement===$('msg'),'после отправки фокус остался в поле ввода');
+ await wait(120);          /* тяжёлая отдача повторяется через 45 и 90 мс */
+ assert(d.activeElement===$('msg'),'повторные щелчки отдачи фокус тоже не забирают');
+}
+
 (async()=>{
  await common('panels.html');
 
@@ -585,5 +615,7 @@ async function clips(file){
  markdown();
  await clips('index.html');
  await clips('panels.html');
+ await haptics('index.html');
+ await haptics('panels.html');
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
 })();

@@ -80,7 +80,16 @@ function tap(ms){
  if(iOSHaptic){
   if(!hapt){ hapt = document.createElement('label'); hapt.className='hapt';
    hapt.innerHTML='<input type="checkbox" switch tabindex="-1" aria-hidden="true">'; document.body.appendChild(hapt); }
-  const hit=()=>{try{hapt.click()}catch(e){}};
+  /* Клик по label в WebKit не только переключает контрол, но и переводит на него фокус.
+     Для iOS это значит, что поле ввода перестало быть активным, и клавиатуру она не
+     показывает. Поэтому запоминаем, кто был в фокусе, и возвращаем его после щелчка. */
+  const hit=()=>{
+   const a=document.activeElement;
+   try{hapt.click()}catch(e){}
+   if(a&&a!==document.body&&a!==document.activeElement&&a.focus){
+    try{a.focus({preventScroll:true})}catch(e){try{a.focus()}catch(e2){}}
+   }
+  };
   hit(); if(ms>=14) setTimeout(hit,45); if(ms>=20) setTimeout(hit,90);
   return;
  }
@@ -1091,7 +1100,8 @@ function paint(keep){
  }
  drawFind();
  if(MODE==='two' || view==='detail') paintDetail();   /* закрытый экран чата не перерисовываем */
- if(!keep && scroll) scroll.scrollTop = scroll.scrollHeight;
+ /* Список начинается сверху и прижимать его не надо: пробовали, владелец вернул как было.
+    К низу список доезжает только после добавления задачи — там, где появилась новая строка. */
 }
 
 /* ---------- выполнение ---------- */
@@ -1456,8 +1466,10 @@ function openComposer(){
  $('dock').classList.add('hide');
  $('veil-b').style.height = 'calc(68px + 40px + var(--pend, 0px) + var(--safe-b))';
  drawAdd();
- try{ nt.focus({preventScroll:true}); }catch(e){ nt.focus(); }
+ /* Отклик — до фокуса: последним действием жеста должен остаться именно focus(),
+    иначе iOS не считает поле активным и клавиатуру не открывает. */
  tap(8);
+ try{ nt.focus({preventScroll:true}); }catch(e){ nt.focus(); }
 }
 function closeComposer(){
  if(mini()) return;
@@ -1486,6 +1498,7 @@ function submitTask(){
  if(!v){ addBtn.classList.add('rec'); tap(12); setTimeout(()=>{ addBtn.classList.remove('rec'); drawAdd(); },900); return; }
  const t = addTask(v);
  nt.value=''; S.showDone=0; save(); paint();
+ scroll.scrollTop = scroll.scrollHeight;     /* новая строка в конце — показываем её */
  fly(list.querySelector('.row[data-id="'+t.id+'"]'));
  tap(14);
  closeComposer();
