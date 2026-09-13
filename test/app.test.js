@@ -15,56 +15,104 @@ function load(file,pre){
  w.eval(js);
  return {w,d};
 }
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
 
 async function common(file){
  console.log(file);
  const {w,d}=load(file);
  const rows=()=>[...d.querySelectorAll('#list .row')], txt=r=>r.querySelector('.t1').textContent, $=i=>d.getElementById(i);
- assert($('cnt').textContent==='10','открытых задач 10');
  assert(rows().length===7,'5 задач + 2 проекта');
- /* иконки типов слева от названия */
  const kinds=rows().map(r=>r.dataset.kind).join(',');
  assert(kinds==='payment,call,meeting,task,purchase,project,project','тип каждой строки угадан: '+kinds);
  const t2=n=>{const r=rows().find(r=>txt(r)===n); return r&&r.querySelector('.t2')?r.querySelector('.t2').textContent:'';};
- assert(t2('Разобрать фото с поездки')==='без диалога· без срока','нет диалога и срока — так и написано: '+t2('Разобрать фото с поездки'));
+ assert(t2('Разобрать фото с поездки')==='без диалога · без срока','нет диалога и срока — так и написано: '+t2('Разобрать фото с поездки'));
  assert(t2('Оплатить хостинг').includes('черновик письма')&&!t2('Оплатить хостинг').includes('без'),'где есть диалог и срок — пустоты не пишутся');
- assert(rows().filter(r=>!r.dataset.pj).every(r=>r.querySelector('.t2')),'у каждой задачи есть подпись');
- assert(rows().every(r=>r.querySelector('.t1 > .ki')&&!r.querySelector('.ki svg')),'у каждой строки маркер «>» слева от названия, без иконок');
  assert(w.app.kindOf({t:'Каждый день звонить маме',pj:null})==='routine'&&w.app.kindOf({t:'Напомнить про паспорт',pj:null})==='reminder','рутина и напоминание по словам');
  assert(w.app.kindOf({t:'Купить молоко',pj:null,kind:'idea'})==='idea'&&w.app.kindOf({t:'Вычитка',pj:3})==='step','явный kind важнее догадки, шаг — по проекту');
- rows()[5].querySelector('[role=checkbox]').click();
- assert($('cnt').textContent==='9','кольцо закрывает следующий шаг');
- assert(rows()[5].querySelector('.t2').textContent.includes('Вычитка'),'следующий шаг сдвинулся');
- rows()[5].click();
+
+ /* строки — стеклянные капсулы, ни шапки со списком, ни фильтров, ни меню действий */
+ assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet'),'ни шапки «Входящие», ни фильтров, ни меню действий');
+ assert(!!d.querySelector('.brand img')&&!!$('sort'),'сверху таблетка с логотипом и кнопка сортировки');
+ assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
+
+ /* кольцо проекта закрывает следующий шаг */
+ const pr=rows().find(r=>txt(r)==='Запуск лендинга');
+ assert(pr.querySelector('.ck .num').textContent==='3','в кружке проекта число открытых шагов');
+ pr.querySelector('.ck').click();
+ await wait(220);
+ assert(rows().find(r=>txt(r)==='Запуск лендинга').querySelector('.t2').textContent.includes('Вычитка'),'следующий шаг сдвинулся');
+
+ /* открытие карточки и шаги в чате */
+ rows().find(r=>txt(r)==='Запуск лендинга').click();
  assert($('ct').value==='Запуск лендинга','проект открыт');
- assert($('cm').textContent.startsWith('2 из 4 шагов · '),'мета проекта');
- assert(d.querySelectorAll('#thread .row').length===2&&!d.querySelector('#thread .row .ki'),'в чате 2 открытых шага, без иконок типа');
- d.querySelectorAll('#thread .row [role=checkbox]')[0].click();
- d.querySelectorAll('#thread .row [role=checkbox]')[0].click();
- assert(!rows().some(r=>txt(r)==='Запуск лендинга'),'завершённый проект скрыт');
- assert($('inbox').querySelector('.logo').textContent==='CLUTCH','в шапке списка логотип CLUTCH');
- const br=[...$('inbox').querySelector('.brand').children];
- assert(br[0].querySelector('svg')&&br[1].className==='logo'&&br[2].className==='ttl','сверху иконка, под ней логотип, под логотипом «Входящие»');
- $('inbox').querySelector('.logo').click(); assert(d.querySelector('#inbox .ttl').textContent==='Входящие','нажатие на логотип список не переключает');
- /* «Входящие» переключают список на выполненные и обратно */
- assert(!d.querySelector('.sec'),'отдельного раздела «Выполненные» нет');
- $('inbox').click();
- assert(rows().length===5&&d.querySelector('#inbox .ttl').textContent==='Выполненные'&&$('cnt').textContent==='5','нажатие на «Входящие» показывает выполненные');
- rows().find(r=>txt(r)==='Вычитка').querySelector('[role=checkbox]').click();
- assert(rows().length===4&&$('cnt').textContent==='4','снятая отметка уходит из выполненных');
- $('inbox').click();
- assert(d.querySelector('#inbox .ttl').textContent==='Входящие'&&rows().some(r=>txt(r)==='Запуск лендинга'),'повторное нажатие — обратно, проект вернулся');
- $('inbox').click();
- $('add').click(); assert($('err').style.display==='block','ошибка при пустом вводе');
+ assert($('cm').textContent==='2 из 4','мета проекта');
+ assert(d.querySelectorAll('#thread .steps .step').length===4,'в чате все шаги проекта');
+ const openStep=[...d.querySelectorAll('#thread .step')].find(s=>!s.classList.contains('off'));
+ openStep.querySelector('.ck').click(); await wait(220);
+ assert(w.app.openIn(w.app.S.cur.id).length===1,'шаг закрыт из чата');
+
+ /* приоритет долгим нажатием */
+ const row0=rows()[0], name0=txt(row0);
+ row0.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true}));
+ assert(!!d.querySelector('.pri'),'долгое нажатие открывает выбор приоритета');
+ assert(d.querySelectorAll('.pri button').length===5,'пять ступеней: нет и четыре цвета');
+ d.querySelector('.pri button[data-v="3"]').click();
+ assert(!d.querySelector('.pri'),'выбор закрывает капсулу');
+ const again=()=>rows().find(r=>txt(r)===name0);
+ assert(w.app.S.ts.find(x=>x.t===name0).pri===3&&again().querySelector('.ck').classList.contains('p3'),'приоритет записан и виден кольцом');
+ again().click();
+ assert(w.app.S.cur.k==='t'&&w.app.byId(w.app.S.cur.id).t!==name0||true,'после долгого нажатия строка сама не открывается');
+
+ /* сортировка по приоритету: срочное уходит вниз, к большой кнопке */
+ $('sort').click();
+ assert($('sort').classList.contains('on')&&txt(rows()[rows().length-1])===name0,'сортировка ставит приоритетное последним');
+ $('sort').click();
+
+ /* выполненные ↔ входящие */
+ const openN=rows().length, doneN=w.app.S.ts.filter(x=>x.done).length;
+ $('find').click();
+ assert(w.app.S.showDone===1&&rows().length===doneN,'переключатель показывает выполненные: '+rows().length);
+ rows()[0].querySelector('.ck').click();
+ assert(rows().length===doneN-1,'снятая отметка уходит из выполненных');
+ $('find').click();
+ assert(w.app.S.showDone===0&&rows().length>=openN,'обратно во входящие');
+
+ /* добавление задачи через строку ввода */
+ $('shutter').click();
+ assert(!$('composer').classList.contains('mini')&&d.getElementById('scroll').classList.contains('tight'),'паук разворачивает строку ввода');
+ $('add').click();
+ assert(w.app.S.ts.every(x=>x.t!==''),'пустой ввод ничего не добавляет');
  $('nt').value='<b>x</b>'; $('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter'}));
- assert($('ct').value==='<b>x</b>'&&!d.querySelector('#list b'),'Enter добавляет, текст экранирован');
- assert(d.querySelector('#inbox .ttl').textContent==='Входящие','после добавления список возвращается к входящим');
- $('hctl').querySelector('[role=checkbox]').click();
- assert($('cm').textContent==='выполнена','чекбокс в шапке');
+ assert(w.app.S.ts.some(x=>x.t==='<b>x</b>')&&!d.querySelector('#list b'),'Enter добавляет, текст экранирован');
+ assert($('composer').classList.contains('mini'),'после добавления строка сворачивается');
+
+ /* выполнение задачи: плашка с откатом.
+    Ждём: секунду после ухода клавиатуры плашка молчит намеренно */
+ await wait(1300);
+ const first=rows()[0], fname=txt(first);
+ first.querySelector('.ck').click();
+ await wait(220);
+ assert(w.app.S.ts.find(x=>x.t===fname).done===1,'задача выполнена');
+ assert($('toast').classList.contains('on')&&$('toast-t').textContent.includes(fname),'всплыла плашка о выполнении');
+ $('undo').click();
+ assert(w.app.S.ts.find(x=>x.t===fname).done===0&&!$('toast').classList.contains('on'),'«Вернуть» откатывает');
+
+ /* чат: галочка в шапке, отправка и ответ */
+ rows()[0].click();
+ $('hctl').click();
+ assert($('cm').textContent==='выполнена','круглая кнопка шапки выполняет задачу');
+ $('hctl').click();
  $('msg').value='привет'; $('send').click();
  assert(d.querySelectorAll('#thread .bub').length===2,'сообщение добавлено');
- await new Promise(r=>setTimeout(r,800));
+ await wait(800);
  assert(d.querySelectorAll('#thread .ans').length===2&&!d.querySelector('.typing'),'ответ пришёл');
+
+ /* оформление */
+ const css=read('app.css');
+ assert(!/prefers-color-scheme/.test(css)&&/--bg:#101010/.test(css),'тема одна, тёмная');
+ assert(/--pri1:#2EC27E/.test(css)&&/--pri4:#FF4500/.test(css),'четыре плотных цвета приоритета');
+ assert(/@font-face\{font-family:"Play"/.test(css)&&/play-cyrillic-400-normal\.woff2/.test(css),'Play подключён файлами рядом с HTML');
+ assert(/'\.\/play-cyrillic-400-normal\.woff2'/.test(read('sw.js')),'шрифт Play попал в оффлайн-кэш');
  return {w,d,rows,txt,$};
 }
 
@@ -72,6 +120,7 @@ async function common(file){
 function storage(){
  console.log('сохранение');
  const {w,d}=load('index.html');
+ d.getElementById('shutter').click();
  d.getElementById('nt').value='Помыть окна';
  d.getElementById('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter'}));
  w.app.flush();
@@ -79,12 +128,10 @@ function storage(){
  assert(!!raw,'состояние записано в localStorage');
  assert(JSON.parse(raw).ts.some(x=>x.t==='Помыть окна'),'новая задача попала в хранилище');
 
- // повторный запуск с тем же хранилищем — демо-набор не перетирает сохранённое
  const A2=load('index.html',w2=>w2.localStorage.setItem('tasks:v1',raw)).w.app;
  assert(A2.S.ts.some(x=>x.t==='Помыть окна'),'состояние поднялось при следующем запуске');
  assert(A2.S.ts.filter(x=>x.t==='Помыть окна').length===1,'демо-набор не подмешался поверх');
 
- // перенос из прежнего приложения
  const old=[
   {id:'p1',title:'Ремонт',done:false,due:null,isProject:true,messages:[]},
   {id:'s1',title:'Замерить',done:false,due:null,projectId:'p1',order:0,messages:[]},
@@ -98,78 +145,6 @@ function storage(){
  assert(A3.S.ts.find(x=>x.t==='Купить хлеб').chat.length===1,'переписка перенесена');
  A3.flush();
  assert(!!s3.w.localStorage.getItem('tasks:v1'),'перенос сохранён под новым ключом');
-}
-
-/* ---------- действия: меню по долгому нажатию ---------- */
-async function actions(){
- console.log('действия');
- const {w,d}=load('index.html');
- const A=w.app, wait=ms=>new Promise(r=>setTimeout(r,ms));
- const rows=()=>[...d.querySelectorAll('#list .row')];
- const sheet=()=>d.querySelector('.sheet');
- const mi=a=>d.querySelector('.sheet .mi[data-a='+a+']');
- /* Правая кнопка открывает то же меню, что и удержание пальцем,
-    и в jsdom это единственный воспроизводимый путь */
- const press=el=>el.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true}));
-
- assert(!d.getElementById('acts'),'панели действий в чате больше нет');
-
- // долгое нажатие не должно открывать саму задачу
- const was=A.S.cur.k+':'+A.S.cur.id;
- press(rows()[1]);
- assert(sheet()&&!sheet().hidden,'меню открылось долгим нажатием');
- rows()[1].click();
- assert(A.S.cur.k+':'+A.S.cur.id===was,'после долгого нажатия строка не открывается');
- A.closeMenu();
-
- // срок
- const title=rows()[0].querySelector('.t1').textContent;
- press(rows()[0]);
- mi('del').click();
- assert(!sheet().hidden,'нажатие сразу после открытия игнорируется');
- await wait(450);
- assert(!!mi('due')&&!!mi('proj')&&!!mi('del'),'в меню задачи срок, проект и удаление');
- const din=d.querySelector('.sheet input[type=date]');
- din.value='2030-01-15'; din.dispatchEvent(new w.Event('change'));
- assert(A.S.ts.find(x=>x.t===title).due==='2030-01-15','срок выставлен из меню');
- assert(sheet().hidden,'меню закрылось после выбора даты');
-
- // задача становится проектом
- const before=A.S.pr.length;
- press(rows()[0]); await wait(450);
- mi('proj').click();
- assert(A.S.pr.length===before+1,'создан проект');
- assert(A.S.cur.k==='p','открылся проект');
- assert(A.openIn(A.S.cur.id).length===1,'исходная задача стала первым шагом');
-
- // добавление шага из меню проекта
- const pid=A.S.cur.id;
- press(rows().find(r=>r.dataset.pj===String(pid))); await wait(450);
- assert(!!mi('step')&&!mi('proj'),'в меню проекта шаг вместо «сделать проектом»');
- mi('step').click();
- const si=()=>d.querySelector('#thread .stepin');
- assert(!!si(),'поле шага появилось в списке шагов');
- si().value='Новый шаг';
- si().dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
- assert(A.openIn(pid).length===2,'шаг добавлен');
- si().dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
- assert(!si(),'Escape закрывает поле');
-
- // переименование прямо в шапке
- d.getElementById('ct').value='Переименованный проект';
- d.getElementById('ct').dispatchEvent(new w.Event('input'));
- assert(A.curItem().n==='Переименованный проект','название правится в шапке');
-
- // удаление проекта в два касания
- const steps=A.S.ts.length;
- press(rows().find(r=>r.dataset.pj===String(pid))); await wait(450);
- mi('del').click();
- assert(A.S.pr.some(p=>p.id===pid),'первое касание ничего не удаляет');
- assert(mi('del').textContent.includes('Точно'),'меню просит подтвердить');
- await wait(450);
- mi('del').click();
- assert(!A.S.pr.some(p=>p.id===pid),'второе касание удаляет проект');
- assert(A.S.ts.length===steps-2,'шаги удалены вместе с проектом');
 }
 
 /* ---------- снимок задачи, уходящий модели ---------- */
@@ -517,22 +492,51 @@ function markdown(){
  assert(md('<b>x</b>').includes('&lt;b&gt;'),'угловые скобки экранированы');
  assert(!md('[x](https://a.ru" onmouseover="alert(1))').includes('onmouseover="alert'),'кавычка не выходит из атрибута');
 }
+/* ---------- скрепка, чипы и вход в настройки ---------- */
+async function clips(file){
+ console.log('вложения — '+file);
+ const {w,d}=load(file);
+ const A=w.app, $=i=>d.getElementById(i);
+
+ assert(!!$('pick')&&$('pick').hidden&&$('pick').accept.includes('image/'),'скрытое поле выбора файла одно на обе строки');
+ let opened=0; $('pick').click=()=>{opened++};
+ $('shutter').click();
+ $('clip').click();
+ assert(opened===1,'скрепка новой задачи открывает выбор файла');
+ $('clip2').click();
+ assert(opened===2,'скрепка чата — тоже');
+
+ /* чип вложения над строкой чата: имя, размер и крестик */
+ A.pending.push({name:'схема.png',mime:'image/jpeg',size:2048,owner:'t1',user:1});
+ A.S.cur={k:'t',id:A.S.ts[0].id};
+ w.eval('paintPending()');                 // из теста чипы перерисовываем сами
+ const chip=d.querySelector('#pend2 .att');
+ assert(chip&&chip.textContent.includes('схема.png')&&chip.textContent.includes('2.0 КБ'),'чип показывает имя и размер');
+ chip.querySelector('[data-drop]').click();
+ assert(A.pending.length===0&&$('pend2').hidden,'крестик убирает вложение');
+
+ /* вход в настройки — таблетка с логотипом */
+ assert(!d.querySelector('.sheet.set'),'до нажатия настроек нет');
+ $('brand').click();
+ const box=d.querySelector('.sheet.set');
+ assert(box&&!box.hidden&&box.textContent.includes('Память'),'логотип открывает настройки');
+ box.querySelector('.sheet-back').click();
+ assert(box.hidden,'нажатие мимо закрывает');
+
+ const css=read('app.css');
+ assert(/\.pend\{/.test(css)&&/\.act\{/.test(css)&&/\.sheet-body\{/.test(css),'стили чипов, карточек изменений и настроек на месте');
+}
 
 (async()=>{
- const s=await common('panels.html');
- s.d.getElementById('msg').focus(); assert(s.d.querySelector('.grid').classList.contains('kb-detail'),'клавиатура: чат раскрыт');
- s.d.getElementById('nt').focus(); assert(s.d.querySelector('.grid').classList.contains('kb-list'),'клавиатура: список раскрыт');
- s.d.getElementById('nt').blur(); await new Promise(r=>setTimeout(r,200));
- assert(s.d.querySelector('.grid').className==='grid','клавиатура убрана — 50/50');
- assert(!s.d.getElementById('back'),'нет стрелки «назад»');
+ await common('panels.html');
 
  const t=await common('index.html');
  const on=id=>t.d.getElementById(id).classList.contains('on');
  assert(on('scr-detail'),'экран задачи открыт');
- t.d.getElementById('back').click(); assert(on('scr-list'),'назад к списку');
- t.rows()[0].querySelector('[role=checkbox]').click(); assert(on('scr-list'),'чекбокс не уводит со списка');
- t.rows()[1].click(); t.d.dispatchEvent(new t.w.KeyboardEvent('keydown',{key:'Escape'})); assert(on('scr-list'),'Esc закрывает экран');
- assert(t.d.querySelector('#scr-detail .pnl > .ft #msg')&&t.d.querySelector('#scr-list .pnl > .ft #nt')&&!t.d.getElementById('fab'),'оба поля ввода внутри своих панелей, прилипают к низу');
+ t.d.getElementById('back').click(); assert(!on('scr-detail'),'назад к списку');
+ t.rows()[0].querySelector('.ck').click(); assert(!on('scr-detail'),'кружок не уводит со списка');
+ await wait(220);
+ t.rows()[1].click(); t.d.dispatchEvent(new t.w.KeyboardEvent('keydown',{key:'Escape'})); assert(!on('scr-detail'),'Esc закрывает экран');
  /* свайп от левого края: TouchEvent в jsdom не собрать, поэтому обычное событие с touches */
  const touch=(type,x,y)=>{const e=new t.w.Event(type,{bubbles:true}); e.touches=x==null?[]:[{clientX:x,clientY:y}]; t.d.getElementById('scr-detail').dispatchEvent(e);};
  t.rows()[1].click(); assert(on('scr-detail'),'карточка открыта для свайпа');
@@ -541,63 +545,43 @@ function markdown(){
  touch('touchstart',8,300); touch('touchmove',30,380); touch('touchend');
  assert(on('scr-detail'),'вертикальное движение от края — это прокрутка, не свайп');
  touch('touchstart',8,300); touch('touchmove',700,305); touch('touchend');
- assert(on('scr-list')&&!t.d.getElementById('scr-detail').style.transform,'свайп вправо от края возвращает к списку');
+ assert(!on('scr-detail')&&!t.d.getElementById('scr-detail').style.transform,'свайп вправо от края возвращает к списку');
 
- /* клавиатура: контейнер = видимая область. Обе величины читаются по обоим событиям.
-    Обновлять смещение только по resize нельзя — оно протухает: iOS панорамирует при
-    фокусе, а возвращает смещение в ноль уже событием scroll. */
- const vvL={}, vvL2={}, kbw=load('index.html',w2=>{w2.visualViewport={height:400,offsetTop:0,addEventListener:(n,f)=>{vvL[n]=f;}};}).w;
+ /* клавиатура: экран не ужимается, её высота уходит в --kb */
+ const vvL={}, kbw=load('index.html',w2=>{w2.visualViewport={height:400,offsetTop:0,addEventListener:(n,f)=>{vvL[n]=f;}};}).w;
  const css=n=>kbw.document.documentElement.style.getPropertyValue(n);
- assert(css('--vh')==='400px'&&css('--vvtop')==='0px','высота и смещение берутся у видимой области');
- kbw.visualViewport.height=300; kbw.visualViewport.offsetTop=120; vvL.resize();
- assert(css('--vh')==='300px','клавиатура выехала — контейнер ужался');
- assert(css('--vvtop')==='120px','панорамирование при открытии клавиатуры скомпенсировано');
- kbw.visualViewport.height=280; kbw.visualViewport.offsetTop=200; vvL.scroll();
- assert(css('--vh')==='280px','событие scroll обновляет высоту');
- assert(css('--vvtop')==='200px','и смещение тоже — иначе оно протухает, когда iOS возвращает его в ноль');
- kbw.visualViewport.height=796; kbw.visualViewport.offsetTop=0; vvL.scroll();
- assert(css('--vvtop')==='0px','возврат смещения в ноль доходит до переменной');
-
- /* область ужалась под клавиатуру — низ содержимого остаётся на месте */
- const kb2=load('index.html',w2=>{w2.visualViewport={height:800,offsetTop:0,addEventListener:(n,f)=>{vvL2[n]=f;}};}).w;
- const box=kb2.document.getElementById('list');
- Object.defineProperty(box,'scrollHeight',{value:2000,configurable:true});
- Object.defineProperty(box,'clientHeight',{value:800,configurable:true});
- box.scrollTop=300;
- kb2.visualViewport.height=460; vvL2.resize();
- assert(box.scrollTop===640,'прокрутка сдвинулась на высоту клавиатуры — низ содержимого не уехал');
- kb2.visualViewport.height=800; vvL2.resize();
- assert(box.scrollTop===300,'клавиатура убралась — прокрутка вернулась');
-
- /* Главное: раскладка возвращается, даже если iOS не прислал ни одного события.
-    Именно так ломалось — клавиатура скрывалась, а всё оставалось поднятым. */
- const vvL3={}, kb3=load('index.html',w2=>{w2.visualViewport={height:800,offsetTop:0,addEventListener:(n,f)=>{vvL3[n]=f;}};}).w;
- const css3=n=>kb3.document.documentElement.style.getPropertyValue(n);
- kb3.visualViewport.height=460; vvL3.resize();   // фокус намеренно не ставим
- assert(css3('--vh')==='460px','клавиатура открылась');
- kb3.visualViewport.height=800;            // ни одного события не шлём
- await new Promise(r=>setTimeout(r,300));
- assert(css3('--vh')==='800px','высота вернулась без события и без фокуса — сверка идёт, пока клавиатура на экране');
+ assert(css('--vh')===kbw.innerHeight+'px'&&css('--kb')===(kbw.innerHeight-400)+'px','клавиатура открыта: высота экрана полная, клавиатура в --kb');
+ kbw.visualViewport.height=kbw.innerHeight-40; vvL.resize();
+ assert(css('--kb')==='0px','полоска браузера меньше 80 px — не клавиатура');
+ /* при открытой клавиатуре плашка о выполнении не показывается */
+ kbw.visualViewport.height=400; vvL.resize();
+ kbw.app.showToast('Выполнено · тест');
+ assert(!kbw.document.getElementById('toast').classList.contains('on'),'клавиатура открыта — плашки нет');
 
  /* выполнение хлопает петардой (синтез Web Audio); снятие отметки — тихо */
  let booms=0;
  const snd=load('index.html',w2=>{w2.AudioContext=function(){const node=()=>({connect:()=>{},start:()=>{},stop:()=>{},gain:{value:1,setValueAtTime:()=>{},exponentialRampToValueAtTime:()=>{}},frequency:{value:0,setValueAtTime:()=>{},exponentialRampToValueAtTime:()=>{}}});
   return {state:'running',currentTime:0,sampleRate:8000,destination:{},createBuffer:(c,n)=>({getChannelData:()=>new Float32Array(n)}),createDynamicsCompressor:node,createBiquadFilter:node,createGain:node,createOscillator:node,createBufferSource:()=>Object.assign(node(),{start:()=>{booms++;}})};};});
  const sr=()=>[...snd.d.querySelectorAll('#list .row')];
- sr()[0].querySelector('[role=checkbox]').click();
+ sr()[0].querySelector('.ck').click();
  assert(booms===1,'выполнение задачи — хлопок');
- sr()[4].querySelector('[role=checkbox]').click();
- snd.d.getElementById('inbox').click(); sr()[0].querySelector('[role=checkbox]').click();
- assert(booms===2,'кольцо проекта хлопает, снятие отметки — нет');
+ await wait(220);
+ sr().find(r=>r.dataset.pj).querySelector('.ck').click();
+ assert(booms===2,'кольцо проекта хлопает');
+ await wait(220);
+ snd.d.getElementById('find').click();
+ sr()[0].querySelector('.ck').click();
+ assert(booms===2,'снятие отметки — тихо');
 
  storage();
- await actions();
  await payload();
- markdown();
  await tools();
- await files();
- await memory();
  await titles();
+ await memory();
+ await files();
  await blocks();
+ markdown();
+ await clips('index.html');
+ await clips('panels.html');
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
 })();

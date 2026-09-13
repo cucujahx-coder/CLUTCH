@@ -2,73 +2,68 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<title>Задачи</title>
-<meta name="theme-color" content="#f6f6f4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual">
+<title>CLUTCH</title>
+<meta name="theme-color" content="#101010">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Задачи">
-<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CLUTCH">
+<meta name="color-scheme" content="dark">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preload" href="Pixelizer.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="play-cyrillic-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="play-cyrillic-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="app.css">
 </head>
 <body class="nav">
-<div class="app">
 <h2 class="sr-only">В строке проекта показан следующий шаг, тап по кольцу закрывает именно его; шаг также можно отметить в чате проекта</h2>
-<div class="grid">
+<div class="phone">
 
-  <div class="scr on" id="scr-list"><div class="pnl">
-    <div class="hd hd-list" id="inbox">
-      <!-- три строки, как в шапке чата: иконка входящих, логотип, заголовок списка; счётчик на линии заголовка -->
-      <div class="brand">
-        <div class="crumb" id="brand-ic" aria-hidden="true"></div>
-        <div class="logo">CLUTCH</div>
-        <span class="ttl" role="button" tabindex="0">Входящие</span>
-      </div>
-      <span class="cnt" id="cnt"></span>
+  <section class="screen" id="scr-list">
+    <div class="veil top" aria-hidden="true"></div>
+    <div class="veil bottom" id="veil-b" aria-hidden="true"></div>
+    <div class="brand press" id="brand" role="button" tabindex="0" aria-label="Настройки"><img alt="CLUTCH" src="data:image/png;base64,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"></div>
+    <button class="rnd44 topbtn press" id="sort" aria-label="Сортировать по приоритету"></button>
+    <div class="scroll" id="scroll">
+      <div class="spacer"></div>
+      <div id="list"></div>
     </div>
-    <div class="bd" id="list" style="display:flex; flex-direction:column;"></div>
-    <!-- поле «Новая задача» — как в чате: внутри панели, прилипает к низу; список прокручивается под ним -->
-    <div class="ft">
-      <div class="ftr">
-        <input type="text" id="nt" placeholder="Новая задача" aria-label="Новая задача" enterkeyhint="done" />
-        <button id="add" class="ib" aria-label="Добавить задачу"></button>
+    <div class="dock" id="dock">
+      <button class="shutter press" id="shutter" aria-label="Новая задача"></button>
+      <div class="dockrow">
+        <button class="rnd44 press" id="find" aria-label="Выполненные"></button>
       </div>
-      <div id="err" class="err" role="alert">Введите текст задачи</div>
     </div>
-  </div></div>
+    <!-- строка ввода вырастает из большой кнопки; в свёрнутом виде её нет -->
+    <div class="composer mini" id="composer">
+      <button class="rnd press" id="clip" aria-label="Вложение"></button>
+      <input class="inp" type="text" id="nt" placeholder="Новая задача" aria-label="Новая задача"
+             autocomplete="off" autocorrect="off" autocapitalize="sentences" enterkeyhint="done">
+      <button class="rnd solid press" id="add" aria-label="Добавить задачу"></button>
+    </div>
+    <div class="pend" id="pend" hidden aria-live="polite"></div>
+    <div class="toast" id="toast"><span id="toast-t"></span><button class="undo press" id="undo">Вернуть</button></div>
+  </section>
 
-  <div class="scr" id="scr-detail"><div class="pnl">
-    <div class="hd">
-      <div class="hd-row">
-        <button id="back" class="back" aria-label="Назад к списку"></button>
-        <div class="cel">
-          <div id="crumb" class="crumb"></div>
-          <input id="ct" class="ct" aria-label="Название" />
-          <div id="cm" class="cm"></div>
-        </div>
-        <span id="hctl" class="ck"></span>
-      </div>
+  <section class="screen" id="scr-detail">
+    <div class="veil top" aria-hidden="true"></div>
+    <button class="rnd44 topbtn left press" id="back" aria-label="Назад к списку"></button>
+    <button class="rnd44 topbtn press" id="hctl" aria-label="Выполнить"></button>
+    <div class="title"><span id="crumb" class="sr-only"></span><input id="ct" class="h1" aria-label="Название"><span class="meta" id="cm" hidden></span></div>
+    <div class="scroll thread" id="thread"></div>
+    <div class="pend" id="pend2" hidden aria-live="polite"></div>
+    <div class="composer" id="composer2">
+      <button class="rnd press" id="clip2" aria-label="Вложение"></button>
+      <input class="inp" type="text" id="msg" placeholder="Спросить" aria-label="Сообщение"
+             autocomplete="off" enterkeyhint="send">
+      <button class="rnd solid press" id="send" aria-label="Отправить"></button>
     </div>
-    <div class="bd thread" id="thread"></div>
-    <!-- поле чата внутри панели, прилипает к низу; лента прокручивается под ним -->
-    <div class="ft">
-      <div id="pend" class="pend" hidden></div>
-      <div class="ftr">
-        <button id="clip" class="ib" aria-label="Приложить файл"></button>
-        <input type="file" id="pick" accept="image/*,application/pdf" multiple hidden />
-        <input type="text" id="msg" placeholder="Спросить Claude" aria-label="Сообщение" />
-        <button id="send" class="ib" aria-label="Отправить"></button>
-      </div>
-    </div>
-  </div></div>
+  </section>
 </div>
-</div>
+<input type="file" id="pick" accept="image/*,application/pdf" multiple hidden>
 <script>window.MODE="nav"</script>
 <script src="app.js"></script>
 </body>
