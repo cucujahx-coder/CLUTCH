@@ -38,8 +38,8 @@
   --font:"Play",Inter,-apple-system,system-ui,sans-serif;
   --font-head:"Pixelizer",var(--font);
   --ground:none;   /* фон плоский: ровный #1A1A1A, без градиента */
-  --kb:0px;        /* высота клавиатуры, ставит JS из visualViewport */
-  --vh:100dvh;     /* видимая высота, ставит JS */
+  --vh:100dvh;     /* высота видимой области, ставит JS из visualViewport */
+  --vvtop:0px;     /* её смещение сверху: iOS панорамирует страницу при фокусе */
   --safe-b:0px; --safe-t:0px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -56,7 +56,11 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .inp,.bub,.ans{-webkit-user-select:text;user-select:text}
 
 /* ── каркас: 600 по центру, абсолютный лэйаут ─────────────────── */
-.phone{position:relative;max-width:600px;margin:0 auto;height:var(--vh);overflow:hidden}
+/* Контейнер = видимая область: высота из visualViewport.height, смещение сверху из
+   visualViewport.offsetTop. Композер лежит на его дне и оказывается над клавиатурой сам —
+   поднимать его на вычисленную высоту клавиатуры пробовали, поле «гуляет» (см. CLAUDE.md) */
+.phone{position:fixed;left:0;right:0;top:var(--vvtop,0px);height:var(--vh);
+  max-width:600px;margin:0 auto;overflow:hidden}
 .screen{position:absolute;inset:0;padding:0 16px;
   padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));
   transition:transform .3s var(--ease-ios);background:var(--bg)}
@@ -70,13 +74,13 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .veil.top{top:0;height:calc(76px + var(--safe-t));
   background:linear-gradient(to bottom,rgba(16,16,16,.85),rgba(16,16,16,.35) 65%,transparent);
   -webkit-mask-image:linear-gradient(to bottom,#000 55%,transparent);mask-image:linear-gradient(to bottom,#000 55%,transparent)}
-.veil.bottom{bottom:0;height:calc(76px + 16px + 44px + 50px + var(--safe-b) + var(--kb));
+.veil.bottom{bottom:0;height:calc(76px + 16px + 44px + 50px + var(--safe-b));
   background:linear-gradient(to top,rgba(16,16,16,.9),rgba(16,16,16,.45) 60%,transparent);
   -webkit-mask-image:linear-gradient(to top,#000 60%,transparent);mask-image:linear-gradient(to top,#000 60%,transparent);
   transition:height .25s var(--ease-ios)}
 
 /* нижний блок управления: большая кнопка по центру, под ней кружок — переключатель — кружок */
-.dock{position:absolute;left:16px;right:16px;bottom:calc(26px + var(--safe-b) + var(--kb));z-index:3;
+.dock{position:absolute;left:16px;right:16px;bottom:calc(26px + var(--safe-b));z-index:3;
   /* 21 = 16 видимых + 5 на внешнее кольцо кнопки: оно рисуется тенью и места не занимает */
   display:flex;flex-direction:column;align-items:center;gap:21px;
   transition:opacity .2s var(--ease-ios),transform .38s var(--bounce),bottom .25s var(--ease-ios)}
@@ -112,7 +116,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 
 /* низ отсчитывается от клавиатуры: композер 68 + его отступ + зазор 16 */
 .scroll{position:absolute;left:16px;right:16px;top:calc(72px + var(--safe-t));
-  bottom:calc(68px + 32px + var(--pend, 0px) + var(--safe-b) + var(--kb));
+  bottom:calc(68px + 32px + var(--pend, 0px) + var(--safe-b));
   overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   display:flex;flex-direction:column;gap:8px;transition:bottom .25s var(--ease-ios)}
 .scroll::-webkit-scrollbar{width:0}
@@ -121,9 +125,9 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 
 #scr-list .scroll{top:0;bottom:0;
   padding-top:calc(16px + 44px + 16px + var(--safe-t));   /* под кнопкой сортировки */
-  padding-bottom:calc(76px + 21px + 44px + 47px + var(--pend, 0px) + var(--safe-b) + var(--kb))}   /* под доком, 16 px до кольца кнопки */
+  padding-bottom:calc(76px + 21px + 44px + 47px + var(--pend, 0px) + var(--safe-b))}   /* под доком, 16 px до кольца кнопки */
 /* строка ввода открыта: дока нет, между ней и последней задачей тот же зазор 8, что между задачами */
-#scr-list .scroll.tight{padding-bottom:calc(68px + 16px + 16px + var(--pend, 0px) + var(--safe-b) + var(--kb))}
+#scr-list .scroll.tight{padding-bottom:calc(68px + 16px + 16px + var(--pend, 0px) + var(--safe-b))}
 
 /* ── строка списка: текст слева, кружок справа под большой палец ─ */
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */
@@ -167,7 +171,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .pri{animation:pri-in .24s var(--bounce)}
 
 /* ── композер: поднимается вместе с клавиатурой ───────────────── */
-.composer{position:absolute;left:16px;right:16px;bottom:calc(16px + var(--safe-b) + var(--kb));z-index:5;
+.composer{position:absolute;left:16px;right:16px;bottom:calc(16px + var(--safe-b));z-index:5;
   height:68px;padding:11px;border-radius:28px;display:flex;align-items:center;gap:6px;
   background:rgba(36,36,36,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:var(--glass);
   transition:bottom .25s var(--ease-ios),opacity .2s var(--ease-ios),transform .42s var(--bounce),box-shadow .18s var(--ease-ios)}
@@ -215,14 +219,14 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   border:0;background:transparent;color:var(--text);padding:0;width:100%;text-align:center;
   text-overflow:ellipsis;-webkit-user-select:text;user-select:text}
 .title .h1:focus{outline:none}
-#scr-detail .scroll{top:0;bottom:calc(68px + 32px + var(--pend, 0px) + var(--safe-b) + var(--kb));
+#scr-detail .scroll{top:0;bottom:calc(68px + 32px + var(--pend, 0px) + var(--safe-b));
   padding-top:calc(16px + 44px + 16px + var(--safe-t))}
 .empty{margin:auto;padding:24px;text-align:center;font-size:15px;color:var(--muted)}
 
 /* ── плашка о выполненном ────────────────────────────────────────
    Она не всплывает отдельно, а вырастает из того же кружка справа: кружок гаснет,
    капсула разъезжается влево на его месте и через 4 секунды сворачивается обратно */
-.toast{position:absolute;left:16px;right:16px;bottom:calc(26px + var(--safe-b) + var(--kb));z-index:15;
+.toast{position:absolute;left:16px;right:16px;bottom:calc(26px + var(--safe-b));z-index:15;
   height:44px;display:flex;align-items:center;gap:12px;border-radius:22px;padding:0 5px 0 18px;font-size:15px;
   background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:var(--glass);
   margin-left:calc(100% - 44px - 32px);opacity:0;pointer-events:none;
@@ -298,7 +302,7 @@ body.two #scr-detail,body.two #scr-list.away{transform:none}
 
 /* ── вложения, изменения, разметка ответа ─────────────────────── */
 /* чипы выбранных файлов стоят над строкой ввода и поднимаются вместе с ней */
-.pend{position:absolute;left:16px;right:16px;bottom:calc(16px + 68px + 8px + var(--safe-b) + var(--kb));z-index:5;
+.pend{position:absolute;left:16px;right:16px;bottom:calc(16px + 68px + 8px + var(--safe-b));z-index:5;
   display:flex;flex-wrap:wrap;gap:6px;transition:bottom .25s var(--ease-ios)}
 .att{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;max-width:100%;height:32px;
   padding:0 6px 0 12px;border-radius:16px;font-size:13px;color:var(--muted);

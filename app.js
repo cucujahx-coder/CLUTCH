@@ -1123,10 +1123,14 @@ function ringTap(p, row){
 /* ---------- плашка о выполненном ----------
    Вырастает из кружка переключателя справа внизу и через 4 секунды сворачивается обратно.
    При открытой клавиатуре не показывается: ей негде встать, она легла бы на строку ввода. */
+/* Видимая область меньше окна — значит клавиатура на экране */
+function kbUp(){
+ const vv = window.visualViewport;
+ return innerHeight - (vv ? vv.height : innerHeight) > 80;
+}
 function kbOpen(){
- const kb = parseFloat(root.getPropertyValue('--kb')) || 0;
  const a = document.activeElement, c = $('composer');
- if(kb > 0) return true;
+ if(kbUp()) return true;
  if(a && a.matches && a.matches('.inp')) return true;
  return !!(c && !c.classList.contains('mini'));
 }
@@ -1295,20 +1299,53 @@ function paintDetail(){
 /* ---------- оболочка ---------- */
 let view = 'list', open, back;
 
-/* Высота окна в --vh, высота клавиатуры в --kb. Экран под клавиатуру не ужимается:
-   на --kb поднимаются строка ввода, док и плашка, а прокрутке снизу добавляется запас. */
+/* Контейнер приложения равен видимой области: высота из visualViewport.height, смещение
+   сверху из visualViewport.offsetTop. Обе величины — чистая функция текущего состояния,
+   без накопленных дельт: пропущенное обновление не оставляет следа.
+
+   Событиям iOS доверять нельзя. При скрытии клавиатуры может не прийти ни одного, и
+   раскладка застревает в поднятом состоянии, накладывая блоки друг на друга. Поэтому
+   пока идёт ввод ИЛИ пока клавиатура на экране — сверяемся с фактическими размерами
+   каждый кадр. Второе условие важнее первого: цикл не остановится, пока высота не
+   вернулась. Вне ввода — обычные события. */
+let vvTrace = [];
 function trackVH(){
- const set = () => {
-  const vv = window.visualViewport;
-  root.setProperty('--vh', innerHeight + 'px');
-  let kb = vv ? Math.round(innerHeight - vv.height - (vv.offsetTop||0)) : 0;
-  if(kb < 80) kb = 0;
-  root.setProperty('--kb', kb + 'px');
+ const vv = window.visualViewport;
+ let lastH = null, until = 0, ticking = false;
+ const apply = src => {
+  const h = vv ? vv.height : innerHeight, t = vv ? vv.offsetTop : 0;
+  root.setProperty('--vh', h + 'px');
+  root.setProperty('--vvtop', t + 'px');
+  if(lastH !== null && h !== lastH){
+   /* Высота изменилась — держим низ содержимого на месте, иначе список и лента съезжают
+      вверх на высоту клавиатуры. Чтение offsetHeight заставляет браузер применить новую
+      высоту: без него scrollTop обрежется по старым размерам. */
+   const d = lastH - h;
+   document.querySelectorAll('.scroll').forEach(b=>{ void b.offsetHeight; b.scrollTop += d; });
+   if(vvTrace.length > 7) vvTrace.shift();
+   vvTrace.push(src + Math.round(h));
+  }
+  lastH = h;
  };
- set();
- if(window.visualViewport){ visualViewport.addEventListener('resize',set); visualViewport.addEventListener('scroll',set); }
- addEventListener('resize', set);
- addEventListener('orientationchange', ()=>setTimeout(set,150));
+ const typing = () => { const a = document.activeElement; return !!a && a.tagName === 'INPUT'; };
+ const pump = () => {
+  apply('f');
+  if(typing() || kbUp() || Date.now() < until) requestAnimationFrame(pump); else ticking = false;
+ };
+ const watch = ms => {
+  until = Math.max(until, Date.now() + ms);
+  if(!ticking){ ticking = true; requestAnimationFrame(pump); }
+ };
+ apply('i');
+ if(vv){
+  vv.addEventListener('resize', ()=>{ apply('r'); watch(800); });
+  vv.addEventListener('scroll', ()=>apply('s'));
+ }
+ addEventListener('resize', ()=>apply('w'));
+ addEventListener('orientationchange', ()=>setTimeout(()=>apply('o'), 150));
+ /* Фокус и его потеря — моменты, когда клавиатура появляется и убирается */
+ addEventListener('focusin', e=>{ if(e.target && e.target.tagName === 'INPUT') watch(1500); });
+ addEventListener('focusout', e=>{ if(e.target && e.target.tagName === 'INPUT') watch(1500); });
 }
 /* Безопасные зоны меряем один раз пробником: env() в calc() из JS не прочитать */
 function trackSafe(){
@@ -1417,7 +1454,7 @@ function openComposer(){
  /* фокус ставим синхронно, прямо в обработчике нажатия: iOS открывает клавиатуру только внутри жеста */
  composer.classList.remove('mini'); scroll.classList.add('tight');
  $('dock').classList.add('hide');
- $('veil-b').style.height = 'calc(68px + 40px + var(--pend, 0px) + var(--safe-b) + var(--kb))';
+ $('veil-b').style.height = 'calc(68px + 40px + var(--pend, 0px) + var(--safe-b))';
  drawAdd();
  try{ nt.focus({preventScroll:true}); }catch(e){ nt.focus(); }
  tap(8);
@@ -1443,8 +1480,6 @@ nt.addEventListener('focus', ()=>{ ntFocused = true; });
 nt.addEventListener('blur', ()=>setTimeout(()=>{ if(ntFocused && !picking && !nt.value.trim()) closeComposer(); },120));
 /* касание по списку мимо строки — тоже закрывает */
 scroll.addEventListener('pointerdown', ()=>{ if(!mini() && !nt.value.trim()) closeComposer(); });
-/* iOS пытается прокрутить страницу к полю — возвращаем на место, поле и так поднято на --kb */
-document.addEventListener('focusin', e => { if(e.target.matches && e.target.matches('.inp')) setTimeout(()=>{ try{ scrollTo(0,0); }catch(err){} }, 50); });
 nt.addEventListener('keydown', e=>{ if(e.key==='Escape') closeComposer(); });
 function submitTask(){
  const v = nt.value.trim();
@@ -1550,4 +1585,39 @@ window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, ad
   settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle,
   get pending(){return pending}, get undos(){return undos}, get undoNote(){return undoNote}};
 
-if('serviceWorker' in navigator) addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+/* Открыть страницу с ?debug — поверх интерфейса появятся живые числа: размеры окна и
+   видимой области, смещение, значения переменных и положение контейнера с композером.
+   Нужно потому, что поведение клавиатуры воспроизводится только на настоящем телефоне:
+   в браузере на компьютере её нет вовсе. Снимок экрана с открытой клавиатурой заменяет
+   целый круг догадок — дважды словесные описания приводили к половинчатым правкам. */
+if(/(^|[?&])debug(=|&|$)/.test(location.search)){
+ const box = document.createElement('pre');
+ box.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;margin:0;padding:4px 6px;'+
+  'font:10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#0f0;'+
+  'background:rgba(0,0,0,.82);white-space:pre;pointer-events:none;max-width:100%';
+ document.body.appendChild(box);
+ const n = v => Math.round(v);
+ const rect = e => { const b = e && e.getBoundingClientRect(); return b ? n(b.top)+'..'+n(b.bottom)+' ('+n(b.height)+')' : 'нет'; };
+ const tick = () => {
+  const vv = window.visualViewport, cs = getComputedStyle(document.documentElement);
+  box.textContent =
+   'окно     '+n(innerWidth)+'x'+n(innerHeight)+'   scrollY '+n(scrollY)+'\n'+
+   'видимая  h '+(vv?n(vv.height):'—')+'  top '+(vv?n(vv.offsetTop):'—')+'  scale '+(vv?vv.scale:'—')+'\n'+
+   'перем.   --vh '+(cs.getPropertyValue('--vh').trim()||'—')+'  --vvtop '+(cs.getPropertyValue('--vvtop').trim()||'—')+'\n'+
+   'phone    '+rect(document.querySelector('.phone'))+'\n'+
+   'композер '+rect(document.querySelector('#scr-detail.on .composer') || $('composer'))+'\n'+
+   'фокус    '+((document.activeElement && document.activeElement.id) || 'нет')+'\n'+
+   'трасса   '+vvTrace.join(' ');
+  requestAnimationFrame(tick);
+ };
+ tick();
+}
+
+/* Обновление установленного приложения: новый service worker забирает управление сам,
+   но страница уже исполняет старый код — перезагружаем её. Только если управляющий
+   воркер уже был: при первой установке controllerchange тоже срабатывает. */
+if('serviceWorker' in navigator){
+ const had = !!navigator.serviceWorker.controller; let done = false;
+ navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(!had||done) return; done = true; location.reload(); });
+ addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}

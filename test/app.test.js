@@ -547,12 +547,14 @@ async function clips(file){
  touch('touchstart',8,300); touch('touchmove',700,305); touch('touchend');
  assert(!on('scr-detail')&&!t.d.getElementById('scr-detail').style.transform,'свайп вправо от края возвращает к списку');
 
- /* клавиатура: экран не ужимается, её высота уходит в --kb */
- const vvL={}, kbw=load('index.html',w2=>{w2.visualViewport={height:400,offsetTop:0,addEventListener:(n,f)=>{vvL[n]=f;}};}).w;
+ /* клавиатура: контейнер приложения равен видимой области, высоты клавиатуры нет вовсе */
+ const vvL={}, kbw=load('index.html',w2=>{w2.visualViewport={height:400,offsetTop:186,addEventListener:(n,f)=>{vvL[n]=f;}};}).w;
  const css=n=>kbw.document.documentElement.style.getPropertyValue(n);
- assert(css('--vh')===kbw.innerHeight+'px'&&css('--kb')===(kbw.innerHeight-400)+'px','клавиатура открыта: высота экрана полная, клавиатура в --kb');
- kbw.visualViewport.height=kbw.innerHeight-40; vvL.resize();
- assert(css('--kb')==='0px','полоска браузера меньше 80 px — не клавиатура');
+ assert(css('--vh')==='400px'&&css('--vvtop')==='186px','контейнер = видимая область: её высота и смещение');
+ assert(!/--kb/.test(read('app.css'))&&!/--kb/.test(read('app.js')),'высоты клавиатуры в раскладке нет: поднимать композер на неё — проверенный тупик');
+ /* панорамирование iOS снимается событием scroll, а не resize — раскладка не должна протухать */
+ kbw.visualViewport.offsetTop=0; vvL.scroll();
+ assert(css('--vvtop')==='0px','смещение обновляется и по scroll: по одному resize оно протухает');
  /* при открытой клавиатуре плашка о выполнении не показывается */
  kbw.visualViewport.height=400; vvL.resize();
  kbw.app.showToast('Выполнено · тест');
