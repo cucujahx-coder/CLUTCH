@@ -1039,7 +1039,9 @@ function settings(){
 
 /* ---------- список ----------
    Список растёт снизу вверх: он прижат к строке ввода, самое свежее ближе к пальцу. */
-let sorted = false, undoBuf = null, toastTimer = null, suppressRow = false, priPop = null;
+/* Список по умолчанию идёт в порядке приоритетов: самое срочное внизу, у большой кнопки.
+   Кнопка в шапке этот порядок выключает, возвращая порядок добавления. */
+let sorted = true, undoBuf = null, toastTimer = null, suppressRow = false, priPop = null;
 let list, scroll, thread;
 
 /* Подпись строки: состояние или «без диалога», затем срок или «без срока» */
@@ -1093,7 +1095,8 @@ function paint(keep){
    if(!op.length) return;
    items.push({x:p, isP:1, next:op[0], left:op.length, pri:p.pri||0});
   });
-  /* сортировка устойчивая: самое срочное уезжает вниз, ближе к большой кнопке */
+  /* Сортировка устойчивая: самое срочное уезжает вниз, ближе к большой кнопке.
+     Порядок по умолчанию — этот, а не порядок добавления. */
   if(sorted) items.sort((a,b)=>(a.pri||0)-(b.pri||0));
   items.forEach(i=>list.appendChild(rowEl(i.x, i.isP, i.next, i.left)));
   if(!items.length) list.innerHTML = '<div class="empty">Входящие пусты. Нажми большую кнопку.</div>';
@@ -1428,11 +1431,16 @@ list = $('list'); scroll = $('scroll'); thread = $('thread');
 trackSafe(); trackVH();
 (MODE==='nav' ? shellNav : shellTwo)();
 
-/* верхняя кнопка — сортировка по приоритету */
+/* верхняя кнопка — сортировка по приоритету, включена с самого начала */
 $('sort').innerHTML = Ic(P.sort,18);
+function drawSort(){
+ $('sort').classList.toggle('on', sorted);
+ $('sort').setAttribute('aria-label', sorted ? 'Вернуть порядок добавления' : 'Сортировать по приоритету');
+}
+drawSort();
 $('sort').onclick = () => {
  sorted = !sorted;
- $('sort').classList.toggle('on', sorted);
+ drawSort();
  tap(8); paint(1);
  if(!RM) [...list.children].forEach((r,i)=>{ r.classList.add('land'); setTimeout(()=>r.classList.remove('land'),210+i*10); });
 };

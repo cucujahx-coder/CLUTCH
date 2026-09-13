@@ -65,9 +65,11 @@ async function common(file){
  again().click();
  assert(w.app.S.cur.k==='t'&&w.app.byId(w.app.S.cur.id).t!==name0||true,'после долгого нажатия строка сама не открывается');
 
- /* сортировка по приоритету: срочное уходит вниз, к большой кнопке */
+ /* порядок по приоритету — по умолчанию: срочное внизу, у большой кнопки */
+ assert($('sort').classList.contains('on'),'сортировка по приоритету включена с самого начала');
+ assert(txt(rows()[rows().length-1])===name0,'приоритетная задача сразу внизу, ближе к кнопке');
  $('sort').click();
- assert($('sort').classList.contains('on')&&txt(rows()[rows().length-1])===name0,'сортировка ставит приоритетное последним');
+ assert(!$('sort').classList.contains('on'),'кнопка возвращает порядок добавления');
  $('sort').click();
 
  /* выполненные ↔ входящие */
@@ -114,6 +116,7 @@ async function common(file){
  assert(!/prefers-color-scheme/.test(css)&&/--bg:#101010/.test(css),'тема одна, тёмная');
  assert(/--pri1:#2EC27E/.test(css)&&/--pri4:#FF4500/.test(css),'четыре плотных цвета приоритета');
  assert(/@font-face\{font-family:"Play"/.test(css)&&/play-cyrillic-400-normal\.woff2/.test(css),'Play подключён файлами рядом с HTML');
+ assert(/\.scroll\{[^}]*overflow-y:scroll/.test(css.replace(/\/\*[\s\S]*?\*\//g,'')),'прокрутка живая всегда: при auto короткий список стоит намертво');
  assert(/'\.\/play-cyrillic-400-normal\.woff2'/.test(read('sw.js')),'шрифт Play попал в оффлайн-кэш');
  return {w,d,rows,txt,$};
 }

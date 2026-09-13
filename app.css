@@ -117,7 +117,10 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* низ отсчитывается от клавиатуры: композер 68 + его отступ + зазор 16 */
 .scroll{position:absolute;left:16px;right:16px;top:calc(72px + var(--safe-t));
   bottom:calc(68px + 32px + var(--pend, 0px) + var(--safe-b));
-  overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  /* scroll, а не auto: при auto короткий список стоит намертво — жест не ловится и
+     отдачи нет. Со scroll область прокручиваемая всегда, и две задачи пружинят так же,
+     как двадцать. overscroll-behavior:contain гасит только переброс на соседнюю панель. */
+  overflow-y:scroll;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   display:flex;flex-direction:column;gap:8px;transition:bottom .25s var(--ease-ios)}
 .scroll::-webkit-scrollbar{width:0}
 .spacer{flex:1 0 auto}
