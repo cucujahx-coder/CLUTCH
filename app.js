@@ -1100,8 +1100,16 @@ function paint(keep){
  }
  drawFind();
  if(MODE==='two' || view==='detail') paintDetail();   /* закрытый экран чата не перерисовываем */
- /* Список начинается сверху и прижимать его не надо: пробовали, владелец вернул как было.
-    К низу список доезжает только после добавления задачи — там, где появилась новая строка. */
+ if(!keep) toBottom();
+}
+/* Список прижат к строке ввода: самое свежее ближе к пальцу, добавил задачу — остальные
+   ушли вверх. Распорка .spacer держит короткий список внизу, прокрутка — длинный.
+   Чтение offsetHeight заставляет браузер применить новые размеры: без него scrollTop
+   обрежется по старым, и только что добавленная задача останется за краем. */
+function toBottom(){
+ if(!scroll) return;
+ void scroll.offsetHeight;
+ scroll.scrollTop = scroll.scrollHeight;
 }
 
 /* ---------- выполнение ---------- */
@@ -1465,7 +1473,7 @@ function openComposer(){
  composer.classList.remove('mini'); scroll.classList.add('tight');
  $('dock').classList.add('hide');
  $('veil-b').style.height = 'calc(68px + 40px + var(--pend, 0px) + var(--safe-b))';
- drawAdd();
+ drawAdd(); toBottom();          /* .tight меняет запас снизу — доводим список до строки ввода */
  /* Отклик — до фокуса: последним действием жеста должен остаться именно focus(),
     иначе iOS не считает поле активным и клавиатуру не открывает. */
  tap(8);
@@ -1477,7 +1485,7 @@ function closeComposer(){
  ntPick = []; paintNtPick();          /* отменили задачу — отменили и её вложения */
  $('dock').classList.remove('hide'); scroll.classList.remove('tight');
  $('veil-b').style.height = '';
- drawAdd();
+ drawAdd(); toBottom();
 }
 /* Открываем по click, не по touchend: iOS отдаёт клавиатуру только из «настоящего» жеста,
    а touchend с preventDefault она за такой не считает */
@@ -1498,7 +1506,6 @@ function submitTask(){
  if(!v){ addBtn.classList.add('rec'); tap(12); setTimeout(()=>{ addBtn.classList.remove('rec'); drawAdd(); },900); return; }
  const t = addTask(v);
  nt.value=''; S.showDone=0; save(); paint();
- scroll.scrollTop = scroll.scrollHeight;     /* новая строка в конце — показываем её */
  fly(list.querySelector('.row[data-id="'+t.id+'"]'));
  tap(14);
  closeComposer();

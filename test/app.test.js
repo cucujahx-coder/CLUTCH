@@ -34,6 +34,8 @@ async function common(file){
  assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet'),'ни шапки «Входящие», ни фильтров, ни меню действий');
  assert(!!d.querySelector('.brand img')&&!!$('sort'),'сверху таблетка с логотипом и кнопка сортировки');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
+ /* Распорка прижимает короткий список к строке ввода: без неё новые задачи уходят под док */
+ assert(!!d.querySelector('#scroll .spacer')&&!!d.querySelector('#thread, .thread'),'список и лента прижаты к низу распоркой');
 
  /* кольцо проекта закрывает следующий шаг */
  const pr=rows().find(r=>txt(r)==='Запуск лендинга');
