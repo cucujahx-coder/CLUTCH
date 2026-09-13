@@ -89,7 +89,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   display:grid;place-items:center;cursor:pointer;
   box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--g3a),var(--glass)}
 /* паук на кнопке: в прыжке он вылетает за край, поэтому кнопка ничего не обрезает */
-.shutter .sw{display:block;width:58%;line-height:0;color:#14100E;transform-origin:50% 100%;pointer-events:none}
+.shutter .sw{display:block;width:72%;line-height:0;color:#14100E;transform-origin:50% 100%;pointer-events:none}
 .shutter .sw svg{display:block;width:100%;height:auto}
 .shutter .eye{fill:#FFE3C2}
 .shutter .eye-b{fill:#FFE3C2;opacity:0}
