@@ -1111,8 +1111,11 @@ function paint(keep){
    обрежется по старым, и только что добавленная задача останется за краем. */
 function toBottom(){
  if(!scroll) return;
- void scroll.offsetHeight;
- scroll.scrollTop = scroll.scrollHeight;
+ const go = () => { void scroll.offsetHeight; scroll.scrollTop = scroll.scrollHeight; };
+ go();
+ /* Второй проход в следующем кадре: на первом размеры ещё не окончательные — при старте
+    и после смены запаса список недоезжал, и последняя задача пряталась под кнопкой. */
+ if(typeof requestAnimationFrame === 'function') requestAnimationFrame(go);
 }
 
 /* ---------- выполнение ---------- */
@@ -1605,6 +1608,9 @@ drawAdd(); drawSend();
 addEventListener('keydown', e=>{ if(e.key==='Escape' && priPop) closePri(); });
 addEventListener('pagehide', flush); addEventListener('beforeunload', flush);
 paint();
+/* Шрифт приезжает после первой отрисовки и меняет высоту строк — доводим список ещё раз */
+addEventListener('load', toBottom);
+try{ document.fonts && document.fonts.ready.then(toBottom); }catch(e){}
 
 /* Поверхность для тестов и консоли: S переприсваивается при загрузке, поэтому отдаётся геттером */
 window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, addTask, addStep, makeProject,
