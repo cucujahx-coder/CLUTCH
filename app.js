@@ -717,7 +717,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v27';
+const APP_V='tasks-v28';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1112,6 +1112,40 @@ function paint(keep){
  if(MODE==='two' || view==='detail') paintDetail();   /* закрытый экран чата не перерисовываем */
  if(!keep) toBottom();
 }
+/* Резинка для короткого списка. iOS даёт отдачу только области, которой есть куда
+   прокручиваться; короткий список у неё стоит намертво, и ни переполнение на пиксель,
+   ни overscroll-behavior этого не меняют — проверено на устройстве. Поэтому пока
+   содержимое помещается, тянем область за пальцем сами с затуханием, как у UIScrollView,
+   и отпускаем с возвратом. Длинный список сюда не попадает — он пружинит нативно. */
+function armRubber(el){
+ let y0 = null, live = false, snapT = 0;
+ const short = () => el.scrollHeight - el.clientHeight <= 1;
+ /* затухание как у iOS: чем дальше тянешь, тем медленнее едет, предел — чуть больше половины */
+ const damp = d => { const h = el.clientHeight || 1, c = 0.55, a = Math.abs(d);
+   return Math.sign(d) * h * c * (1 - 1 / (a * c / h + 1)); };
+ el.addEventListener('touchstart', e => {
+  if(e.touches.length !== 1 || !short()){ y0 = null; return; }
+  y0 = e.touches[0].clientY; live = false;
+ }, {passive:true});
+ el.addEventListener('touchmove', e => {
+  if(y0 === null) return;
+  const dy = e.touches[0].clientY - y0;
+  if(!live){ if(Math.abs(dy) < 6) return; live = true; clearTimeout(snapT); el.classList.add('dragging'); el.classList.remove('rubber'); }
+  el.style.transform = 'translateY(' + damp(dy).toFixed(1) + 'px)';
+ }, {passive:true});
+ const release = () => {
+  if(y0 === null) return;
+  y0 = null;
+  if(!live) return;
+  live = false;
+  el.classList.remove('dragging'); if(!RM) el.classList.add('rubber');
+  el.style.transform = '';
+  snapT = setTimeout(()=>el.classList.remove('rubber'), 450);
+ };
+ el.addEventListener('touchend', release);
+ el.addEventListener('touchcancel', release);
+}
+
 /* Список прижат к строке ввода: самое свежее ближе к пальцу, добавил задачу — остальные
    ушли вверх. Распорка .spacer держит короткий список внизу, прокрутка — длинный.
    Чтение offsetHeight заставляет браузер применить новые размеры: без него scrollTop
@@ -1614,6 +1648,7 @@ ct.onkeydown = e => { if(e.key==='Enter'){ e.preventDefault(); ct.blur(); } };
 drawAdd(); drawSend();
 addEventListener('keydown', e=>{ if(e.key==='Escape' && priPop) closePri(); });
 addEventListener('pagehide', flush); addEventListener('beforeunload', flush);
+armRubber(scroll); armRubber(thread);
 paint();
 /* Шрифт приезжает после первой отрисовки и меняет высоту строк — доводим список ещё раз */
 addEventListener('load', toBottom);

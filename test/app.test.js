@@ -38,9 +38,17 @@ async function common(file){
  assert(!!d.querySelector('#scroll .spacer')&&!!d.querySelector('#thread, .thread'),'список и лента прижаты к низу распоркой');
  /* Первая задача упирается ровно в 16 px под таблеткой логотипа: 16 сверху + 44 таблетка + 16 зазор */
  assert(/#scr-list \.scroll\{top:0;bottom:0;gap:0;\s*padding-top:calc\(16px \+ 44px \+ 16px \+ var\(--safe-t\)\)/.test(read('app.css')),'над первой задачей ровно 16 px: без зазора у схлопнутой распорки');
- /* Дорожка выше области ровно на 1 px: iOS пружинит только при переполнении; больше — пустота под логотипом */
- assert(!!d.querySelector('#scroll .lane .spacer')&&!!d.querySelector('#scroll .lane #list'),'список лежит в дорожке');
- assert(/\.lane\{flex:1 0 auto[^}]*min-height:calc\(100% \+ 1px\)\}/.test(read('app.css')),'дорожка не сжимается и выше области ровно на пиксель');
+ /* Резинка короткого списка — своя: в jsdom высоты нулевые, значит список «короткий», и тянуть его должен JS.
+    TouchEvent в jsdom не собрать, поэтому обычное событие с touches, как в тесте свайпа */
+ const sc=$('scroll'), tch=(type,y)=>{const e=new w.Event(type,{bubbles:true}); e.touches=y==null?[]:[{clientX:100,clientY:y}]; sc.dispatchEvent(e);};
+ tch('touchstart',300); tch('touchmove',303);
+ assert(!sc.style.transform,'сдвиг меньше 6 px — не тяга, список на месте');
+ tch('touchmove',380);
+ assert(/translateY\(-?\d/.test(sc.style.transform)&&sc.classList.contains('dragging'),'палец ведёт — список едет за ним без перехода');
+ tch('touchend');
+ assert(sc.style.transform===''&&!sc.classList.contains('dragging'),'отпустили — список возвращается');
+ tch('touchstart',300); tch('touchmove',380); tch('touchcancel');
+ assert(sc.style.transform==='','обрыв касания тоже возвращает');
 
  /* кольцо проекта закрывает следующий шаг */
  const pr=rows().find(r=>txt(r)==='Запуск лендинга');

@@ -126,15 +126,11 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   display:flex;flex-direction:column;gap:8px;transition:bottom .25s var(--ease-ios)}
 .scroll::-webkit-scrollbar{width:0}
 .spacer{flex:1 0 auto}
-/* iOS пружинит только область, содержимое которой хоть на пиксель выше неё: короткий список
-   с overflow-y:scroll без переполнения стоит намертво. Дорожка выше области ровно на 1 px —
-   отдача есть, а зазор над первой задачей при длинном списке те же 16 px: содержимое
-   перерастает min-height, распорка схлопывается в ноль. Больше пикселя не давать: любой
-   запас превращается в пустую полосу под логотипом при прокрутке вверх, это уже откатывали.
-   flex:1 0 auto обязателен — как обычный flex-элемент дорожка сжимается, содержимое вылезает
-   наружу, и длинный список не доезжает до конца. min-height на самой распорке нельзя по той
-   же причине: она не схлопнется. */
-.lane{flex:1 0 auto;display:flex;flex-direction:column;min-height:calc(100% + 1px)}
+/* Резинка короткого списка — в JS (armRubber): iOS не даёт отдачи области, которой некуда
+   прокручиваться, и ни переполнение на пиксель, ни overscroll-behavior этого не меняют.
+   Пока палец ведёт, область сдвигается трансформой без перехода; отпустили — возвращается. */
+.scroll.rubber{transition:transform .4s var(--ease-ios),bottom .25s var(--ease-ios)}
+.scroll.dragging{transition:none}
 #list{display:flex;flex-direction:column;gap:8px;flex:none}
 
 /* gap:0 — зазор между распоркой и списком идёт в счёт даже когда распорка схлопнута в ноль,
