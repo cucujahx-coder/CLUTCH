@@ -102,7 +102,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .dock.hide{opacity:0;transform:translateY(12px) scale(.96);pointer-events:none}
 /* кнопка-паук: в свёрнутой капсуле занимает весь круг, в раскрытой гаснет */
 .shutter{position:absolute;inset:0;border:0;border-radius:inherit;background:transparent;color:#fff;
-  display:grid;place-items:center;cursor:pointer;transition:opacity .18s var(--ease-ios)}
+  display:grid;place-items:center;cursor:pointer;transition:opacity .12s var(--ease-ios)}
 .composer:not(.mini) .shutter{opacity:0;pointer-events:none}
 /* паук на кнопке: в прыжке он вылетает за край, поэтому кнопка ничего не обрезает */
 .shutter .sw{display:block;width:55px;line-height:0;color:#14100E;transform-origin:50% 100%;pointer-events:none}
@@ -213,14 +213,14 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .composer{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + var(--safe-b));z-index:5;
   height:68px;padding:11px;border-radius:28px;display:flex;align-items:center;gap:6px;
   background:rgba(36,36,36,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:var(--glass);
-  --tr-composer:left .42s var(--ease-ios),right .42s var(--ease-ios),height .42s var(--ease-ios),
-    border-radius .42s var(--ease-ios),padding .42s var(--ease-ios),background .3s var(--ease-ios),
-    transform .42s var(--bounce),box-shadow .18s var(--ease-ios);
+  --tr-composer:left .3s var(--ease-ios),right .3s var(--ease-ios),height .3s var(--ease-ios),
+    border-radius .3s var(--ease-ios),padding .3s var(--ease-ios),background .22s var(--ease-ios),
+    transform .32s var(--bounce),box-shadow .18s var(--ease-ios);
   transition:var(--tr-composer)}
-/* вспышка активации: белая полоса проходит по капсуле слева направо */
+/* вспышка активации: вся капсула вспыхивает белым разом и быстро гаснет — как фотовспышка,
+   а не полоса, проезжающая слева направо (владелец просил резко) */
 .sweep{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;z-index:1}
-.sweep i{position:absolute;top:0;bottom:0;left:0;width:100%;
-  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.85) 50%,rgba(255,255,255,0))}
+.sweep i{position:absolute;inset:0;background:#fff}
 /* строка в работе — синяя обводка по всей капсуле */
 .composer:focus-within{box-shadow:inset 0 0 0 2px var(--blue), var(--glass)}
 /* Свёрнутый вид — красный круг 76 по центру, ровно на месте большой кнопки в доке:
@@ -232,11 +232,11 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--g3a),var(--glass)}
 .composer.mini .inp{width:0;flex:0 0 0;padding:0;opacity:0;pointer-events:none}
 .composer.mini #clip,.composer.mini #add{width:0;height:0;flex:0 0 0;opacity:0;pointer-events:none;box-shadow:none;overflow:hidden}
-.composer .inp,.composer #clip{transition:width .32s var(--ease-ios),opacity .18s var(--ease-ios),flex-basis .32s var(--ease-ios)}
+.composer .inp,.composer #clip{transition:width .24s var(--ease-ios),opacity .14s var(--ease-ios),flex-basis .24s var(--ease-ios)}
 /* содержимое проявляется, когда капсула уже почти раскрылась — иначе поле и кнопки всплывали
    на ещё красном круге; при сворачивании задержки нет, гаснут сразу */
-.composer:not(.mini) .inp,.composer:not(.mini) #clip{transition-delay:0s,.16s,0s}
-.composer:not(.mini) #add{transition-delay:0s,0s,0s,0s,.16s}
+.composer:not(.mini) .inp,.composer:not(.mini) #clip{transition-delay:0s,.1s,0s}
+.composer:not(.mini) #add{transition-delay:0s,0s,0s,0s,.1s}
 .rnd{flex:none;width:44px;height:44px;padding:0;border-radius:22px;border:0;background:transparent;color:var(--muted);
   display:grid;place-items:center;cursor:pointer;box-shadow:inset 0 0 0 1px var(--g3a);
   transition:background .18s var(--ease-ios),color .18s var(--ease-ios),width .32s var(--ease-ios),height .32s var(--ease-ios),opacity .18s var(--ease-ios)}

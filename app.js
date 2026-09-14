@@ -140,13 +140,14 @@ addEventListener('pointerdown', e => {
  kbAtTap = kbOpen() ? Date.now() : kbLast;
  elflash(e.target.closest && e.target.closest('.press,.row,.step'));
 }, true);
-/* Строка ввода вспыхивает в момент активации: белая полоса идёт слева направо */
+/* Строка ввода вспыхивает в момент активации: вся капсула белеет разом, держит четверть
+   времени и гаснет — резко, как фотовспышка. Полоса, проезжавшая 460 мс, была мягкой. */
 function sweep(el){
  if(!el || RM || !el.animate) return;
  const w = document.createElement('div'); w.className='sweep'; w.innerHTML='<i></i>';
  el.appendChild(w);
- const a = w.firstChild.animate([{transform:'translateX(-130%)'},{transform:'translateX(130%)'}],
-   {duration:460,easing:'cubic-bezier(.4,0,.2,1)'});
+ const a = w.firstChild.animate([{opacity:.95,offset:0},{opacity:.95,offset:.25},{opacity:0,offset:1}],
+   {duration:180,easing:'cubic-bezier(.3,0,.6,1)'});
  a.onfinish = () => w.remove();
 }
 addEventListener('focusin', e => { if(e.target.matches && e.target.matches('.inp')) sweep(e.target.closest('.composer')); });
@@ -721,7 +722,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v41';
+const APP_V='tasks-v42';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
