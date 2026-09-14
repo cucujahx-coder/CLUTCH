@@ -142,6 +142,7 @@ async function common(file){
  const css=read('app.css');
  assert(!/prefers-color-scheme/.test(css)&&/--bg:#101010/.test(css),'тема одна, тёмная');
  assert(/--pri1:#2EC27E/.test(css)&&/--pri4:#FF4500/.test(css),'четыре плотных цвета приоритета');
+ assert(/\.row\{[^}]*flex-direction:row-reverse[^}]*padding:11px 20px 11px 11px/.test(css)&&/\.step\{[^}]*flex-direction:row-reverse/.test(css),'кружки слева: строки и шаги перевёрнуты, отступ текста справа');
  assert(/@font-face\{font-family:"Play"/.test(css)&&/play-cyrillic-400-normal\.woff2/.test(css),'Play подключён файлами рядом с HTML');
  assert(/\.scroll\{[^}]*overflow-y:scroll/.test(css.replace(/\/\*[\s\S]*?\*\//g,'')),'прокрутка живая всегда: при auto короткий список стоит намертво');
  assert(/'\.\/play-cyrillic-400-normal\.woff2'/.test(read('sw.js')),'шрифт Play попал в оффлайн-кэш');
