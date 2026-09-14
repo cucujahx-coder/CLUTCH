@@ -722,7 +722,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v45';
+const APP_V='tasks-v46';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1644,11 +1644,23 @@ function openComposer(){
  $('dock').classList.add('hide');
  $('veil-b').style.height = 'calc(68px + 24px + var(--foot) + var(--pend, 0px) + var(--safe-b))';
  drawAdd(); toBottom();          /* .tight меняет запас снизу — доводим список до строки ввода */
+ hopRows();
  /* Отклик — до фокуса: последним действием жеста должен остаться именно focus(),
     иначе iOS не считает поле активным и клавиатуру не открывает. */
  tap(8);
  try{ nt.focus({preventScroll:true}); }catch(e){ nt.focus(); }
  composer.style.transform = '';
+}
+/* Строки над появившейся строкой ввода выпрыгивают по очереди снизу вверх — пам-пам-пам.
+   Ближняя к строке первой, дальше по 40 мс на строку; backwards в анимации держит строку
+   опущенной, пока до неё не дошла очередь. Класс снимается по окончании, чтобы следующее
+   раскрытие снова сыграло с начала. */
+function hopRows(){
+ if(RM || !list) return;
+ [...list.children].reverse().forEach((r,i)=>{
+  r.style.animationDelay = (i*40) + 'ms'; r.classList.add('hop');
+  setTimeout(()=>{ r.classList.remove('hop'); r.style.animationDelay = ''; }, 380 + i*40);
+ });
 }
 function closeComposer(){
  if(mini()) return;
