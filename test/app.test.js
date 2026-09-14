@@ -36,9 +36,8 @@ async function common(file){
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
  /* Распорка прижимает короткий список к строке ввода: без неё новые задачи уходят под док */
  assert(!!d.querySelector('#scroll .spacer')&&!!d.querySelector('#thread, .thread'),'список и лента прижаты к низу распоркой');
- /* Дорожка выше области на запас — иначе короткий список не утянуть; сжиматься ей нельзя */
- assert(!!d.querySelector('#scroll .lane .spacer')&&!!d.querySelector('#scroll .lane #list'),'список лежит в дорожке с запасом');
- assert(/\.lane\{flex:1 0 auto[^}]*min-height:calc\(100% \+ var\(--pull\)\)\}/.test(read('app.css')),'дорожка не сжимается и выше области на --pull');
+ /* Первая задача упирается ровно в 16 px под таблеткой логотипа: 16 сверху + 44 таблетка + 16 зазор */
+ assert(/#scr-list \.scroll\{top:0;bottom:0;gap:0;\s*padding-top:calc\(16px \+ 44px \+ 16px \+ var\(--safe-t\)\)/.test(read('app.css')),'над первой задачей ровно 16 px: без запаса на прокрутку и без зазора у схлопнутой распорки');
 
  /* кольцо проекта закрывает следующий шаг */
  const pr=rows().find(r=>txt(r)==='Запуск лендинга');

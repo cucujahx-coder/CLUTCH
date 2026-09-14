@@ -40,9 +40,6 @@
   --ground:none;   /* фон плоский: ровный #1A1A1A, без градиента */
   --vh:100dvh;     /* высота видимой области, ставит JS из visualViewport */
   --vvtop:0px;     /* её смещение сверху: iOS панорамирует страницу при фокусе */
-  --pull:50%;      /* запас над списком: на столько его можно утянуть, когда задач мало.
-                      В процентах от области прокрутки — 120 px не ощущались, список
-                      упирался почти сразу и всё равно казался приклеенным */
   --safe-b:0px; --safe-t:0px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -127,17 +124,12 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   display:flex;flex-direction:column;gap:8px;transition:bottom .25s var(--ease-ios)}
 .scroll::-webkit-scrollbar{width:0}
 .spacer{flex:1 0 auto}
-/* Запас, на который короткий список можно утянуть вниз. Распорка одна этого не даёт:
-   flex:1 0 auto растягивается ровно до края области, переполнения не возникает никогда.
-   min-height на дорожке — даёт: при коротком списке она выше области на --pull, при
-   длинном содержимое перерастает эту величину, распорка схлопывается, и лишней пустоты
-   сверху не остаётся. Ставить min-height самой распорке нельзя по той же причине:
-   она не схлопнется, и пустая полоса поедет в каждый длинный список. */
-.lane{flex:1 0 auto;display:flex;flex-direction:column;gap:8px;min-height:calc(100% + var(--pull))}
 #list{display:flex;flex-direction:column;gap:8px;flex:none}
 
-#scr-list .scroll{top:0;bottom:0;
-  padding-top:calc(16px + 44px + 16px + var(--safe-t));   /* под кнопкой сортировки */
+/* gap:0 — зазор между распоркой и списком идёт в счёт даже когда распорка схлопнута в ноль,
+   и над первой задачей набегало 24 px вместо 16. Свой зазор между строками у #list есть. */
+#scr-list .scroll{top:0;bottom:0;gap:0;
+  padding-top:calc(16px + 44px + 16px + var(--safe-t));   /* 16 сверху + таблетка 44 + зазор 16 */
   padding-bottom:calc(76px + 21px + 44px + 47px + var(--pend, 0px) + var(--safe-b))}   /* под доком, 16 px до кольца кнопки */
 /* строка ввода открыта: дока нет, между ней и последней задачей тот же зазор 8, что между задачами */
 #scr-list .scroll.tight{padding-bottom:calc(68px + 16px + 16px + var(--pend, 0px) + var(--safe-b))}
