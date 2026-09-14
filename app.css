@@ -66,7 +66,14 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    контейнер при фокусе и разворачивает при его потере — до событий iOS), и любой переход
    здесь превращается в запаздывание: при выходе из чата интерфейс возвращался с задержкой,
    пока контейнер доезжал. Всё, что считает низ от --safe-b и --foot, тоже без переходов —
-   иначе низ едет отдельно от контейнера. */
+   иначе низ едет отдельно от контейнера.
+   Одно исключение — .easing: его вешает trackVH на 320 мс ровно на предсказанный разворот
+   при потере фокуса, чтобы список ехал вниз вместе с клавиатурой iOS (~250 мс), а не падал
+   под неё одним кадром. Низ едет тем же переходом, иначе строка ввода отстаёт от контейнера. */
+.phone.easing{transition:height .25s var(--ease-ios),top .25s var(--ease-ios)}
+.phone.easing .composer{transition:bottom .25s var(--ease-ios),opacity .2s var(--ease-ios),transform .42s var(--bounce),box-shadow .18s var(--ease-ios)}
+.phone.easing .dock{transition:bottom .25s var(--ease-ios),opacity .2s var(--ease-ios),transform .38s var(--bounce)}
+.phone.easing .scroll,.phone.easing .pend,.phone.easing .toast{transition:bottom .25s var(--ease-ios)}
 .screen{position:absolute;inset:0;padding:0 16px;
   padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));
   transition:transform .3s var(--ease-ios);background:var(--bg)}

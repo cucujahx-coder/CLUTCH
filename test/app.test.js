@@ -596,6 +596,10 @@ async function haptics(file){
  $('shutter').click();
  assert(!!d.querySelector('.hapt input'),'скрытый переключатель появился');
  assert(d.activeElement===$('nt'),'после разворота строки фокус в поле, а не в переключателе');
+ /* отправка закрывает строку, а тяжёлая отдача повторяется через 45 и 90 мс — переключатель не должен остаться в фокусе */
+ $('nt').value='Проверка отдачи'; $('add').click();
+ await wait(150);
+ assert(!(d.activeElement&&d.activeElement.closest&&d.activeElement.closest('.hapt')),'после отправки задачи фокус не остался на переключателе отдачи');
 
  /* отправка в чате: отдача идёт при живом фокусе, и он должен остаться в поле */
  w.app.S.cur={k:'t',id:w.app.S.ts[0].id};
@@ -632,7 +636,10 @@ async function haptics(file){
  assert(!on('scr-detail')&&!t.d.getElementById('scr-detail').style.transform,'свайп вправо от края возвращает к списку');
 
  /* клавиатура: контейнер приложения равен видимой области, высоты клавиатуры нет вовсе */
- const vvL={}, kbw=load('index.html',w2=>{w2.visualViewport={height:400,offsetTop:186,addEventListener:(n,f)=>{vvL[n]=f;}};}).w;
+ const vvL={}, kbw=load('index.html',w2=>{
+  w2.matchMedia=()=>({matches:false});   /* движение включено: иначе .easing по правилу не вешается */
+  w2.visualViewport={height:400,offsetTop:186,addEventListener:(n,f)=>{vvL[n]=f;}};
+ }).w;
  const css=n=>kbw.document.documentElement.style.getPropertyValue(n);
  assert(css('--vh')==='400px'&&css('--vvtop')==='186px','контейнер = видимая область: её высота и смещение');
  /* при клавиатуре индикатор «домой» под ней: отступ под него снят, зазор под строкой ввода 8 */
@@ -663,6 +670,10 @@ async function haptics(file){
  assert(css('--vh')==='400px','клавиатура на экране');
  kbw.document.getElementById('msg').blur();
  assert(css('--vh')==='768px'&&css('--foot')==='16px'&&css('--vvtop')==='0px','фокус ушёл — контейнер, низ и сдвиг возвращены сразу, до resize');
+ /* разворот идёт движением вместе с клавиатурой: класс .easing на 320 мс, ужатие — без него */
+ assert(kbw.document.querySelector('.phone').classList.contains('easing'),'на предсказанный разворот повешен переход');
+ await wait(400);
+ assert(!kbw.document.querySelector('.phone').classList.contains('easing'),'через 320 мс переход снят');
  kbw.visualViewport.height=768; vvL.resize();
  assert(css('--vh')==='768px','пришёл настоящий resize — совпал с догадкой');
  /* фокус ушёл раньше, чем поднялась клавиатура: догадка ужатия снимается сразу, а не через 1,5 с.
@@ -670,6 +681,7 @@ async function haptics(file){
  kbw.visualViewport.offsetTop=0;
  kbw.document.getElementById('msg').focus();
  assert(css('--vh')==='400px'&&css('--vvtop')==='368px','фокус — догадка ужатия');
+ assert(!kbw.document.querySelector('.phone').classList.contains('easing'),'ужатие при фокусе — мгновенно, без перехода');
  kbw.document.getElementById('msg').blur();
  assert(css('--vh')==='768px'&&css('--vvtop')==='0px'&&css('--foot')==='16px','клавиатуры не было — после потери фокуса всё развёрнуто сразу');
  kbw.visualViewport.height=400; vvL.resize();
@@ -677,7 +689,8 @@ async function haptics(file){
  /* никаких переходов на раскладке под клавиатуру: она предвосхищает события, переход = запаздывание */
  const cssClean=read('app.css').replace(/\/\*[\s\S]*?\*\//g,'');
  const phoneRule=(cssClean.match(/\.phone\{[^}]*\}/)||[''])[0];
- assert(!/transition/.test(phoneRule)&&!/bottom \.\d+s/.test(cssClean),'ни у контейнера, ни у низа нет переходов');
+ const noEase=cssClean.replace(/\.phone\.easing[^{]*\{[^}]*\}/g,'');
+ assert(!/transition/.test(phoneRule)&&!/bottom \.\d+s/.test(noEase),'ни у контейнера, ни у низа нет переходов — кроме .easing на предсказанный разворот');
  /* панорамирование iOS снимается событием scroll, а не resize — раскладка не должна протухать */
  kbw.visualViewport.offsetTop=0; vvL.scroll();
  assert(css('--vvtop')==='0px','смещение обновляется и по scroll: по одному resize оно протухает');

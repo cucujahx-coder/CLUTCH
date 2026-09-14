@@ -89,6 +89,10 @@ function tap(ms){
    if(a&&a!==document.body&&a!==document.activeElement&&a.focus){
     try{a.focus({preventScroll:true})}catch(e){try{a.focus()}catch(e2){}}
    }
+   /* Фокуса не было (строка ввода уже закрыта, а тяжёлая отдача повторяется через 45 и 90 мс) —
+      переключатель забирал его себе насовсем, и логика клавиатуры видела «поле в фокусе» */
+   const now=document.activeElement;
+   if(now&&now!==a&&now.closest&&now.closest('.hapt')){ try{now.blur()}catch(e){} }
   };
   hit(); if(ms>=14) setTimeout(hit,45); if(ms>=20) setTimeout(hit,90);
   return;
@@ -717,7 +721,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v39';
+const APP_V='tasks-v40';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1209,12 +1213,15 @@ function ringTap(p, row){
    только чтобы не обновлять базу под клавиатурой; поворот (другая ширина) сбрасывает её.
    150, а не 80: полоса инструментов Safari меняет высоту до ~100, клавиатура — от 250. */
 let kbBaseH = 0, kbBaseW = 0;
+/* Клавиатуру зовёт только текстовое поле: переключатель отдачи тоже <input>, но нет */
+const isText = el => !!el && (el.tagName === 'TEXTAREA' ||
+ (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|range|file|color|hidden)$/.test(el.type)));
 function kbUp(){
  const vv = window.visualViewport;
  if(!vv) return false;
  if(innerWidth !== kbBaseW){ kbBaseW = innerWidth; kbBaseH = 0; }
  const h = vv.height, a = document.activeElement;
- const focused = !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
+ const focused = isText(a);
  if(!focused && h > kbBaseH) kbBaseH = h;
  return innerHeight - h > 150 || kbBaseH - h > 150;
 }
@@ -1417,8 +1424,8 @@ let view = 'list', open, back;
    вернулась. Вне ввода — обычные события. */
 let vvTrace = [], kbH = 0;
 function trackVH(){
- const vv = window.visualViewport;
- let lastH = null, until = 0, ticking = false, predictUntil = 0, predictH = 0, predictT = 0;
+ const vv = window.visualViewport, phone = document.querySelector('.phone');
+ let lastH = null, until = 0, ticking = false, predictUntil = 0, predictH = 0, predictT = 0, easeT = 0;
  /* Раскладка предвосхищает клавиатуру, как приложение на iOS по keyboardWillShow. Высота
     клавиатуры на устройстве постоянна — помним её (kbH, по ширине окна: у поворота своя).
     При фокусе контейнер ужимается сразу, до событий iOS: поле уже над будущей клавиатурой,
@@ -1431,7 +1438,22 @@ function trackVH(){
     Гнаться за сдвигом по факту значит опаздывать на кадры, а шапка на это время уезжает.
     Ставим конечные значения до того, как iOS начнёт анимацию: ей остаётся только проехать
     по уже готовой раскладке. resize приходит позже, чем кажется, — окно догадки 1,5 с. */
- const predict = (h, t, src) => { predictH = h; predictT = t; predictUntil = Date.now() + 1500; apply(src); };
+ /* Открытие — мгновенно: контейнер ужимается заранее, клавиатура приезжает под готовую
+    раскладку, движется только она. Закрытие — наоборот, двигаться должен сам список, и
+    делать это ему надо вместе с клавиатурой: iOS увозит её за ~250 мс, а разворот одним
+    кадром ронял список на её высоту под ещё видимую клавиатуру. Поэтому на предсказанный
+    разворот вешается класс .easing с переходом на те же 250 мс и снимается сразу после.
+    Это не переход «на всё», который снимали раньше: тот превращал в задержку и приход
+    реальных событий. Этот живёт 320 мс и только в момент, который мы сами предсказали. */
+ const predict = (h, t, src) => {
+  predictH = h; predictT = t; predictUntil = Date.now() + 1500;
+  if(phone){
+   clearTimeout(easeT);
+   if(src === 'q' && !RM){ phone.classList.add('easing'); easeT = setTimeout(()=>phone.classList.remove('easing'), 320); }
+   else phone.classList.remove('easing');
+  }
+  apply(src);
+ };
  const apply = src => {
   const real = vv ? vv.height : innerHeight;
   let h = real, t = vv ? vv.offsetTop : 0;
@@ -1463,7 +1485,7 @@ function trackVH(){
   }
   lastH = h;
  };
- const typing = () => { const a = document.activeElement; return !!a && a.tagName === 'INPUT'; };
+ const typing = () => isText(document.activeElement);
  const pump = () => {
   apply('f');
   if(typing() || kbUp() || Date.now() < until) requestAnimationFrame(pump); else ticking = false;
@@ -1481,12 +1503,12 @@ function trackVH(){
  addEventListener('orientationchange', ()=>setTimeout(()=>apply('o'), 150));
  /* Фокус и его потеря — моменты, когда клавиатура появляется и убирается */
  addEventListener('focusin', e=>{
-  if(!e.target || e.target.tagName !== 'INPUT') return;
+  if(!isText(e.target)) return;
   if(kbH && kbBaseH && !kbUp()) predict(kbBaseH - kbH, kbH, 'p');   /* клавиатура придёт — ужимаемся и сдвигаемся сейчас */
   watch(1500);
  });
  addEventListener('focusout', e=>{
-  if(!e.target || e.target.tagName !== 'INPUT') return;
+  if(!isText(e.target)) return;
   /* Клавиатура уйдёт — разворачиваемся сейчас. А если её и не было (фокус ушёл раньше,
      чем она поднялась), догадка ужатия снимается принудительно: иначе контейнер стоял
      ужатым и сдвинутым при закрытой клавиатуре до конца окна догадки. */
@@ -1516,7 +1538,7 @@ function shellNav(){
  open = () => { tap(8); show('detail'); paintDetail(); setTimeout(()=>{ thread.scrollTop = thread.scrollHeight; },320); };
  back = () => {
   /* Сначала снять фокус: иначе клавиатура остаётся висеть над уже показанным списком */
-  const a = document.activeElement; if(a && a.blur && a.tagName === 'INPUT') a.blur();
+  const a = document.activeElement; if(isText(a) && a.blur) a.blur();
   show('list'); paint(1);
  };
  $('back').onclick = () => { tap(8); back(); };
