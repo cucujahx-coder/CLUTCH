@@ -717,7 +717,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v32';
+const APP_V='tasks-v33';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1028,11 +1028,17 @@ function settings(){
  h+='<div class="se">Текст задачи уходит в Anthropic, у нас не хранится. Задачи, переписка и файлы лежат в этом браузере.</div>';
 
  h+='<div class="sh">Версия</div>';
- h+='<div class="si"><span>'+esc(APP_V)+'</span><span class="as">обновление приезжает само</span></div>';
+ h+='<div class="si" data-ver="1"><span>'+esc(APP_V)+'</span><span class="as">обновление приезжает само</span></div>';
  body.innerHTML=h;
 
  body.querySelectorAll('[data-forget]').forEach(b=>b.onclick=()=>{S.mem.splice(+b.dataset.forget,1); save(); settings();});
  body.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>{delete trash[+b.dataset.restore].o.del; save(); paint(); settings();});
+ /* Пять нажатий на версию включают отладочный слой в установленном приложении, где
+    ?debug в адрес не дописать; ещё пять — выключают. */
+ body.querySelectorAll('[data-ver]').forEach(v=>{
+  let n=0;
+  v.onclick=()=>{ if(++n<5)return; try{localStorage.setItem('debug', DEBUG?'0':'1')}catch(e){} location.reload(); };
+ });
  body.querySelectorAll('[data-wipe]').forEach(b=>{
   let armed=false;
   b.onclick=()=>{
@@ -1194,10 +1200,20 @@ function ringTap(p, row){
 /* ---------- плашка о выполненном ----------
    Вырастает из кружка переключателя справа внизу и через 4 секунды сворачивается обратно.
    При открытой клавиатуре не показывается: ей негде встать, она легла бы на строку ввода. */
-/* Видимая область меньше окна — значит клавиатура на экране */
+/* Клавиатура на экране. Первый признак — видимая область меньше окна. Он молчит, если
+   система ужимает и само окно (viewport с resizes-content): обе высоты равны, а
+   клавиатура есть — так было в чате, и отступ под индикатор «домой» оставался. Поэтому
+   второй признак: поле в фокусе и область ниже наибольшей высоты, что видели без
+   клавиатуры. Базу меряем только без фокуса; поворот (другая ширина) сбрасывает её. */
+let kbBaseH = 0, kbBaseW = 0;
 function kbUp(){
  const vv = window.visualViewport;
- return innerHeight - (vv ? vv.height : innerHeight) > 80;
+ if(!vv) return false;
+ if(innerWidth !== kbBaseW){ kbBaseW = innerWidth; kbBaseH = 0; }
+ const h = vv.height, a = document.activeElement;
+ const focused = !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
+ if(!focused && h > kbBaseH) kbBaseH = h;
+ return innerHeight - h > 80 || (focused && kbBaseH - h > 80);
 }
 function kbOpen(){
  const a = document.activeElement, c = $('composer');
@@ -1702,7 +1718,9 @@ window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, ad
    Нужно потому, что поведение клавиатуры воспроизводится только на настоящем телефоне:
    в браузере на компьютере её нет вовсе. Снимок экрана с открытой клавиатурой заменяет
    целый круг догадок — дважды словесные описания приводили к половинчатым правкам. */
-if(/(^|[?&])debug(=|&|$)/.test(location.search)){
+let DEBUG = /(^|[?&])debug(=|&|$)/.test(location.search);
+try{ DEBUG = DEBUG || localStorage.getItem('debug') === '1'; }catch(e){}
+if(DEBUG){
  const box = document.createElement('pre');
  box.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;margin:0;padding:4px 6px;'+
   'font:10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#0f0;'+
@@ -1718,7 +1736,8 @@ if(/(^|[?&])debug(=|&|$)/.test(location.search)){
    'перем.   --vh '+(cs.getPropertyValue('--vh').trim()||'—')+'  --vvtop '+(cs.getPropertyValue('--vvtop').trim()||'—')+'\n'+
    'phone    '+rect(document.querySelector('.phone'))+'\n'+
    'композер '+rect(document.querySelector('#scr-detail.on .composer') || $('composer'))+'\n'+
-   'фокус    '+((document.activeElement && document.activeElement.id) || 'нет')+'\n'+
+   'фокус    '+((document.activeElement && document.activeElement.id) || 'нет')+'   клавиатура '+(kbUp()?'да':'нет')+'  база '+n(kbBaseH)+'\n'+
+   'низ      --safe-b '+(cs.getPropertyValue('--safe-b').trim()||'—')+'  --foot '+(cs.getPropertyValue('--foot').trim()||'—')+'\n'+
    'трасса   '+vvTrace.join(' ');
   requestAnimationFrame(tick);
  };

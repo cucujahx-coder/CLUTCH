@@ -635,6 +635,15 @@ async function haptics(file){
  assert(css('--safe-b')==='0px'&&css('--foot')==='8px','клавиатура открыта: отступ под индикатор снят, зазор 8 px');
  kbw.visualViewport.height=kbw.innerHeight; vvL.resize();
  assert(css('--foot')==='16px','клавиатура ушла — зазор снова 16 px');
+ /* Система ужала и само окно (resizes-content): окно и область равны, но поле в фокусе и
+    область ниже базы — это тоже клавиатура. Без фокуса та же высота — нет */
+ Object.defineProperty(kbw,'innerHeight',{value:400,configurable:true});
+ kbw.visualViewport.height=400; vvL.resize();
+ assert(css('--foot')==='16px','окно ужалось вместе с областью, поля в фокусе нет — не клавиатура');
+ kbw.document.getElementById('msg').focus(); vvL.resize();
+ assert(css('--foot')==='8px'&&css('--safe-b')==='0px','поле в фокусе и область ниже базы — клавиатура, отступ снят');
+ kbw.document.getElementById('msg').blur();
+ Object.defineProperty(kbw,'innerHeight',{value:768,configurable:true});
  kbw.visualViewport.height=400; vvL.resize();
  assert(!/--kb/.test(read('app.css'))&&!/--kb/.test(read('app.js')),'высоты клавиатуры в раскладке нет: поднимать композер на неё — проверенный тупик');
  /* панорамирование iOS снимается событием scroll, а не resize — раскладка не должна протухать */
