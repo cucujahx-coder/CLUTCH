@@ -554,6 +554,30 @@ async function clips(file){
 }
 
 
+/* ---------- паук в ленте ----------
+   Один на всю ленту, в конце последнего ответа, внутри последнего текстового блока разметки —
+   иначе он падал бы на новую строку под абзацем. При prefers-reduced-motion его нет вовсе. */
+function spiderTest(){
+ console.log('паук');
+ const {w,d}=load('index.html',w2=>{ w2.matchMedia=()=>({matches:false}); });
+ const A=w.app, t=A.S.ts.find(x=>x.pj===null);
+ A.S.cur={k:'t',id:t.id};
+ t.chat=[{u:'раз'},{a:'первый ответ'},{u:'два'},{a:'абзац\n\n- пункт\n- **последний**'}];
+ A.paint(); d.querySelector('#list .row[data-id="'+t.id+'"]').click();   /* именно эту задачу, не первую строку */
+ const sp=d.querySelectorAll('#thread .spider');
+ assert(sp.length===1,'паук один на всю ленту, а не после каждого сообщения');
+ const ans=[...d.querySelectorAll('#thread .ans')].pop();
+ assert(ans.contains(sp[0]),'сидит в конце последнего ответа');
+ assert(sp[0].parentElement.tagName==='LI'&&sp[0].parentElement===ans.querySelector('li:last-child'),'внутри последнего блока разметки, а не под ним');
+ assert(sp[0].classList.contains('idle'),'в покое лапы замерли');
+ t.chat.push({a:'код:\n```\nx\n```'}); A.paint();
+ const sp2=d.querySelector('#thread .spider');
+ assert(sp2&&sp2.parentElement.classList.contains('tx')&&!sp2.closest('pre'),'после блока кода — снаружи, не внутри');
+ const rm=load('index.html');
+ rm.w.app.paint(); rm.d.querySelector('#list .row').click();
+ assert(!rm.d.querySelector('#thread .spider'),'при prefers-reduced-motion паука нет');
+}
+
 /* ---------- тактильный щелчок не уводит фокус ----------
    На iPhone отдача делается кликом по скрытому <label> с переключателем, а клик по label
    в WebKit переводит на него фокус. Из-за этого клавиатура не открывалась: iOS считала,
@@ -646,6 +670,7 @@ async function haptics(file){
  markdown();
  await clips('index.html');
  await clips('panels.html');
+ spiderTest();
  await haptics('index.html');
  await haptics('panels.html');
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);

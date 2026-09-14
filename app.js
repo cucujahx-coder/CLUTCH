@@ -717,7 +717,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v31';
+const APP_V='tasks-v32';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -890,7 +890,9 @@ async function turn(item,isP){
  if(!API){
   const ph={typing:1}; item.chat.push(ph); paint(); save();
   const last=[...item.chat].reverse().find(m=>m.u!==undefined);
-  ph.typing=0; ph.a=await stubReply((last&&last.u)||'',item,isP); paint(); save(); return;
+  ph.typing=0; ph.a=await stubReply((last&&last.u)||'',item,isP);
+  typeNext=ph;                       /* без сервера ответ печатается по буквам, паук бежит следом */
+  paint(); save(); return;
  }
  const key=curKey();
  let acts=0;
@@ -907,6 +909,7 @@ async function turn(item,isP){
      /* Пишем внутрь .tx, чтобы не ломать разметку элемента ленты */
      const tx=el.querySelector('.tx');
      if(tx)tx.innerHTML=md(t); else el.innerHTML='<span class="tx">'+md(t)+'</span>';
+     spiderRun(el);
      thread.scrollTop=thread.scrollHeight;
     }
    });
@@ -1256,11 +1259,28 @@ function armPri(row, x){
    Шапка — таблетка с названием и круглые кнопки по углам: слева назад, справа выполнить.
    Паучок один на всю ленту: бежит за печатающимся ответом и остаётся сидеть в конце последнего. */
 let typeNext = null, typing = null;
+/* Паук один на всю ленту: старый снимается, новый встаёт в конец последнего ответа. Ответ
+   размечен — абзацы, списки — поэтому паук ставится внутрь последнего текстового блока,
+   иначе он падал бы на новую строку под абзацем, а не бежал за последней буквой. Внутрь
+   кода и таблицы не лезем: там он встаёт после блока. */
+const SPIDER_IN = /^(P|UL|OL|LI|H3|H4|H5)$/;
 function spider(host){
  thread.querySelectorAll('.spider').forEach(o=>o.remove());
  if(RM || !host) return null;
- host.insertAdjacentHTML('beforeend', SPIDER);
+ let at = host.querySelector('.tx') || host;
+ while(at.lastElementChild && SPIDER_IN.test(at.lastElementChild.tagName)) at = at.lastElementChild;
+ at.insertAdjacentHTML('beforeend', SPIDER);
  return host.querySelector('.spider');
+}
+/* Пока ответ идёт потоком, паук бежит за приходящим текстом; пауза дольше 160 мс — лапы
+   замирают, следующий кусок снова их запускает. В конце paint() сажает его на место. */
+let spIdle = null;
+function spiderRun(el){
+ const sp = spider(el);
+ if(!sp) return;
+ sp.classList.remove('idle');
+ clearTimeout(spIdle);
+ spIdle = setTimeout(()=>sp.classList.add('idle'), 160);
 }
 function parkSpider(){
  const all = thread.querySelectorAll('.ans');
