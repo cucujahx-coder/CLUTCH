@@ -749,7 +749,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v58';
+const APP_V='tasks-v59';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1643,12 +1643,16 @@ trackSafe(); trackVH();
 /* Три капсулы в доке: чем показан список. Выбор живёт в S — переживает перезагрузку.
    Выполненные идут поверх вида, поэтому при переключении капсулы список возвращается к ним. */
 function drawTabs(){
- const t = curTab();
- document.querySelectorAll('.seg').forEach(b=>{
+ const t = curTab(), segs = [...document.querySelectorAll('.seg')];
+ segs.forEach((b,i)=>{
   const on = !S.showDone && b.dataset.tab === t;
   b.classList.toggle('on', on);
   b.setAttribute('aria-selected', on ? 'true' : 'false');
+  /* подложка одна на всех — двигаем её к активной трети, а не перекрашиваем фоны */
+  if(on) b.parentElement.style.setProperty('--seg-i', i);
  });
+ const row = segs[0] && segs[0].parentElement;
+ if(row) row.classList.toggle('none', !!S.showDone);
 }
 /* доводка: строки садятся друг за другом с шагом LAG */
 function landRows(){

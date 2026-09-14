@@ -40,6 +40,8 @@ async function common(file){
  const segs=[...d.querySelectorAll('.dockrow .seg')];
  assert(!$('sort')&&segs.map(b=>b.dataset.tab).join(',')==='flow,process,focus'&&segs.map(b=>b.textContent).join(',')==='FLOW,PROCESS,FOCUS','вместо сортировки — три капсулы FLOW / PROCESS / FOCUS');
  assert(segs[0].classList.contains('on')&&segs[0].getAttribute('aria-selected')==='true','по умолчанию FLOW');
+ /* одна плашка на три вида: подложка активного одна и ездит между третями */
+ assert(d.querySelectorAll('.dockrow .segbar').length===1&&d.querySelector('.dockrow').style.getPropertyValue('--seg-i')==='0','активный вид отмечен общей подложкой, стоящей на первой трети');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
  /* кнопка и строка ввода — одна капсула: кнопка внутри неё, свёрнутый вид — красный круг на месте кнопки в доке */
  assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');
@@ -103,6 +105,7 @@ async function common(file){
  seg('process').click();
  assert(w.app.S.tab==='process'&&rows().length&&rows().every(r=>r.dataset.pj),'PROCESS показывает только проекты');
  assert(seg('process').classList.contains('on')&&!seg('flow').classList.contains('on'),'активна капсула PROCESS');
+ assert(d.querySelector('.dockrow').style.getPropertyValue('--seg-i')==='1','подложка переехала на вторую треть');
  seg('focus').click();
  assert(rows().length&&rows().every(r=>{const x=w.app.byId(+r.dataset.id)||w.app.prById(+r.dataset.pj); return (x.pri||0)>0}),'FOCUS показывает только то, чему проставлен приоритет');
  seg('flow').click();
@@ -114,7 +117,7 @@ async function common(file){
  assert(w.app.S.showDone===1&&rows().length===doneN,'переключатель показывает выполненные: '+rows().length);
  rows()[0].querySelector('.ck').click();
  assert(rows().length===doneN-1,'снятая отметка уходит из выполненных');
- assert(!d.querySelector('.dockrow .seg.on'),'в выполненных ни одна капсула не подсвечена');
+ assert(!d.querySelector('.dockrow .seg.on')&&d.querySelector('.dockrow').classList.contains('none'),'в выполненных ни одна капсула не подсвечена, подложка убрана');
  $('find').click();
  assert(w.app.S.showDone===0&&rows().length>=openN,'обратно во входящие');
  /* нажатие на капсулу из выполненных возвращает к списку */
