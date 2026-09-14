@@ -656,7 +656,7 @@ async function haptics(file){
  kbw.document.getElementById('msg').focus();
  assert(css('--vh')==='400px'&&css('--foot')==='8px','фокус — контейнер и низ ужаты сразу, до прихода resize');
  assert(css('--vvtop')==='368px','и сдвиг на высоту клавиатуры выставлен заранее: iOS панорамирует ровно на неё');
- await wait(900);
+ await wait(1700);          /* окно догадки 1,5 с: resize на iOS приходит позже, чем кажется */
  assert(css('--vh')==='768px','клавиатура не пришла — догадка снята');
  kbw.document.getElementById('msg').blur();
  /* обратная догадка: потеря фокуса разворачивает контейнер сразу, пока клавиатура ещё едет вниз */
