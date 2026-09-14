@@ -383,6 +383,9 @@ async function memory(){
  const txt=box.textContent;
  assert(txt.includes('Сергей, Москва'),'в настройках видна память');
  assert(txt.includes('Корзина')&&txt.includes('уходит в Anthropic'),'есть корзина и строка про приватность');
+ /* Версия видна в настройках и совпадает с версией кэша: иначе «приехало ли обновление» — гадание */
+ const swV=(read('sw.js').match(/const V='([^']+)'/)||[])[1];
+ assert(!!swV&&txt.includes(swV),'в настройках показана версия сборки, та же, что в sw.js: '+swV);
  box.querySelector('[data-forget]').click();
  assert(A.S.mem.length===1,'факт стирается из настроек');
 

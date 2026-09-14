@@ -714,6 +714,10 @@ async function runTool(tu,item,isP){
 /* ---------- чат ----------
    API — адрес серверной функции из worker/. Ключ Anthropic в статике держать нельзя:
    бандл публичный. Пока адрес пуст, отвечает локальная заглушка. */
+/* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
+   без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
+   установленное приложение умеет держаться за старый код дольше, чем кажется. */
+const APP_V='tasks-v24';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1019,6 +1023,9 @@ function settings(){
  h+='<div class="sh">Данные</div>';
  h+='<button class="mi danger" type="button" data-wipe="1">'+Ic(P.trash,16)+'<span>Стереть все данные</span></button>';
  h+='<div class="se">Текст задачи уходит в Anthropic, у нас не хранится. Задачи, переписка и файлы лежат в этом браузере.</div>';
+
+ h+='<div class="sh">Версия</div>';
+ h+='<div class="si"><span>'+esc(APP_V)+'</span><span class="as">обновление приезжает само</span></div>';
  body.innerHTML=h;
 
  body.querySelectorAll('[data-forget]').forEach(b=>b.onclick=()=>{S.mem.splice(+b.dataset.forget,1); save(); settings();});
