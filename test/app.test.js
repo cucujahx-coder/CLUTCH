@@ -25,9 +25,10 @@ async function common(file){
  const kinds=rows().map(r=>r.dataset.kind).join(',');
  /* порядок хронологический, задачи и проекты одним рядом: в демо-наборе проекты созданы первыми */
  assert(kinds==='project,project,payment,call,meeting,task,purchase','тип каждой строки угадан: '+kinds);
- const t2=n=>{const r=rows().find(r=>txt(r)===n); return r&&r.querySelector('.t2')?r.querySelector('.t2').textContent:'';};
- assert(t2('Разобрать фото с поездки')==='без диалога · без срока','нет диалога и срока — так и написано: '+t2('Разобрать фото с поездки'));
- assert(t2('Оплатить хостинг').includes('черновик письма')&&!t2('Оплатить хостинг').includes('без'),'где есть диалог и срок — пустоты не пишутся');
+ /* у задачи только название; у проекта заголовок — ближайший шаг, мелким снизу — название проекта */
+ const pj=n=>rows().find(r=>r.dataset.pj&&r.querySelector('.t2')&&r.querySelector('.t2').textContent===n);
+ assert(rows().filter(r=>r.dataset.id).every(r=>!r.querySelector('.t2')),'у задач подзаголовка нет');
+ assert(pj('Запуск лендинга')&&txt(pj('Запуск лендинга'))==='Написать текст оффера','у проекта заголовок — ближайший открытый шаг, снизу — имя проекта');
  assert(w.app.kindOf({t:'Каждый день звонить маме',pj:null})==='routine'&&w.app.kindOf({t:'Напомнить про паспорт',pj:null})==='reminder','рутина и напоминание по словам');
  assert(w.app.kindOf({t:'Купить молоко',pj:null,kind:'idea'})==='idea'&&w.app.kindOf({t:'Вычитка',pj:3})==='step','явный kind важнее догадки, шаг — по проекту');
 
@@ -62,14 +63,14 @@ async function common(file){
  assert(sc.style.transform==='','обрыв касания тоже возвращает');
 
  /* кольцо проекта закрывает следующий шаг */
- const pr=rows().find(r=>txt(r)==='Запуск лендинга');
+ const pr=pj('Запуск лендинга');
  assert(pr.querySelector('.ck .num').textContent==='3','в кружке проекта число открытых шагов');
  pr.querySelector('.ck').click();
  await wait(220);
- assert(rows().find(r=>txt(r)==='Запуск лендинга').querySelector('.t2').textContent.includes('Вычитка'),'следующий шаг сдвинулся');
+ assert(txt(pj('Запуск лендинга'))==='Вычитка','следующий шаг сдвинулся — теперь он в заголовке');
 
  /* открытие карточки и шаги в чате */
- rows().find(r=>txt(r)==='Запуск лендинга').click();
+ pj('Запуск лендинга').click();
  assert($('ct').value==='Запуск лендинга','проект открыт');
  assert($('cm').textContent==='2 из 4','мета проекта');
  assert(d.querySelectorAll('#thread .steps .step').length===4,'в чате все шаги проекта');

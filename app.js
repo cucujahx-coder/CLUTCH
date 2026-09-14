@@ -749,7 +749,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v55';
+const APP_V='tasks-v56';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1121,9 +1121,10 @@ function rowEl(x, isP, next, left){
  if(isP) r.dataset.pj = x.id; else r.dataset.id = x.id;
  r.dataset.kind = kindOf(x, isP);
  r.tabIndex = 0;
- const title = isP ? x.n : x.t;
- const meta  = isP ? ('→ ' + (next ? next.t : '') + ' · ' + (fmtDue((next&&next.due)||x.due) || 'без срока'))
-                   : sub(x, 1);
+ /* У задачи только название, подзаголовка нет. У проекта заголовок — ближайший открытый шаг,
+    мелким снизу — название самого проекта: в списке видно, что делать, а не как называется папка. */
+ const title = isP ? ((next && next.t) || x.n) : x.t;
+ const meta  = isP ? x.n : '';
  r.innerHTML = '<div class="cell"><span class="sr-only">'+KIND[r.dataset.kind]+': </span>'+
    '<div class="t1">'+esc(title)+'</div>'+(meta?'<div class="t2">'+esc(meta)+'</div>':'')+'</div>' +
    ckHTML(isP ? {pri:x.pri, done:0, n:x.n} : x, isP ? left : undefined);
