@@ -722,7 +722,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v42';
+const APP_V='tasks-v43';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1644,6 +1644,7 @@ function openComposer(){
 }
 function closeComposer(){
  if(mini()) return;
+ sweep(composer);                     /* та же вспышка, что при раскрытии: капсула гаснет и сворачивается разом */
  nt.value=''; nt.blur(); composer.classList.add('mini');
  ntPick = []; paintNtPick();          /* отменили задачу — отменили и её вложения */
  $('dock').classList.remove('hide'); scroll.classList.remove('tight');
