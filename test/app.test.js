@@ -39,7 +39,7 @@ async function common(file){
  assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');
  const cssMini=read('app.css').replace(/\/\*[\s\S]*?\*\//g,'');
  assert(/\.composer\.mini\{left:calc\(50% - 38px\);right:calc\(50% - 38px\);height:76px;[^}]*background:var\(--hot\)[^}]*transform:translateY\(-75px\)/.test(cssMini),'свёрнутая капсула — круг 76 цвета кнопки, поднятый на место кнопки трансформой');
- assert(/\.composer\{[^}]*--tr-composer:left[^}]*transition:var\(--tr-composer\)/.test(cssMini)&&/\.phone\.easing \.composer\{transition:bottom \.25s var\(--ease-ios\),var\(--tr-composer\)\}/.test(cssMini),'геометрия капсулы едет одним списком переходов, .easing его дополняет, а не заменяет');
+ assert(/\.composer\{[^}]*--tr-composer:left[^}]*transition:var\(--tr-composer\)/.test(cssMini)&&/\.phone\.easing \.composer\{transition:bottom var\(--t-kb\) var\(--e-move\),var\(--tr-composer\)\}/.test(cssMini),'геометрия капсулы едет одним списком переходов, .easing его дополняет, а не заменяет');
  /* resizes-content на iOS сдвигает экран на высоту клавиатуры всегда, и шапка дёргается; overlays — только когда поле под клавиатурой */
  assert(/interactive-widget=overlays-content/.test(read(file)),'viewport с overlays-content, а не resizes-content');
  /* Список перевёрнут: первый в разметке — у низа, колпак под шапку — над ним. Ноль прокрутки = низ,
@@ -142,6 +142,16 @@ async function common(file){
  const css=read('app.css');
  assert(!/prefers-color-scheme/.test(css)&&/--bg:#101010/.test(css),'тема одна, тёмная');
  assert(/--pri1:#2EC27E/.test(css)&&/--pri4:#FF4500/.test(css),'четыре плотных цвета приоритета');
+ /* движение — одна система: кривые по роли в CSS и в EASE движка совпадают, сырых кривых и секунд в переходах нет */
+ const js=read('app.js'), tokOf=n=>(css.match(new RegExp('--'+n+':(cubic-bezier\\([^)]*\\))'))||[])[1];
+ const ease=eval('('+(js.match(/const EASE = (\{[^}]*\})/)||[])[1]+')');
+ assert(ease.out===tokOf('e-out')&&ease.in===tokOf('e-in')&&ease.move===tokOf('e-move')&&ease.over===tokOf('e-over'),'EASE в движке = токены --e-* в стилях');
+ const motion=css.replace(/\/\*[\s\S]*?\*\//g,'').split('\n').filter(l=>/transition:|animation:/.test(l));
+ assert(motion.every(l=>!/cubic-bezier|ease-in-out|\d+ms|\.\d+s(?![\w-])/.test(l.replace(/steps\(1\)/g,''))),'в переходах нет сырых кривых и длительностей — только токены');
+ assert(!/easing:'(ease|cubic)/.test(js),'в движке кривые только из EASE');
+ assert(/\.press:active\{transform:scale\(1\.05,\.92\)/.test(css)&&/scale\(1\.28,\.8\)/.test(js),'сжатие и растяжение: кнопка плющится под пальцем, кружок — при отметке');
+ assert(/\.pri button:nth-child\(5\)\{animation-delay:calc\(var\(--lag\) \* 4\)\}/.test(css)&&/\n\.sheet-body > \*\{animation:rise[^}]*var\(--i, 0\) \* var\(--lag\)\)\}\n/.test(css)&&/@keyframes sheet-in\{from\{[^}]*\}to\{[^}]*\}\}\n/.test(css),'доводка: кнопки приоритета и разделы настроек догоняют друг друга');
+ assert(/@keyframes toast-in\{0%\{[^}]*\}55%\{transform:translateY\(-6px\)\}/.test(css)&&/translate\('\+\(x\*\.6\)/.test(js),'дуги: плашка приподнимается по пути, искры летят по параболе');
  assert(/\.row\{[^}]*flex-direction:row-reverse[^}]*padding:11px 20px 11px 11px/.test(css)&&/\.step\{[^}]*flex-direction:row-reverse/.test(css),'кружки слева: строки и шаги перевёрнуты, отступ текста справа');
  assert(/@font-face\{font-family:"Play"/.test(css)&&/play-cyrillic-400-normal\.woff2/.test(css),'Play подключён файлами рядом с HTML');
  assert(/\.scroll\{[^}]*overflow-y:scroll/.test(css.replace(/\/\*[\s\S]*?\*\//g,'')),'прокрутка живая всегда: при auto короткий список стоит намертво');

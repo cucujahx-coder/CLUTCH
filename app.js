@@ -4,6 +4,10 @@
    с пауком, под ней переключатель «выполненные», строка ввода вырастает из кнопки. */
 const MODE = window.MODE || 'two';
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* Кривые движения — те же, что токены --e-* в app.css, по роли: out — появление и остановка,
+   in — уход, move — перемещение, over — прибытие с перелётом. Тест сверяет с CSS. */
+const EASE = {out:'cubic-bezier(.2,.8,.2,1)', in:'cubic-bezier(.4,0,.8,.4)', move:'cubic-bezier(.32,.72,0,1)', over:'cubic-bezier(.34,1.56,.64,1)'};
+const LAG = 40;   /* мс между элементами группы — доводка, как --lag в CSS */
 const $ = id => document.getElementById(id);
 const root = document.documentElement.style;
 const esc = t => String(t).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -131,7 +135,7 @@ addEventListener('touchend', function unlock(){
 function elflash(el, ms){
  if(!el || RM || !el.animate) return;
  el.animate([{boxShadow:'inset 0 0 0 999px rgba(255,255,255,.85)'},
-             {boxShadow:'inset 0 0 0 999px rgba(255,255,255,0)'}],{duration:ms||220,easing:'ease-out'});
+             {boxShadow:'inset 0 0 0 999px rgba(255,255,255,0)'}],{duration:ms||220,easing:EASE.out});
 }
 /* Когда клавиатура была видна в последний раз: первое касание по экрану её убирает, и к моменту
    показа плашки поле уже без фокуса — помним момент, а не только состояние. */
@@ -148,7 +152,7 @@ function sweep(el){
  const w = document.createElement('div'); w.className='sweep'; w.innerHTML='<i></i>';
  el.appendChild(w);
  const a = w.firstChild.animate([{opacity:.95,offset:0},{opacity:.95,offset:.25},{opacity:0,offset:1}],
-   {duration:180,easing:'cubic-bezier(.3,0,.6,1)'});
+   {duration:180,easing:EASE.in});   /* гаснет с ускорением — уход */
  a.onfinish = () => w.remove();
 }
 addEventListener('focusin', e => { if(e.target.matches && e.target.matches('.inp')) sweep(e.target.closest('.composer')); });
@@ -167,24 +171,27 @@ function burst(row, keepRow){
   ghost.className = 'ghost ' + row.className;
   ghost.style.cssText += 'left:'+(rb.left-hb.left)+'px;top:'+(rb.top-hb.top)+'px;width:'+rb.width+'px;height:'+rb.height+'px';
   host.appendChild(ghost);
-  ghost.animate([{filter:'brightness(1) blur(0)',opacity:1},{filter:'brightness(3) blur(7px)',opacity:0,transform:'scale(1.04)'}],
-    {duration:130,easing:'ease-out',fill:'forwards'});
+  /* дуга: призрак уходит вверх и чуть вправо, не по прямой */
+  ghost.animate([{filter:'brightness(1) blur(0)',opacity:1,transform:'translate(0,0) scale(1)'},
+                 {filter:'brightness(2) blur(3px)',opacity:.6,transform:'translate(5px,-9px) scale(1.02)',offset:.5},
+                 {filter:'brightness(3) blur(7px)',opacity:0,transform:'translate(8px,-12px) scale(1.04)'}],
+    {duration:130,easing:EASE.out,fill:'forwards'});
   setTimeout(()=>ghost.remove(),150);
  } else {
   row.animate([{boxShadow:'inset 0 0 0 999px rgba(255,255,255,.92)'},
                {boxShadow:'inset 0 0 0 999px rgba(255,255,255,.92)',offset:.18},
-               {boxShadow:'inset 0 0 0 999px rgba(255,255,255,0)'}],{duration:180,easing:'ease-out'});
+               {boxShadow:'inset 0 0 0 999px rgba(255,255,255,0)'}],{duration:180,easing:EASE.out});
  }
  const fl = document.createElement('div'); fl.className='rflash';
  fl.style.cssText += 'left:'+(cx-90)+'px;top:'+(cy-90)+'px';
  host.appendChild(fl);
- fl.animate([{opacity:.95,transform:'scale(.4)'},{opacity:0,transform:'scale(1)'}],{duration:200,easing:'ease-out'});
+ fl.animate([{opacity:.95,transform:'scale(.4)'},{opacity:0,transform:'scale(1)'}],{duration:200,easing:EASE.out});
  setTimeout(()=>fl.remove(),210);
 
  const rf = document.createElement('div'); rf.className='ringfx';
  rf.style.cssText += 'left:'+(cx-22)+'px;top:'+(cy-22)+'px;width:44px;height:44px';
  host.appendChild(rf);
- rf.animate([{opacity:.5,transform:'scale(.6)'},{opacity:0,transform:'scale(2.6)'}],{duration:390,easing:'ease-out'});
+ rf.animate([{opacity:.5,transform:'scale(.6)'},{opacity:0,transform:'scale(2.6)'}],{duration:390,easing:EASE.out});
  setTimeout(()=>rf.remove(),400);
 
  const cols=['#FF4500','#FF7A3D','#E0E0E0','#FFA073'];
@@ -192,17 +199,23 @@ function burst(row, keepRow){
   const a=(i/10)*Math.PI*2+Math.random(), d=34+Math.random()*40, s=document.createElement('span');
   s.className='spark'; s.style.cssText += 'left:'+cx+'px;top:'+cy+'px;background:'+cols[i%4];
   host.appendChild(s);
+  /* дуги: искра летит по параболе — на полпути выше прямой, к концу проседает под тяжестью */
+  const x=Math.cos(a)*d, y=Math.sin(a)*d;
   s.animate([{transform:'translate(0,0) scale(1)',opacity:1},
-             {transform:'translate('+(Math.cos(a)*d).toFixed(1)+'px,'+(Math.sin(a)*d).toFixed(1)+'px) scale(0)',opacity:0}],
-    {duration:180+Math.random()*40,easing:'cubic-bezier(.2,.7,.3,1)',fill:'forwards'});
+             {transform:'translate('+(x*.6).toFixed(1)+'px,'+(y*.6-10).toFixed(1)+'px) scale(.8)',opacity:.9,offset:.5},
+             {transform:'translate('+x.toFixed(1)+'px,'+(y+14).toFixed(1)+'px) scale(0)',opacity:0}],
+    {duration:180+Math.random()*40,easing:EASE.out,fill:'forwards'});
   setTimeout(()=>s.remove(),230);
  }
 }
 /* Появление новой строки: всплывает снизу и пружинит */
 function fly(row){
  if(!row || RM || !row.animate) return;
- row.animate([{opacity:0,transform:'translateY(16px) scale(.98)'},{opacity:1,transform:'none'}],
-   {duration:420,easing:'cubic-bezier(.34,1.56,.64,1)'});
+ /* дуга: новая строка заходит снизу и чуть слева, выравниваясь к месту; садится с перелётом */
+ row.animate([{opacity:0,transform:'translate(-8px,16px) scale(.98)'},
+              {opacity:1,transform:'translate(2px,4px) scale(1)',offset:.6},
+              {opacity:1,transform:'none'}],
+   {duration:420,easing:EASE.over});
 }
 /* ---------- даты ---------- */
 const MON=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
@@ -723,7 +736,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v49';
+const APP_V='tasks-v50';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1036,6 +1049,7 @@ function settings(){
  h+='<div class="sh">Версия</div>';
  h+='<div class="si" data-ver="1"><span>'+esc(APP_V)+'</span><span class="as">обновление приезжает само</span></div>';
  body.innerHTML=h;
+ [...body.children].forEach((el,i)=>el.style.setProperty('--i',i));   /* доводка: разделы друг за другом */
 
  body.querySelectorAll('[data-forget]').forEach(b=>b.onclick=()=>{S.mem.splice(+b.dataset.forget,1); save(); settings();});
  body.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>{delete trash[+b.dataset.restore].o.del; save(); paint(); settings();});
@@ -1197,8 +1211,9 @@ function ringTap(p, row){
  tap(25); pop();
  const ck = row.querySelector('.ck');
  burst(row, true);
- if(!RM && ck && ck.animate) ck.animate([{transform:'scale(1)'},{transform:'scale(1.22)'},{transform:'scale(1)'}],
-   {duration:320,easing:'cubic-bezier(.34,1.56,.64,1)'});
+ /* сжатие и растяжение: кружок плющится под нажатием, растягивается и садится */
+ if(!RM && ck && ck.animate) ck.animate([{transform:'scale(1)'},{transform:'scale(1.28,.8)',offset:.3},
+   {transform:'scale(.9,1.16)',offset:.65},{transform:'scale(1)'}],{duration:320,easing:EASE.over});
  undoBuf = {x:op[0]};
  setTimeout(()=>{ mark(op[0],1); save(); paint(1); showToast('Шаг закрыт · ' + op[0].t); }, RM?0:140);
 }
@@ -1598,7 +1613,9 @@ $('sort').onclick = () => {
  sorted = !sorted;
  drawSort();
  tap(8); paint(1);
- if(!RM) [...list.children].forEach((r,i)=>{ r.classList.add('land'); setTimeout(()=>r.classList.remove('land'),210+i*10); });
+ /* доводка: строки садятся друг за другом с шагом LAG */
+ if(!RM) [...list.children].forEach((r,i)=>{ r.style.animationDelay=(i*LAG)+'ms'; r.classList.add('land');
+   setTimeout(()=>{ r.classList.remove('land'); r.style.animationDelay=''; },460+i*LAG); });
 };
 /* правый нижний кружок переключает входящие ↔ выполненные */
 function drawFind(){
