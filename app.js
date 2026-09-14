@@ -89,7 +89,7 @@ const Ic = (d,s=16) => '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fi
    Вес действия: 6 перелистнуть, 8 открыть, 14 отправить или вызвать меню, 25 выполнить.
    Android умеет vibrate; на iPhone щёлкает скрытый переключатель (Safari 17.4+),
    для тяжёлых значений он повторяется через 45 и 90 мс. */
-let hapt = null;
+let hapt = null, hapting = false;   /* hapting: идёт щелчок, фокус на миг уходит в переключатель — это не потеря фокуса */
 const iOSHaptic = typeof HTMLInputElement !== 'undefined' && 'switch' in HTMLInputElement.prototype;
 function tap(ms){
  if(RM) return;
@@ -101,6 +101,7 @@ function tap(ms){
      показывает. Поэтому запоминаем, кто был в фокусе, и возвращаем его после щелчка. */
   const hit=()=>{
    const a=document.activeElement;
+   hapting=true;
    try{hapt.click()}catch(e){}
    if(a&&a!==document.body&&a!==document.activeElement&&a.focus){
     try{a.focus({preventScroll:true})}catch(e){try{a.focus()}catch(e2){}}
@@ -109,6 +110,7 @@ function tap(ms){
       переключатель забирал его себе насовсем, и логика клавиатуры видела «поле в фокусе» */
    const now=document.activeElement;
    if(now&&now!==a&&now.closest&&now.closest('.hapt')){ try{now.blur()}catch(e){} }
+   hapting=false;
   };
   hit(); if(ms>=14) setTimeout(hit,45); if(ms>=20) setTimeout(hit,90);
   return;
@@ -747,7 +749,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v54';
+const APP_V='tasks-v55';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1545,12 +1547,12 @@ function trackVH(){
  addEventListener('orientationchange', ()=>setTimeout(()=>apply('o'), 150));
  /* Фокус и его потеря — моменты, когда клавиатура появляется и убирается */
  addEventListener('focusin', e=>{
-  if(!isText(e.target)) return;
+  if(hapting || !isText(e.target)) return;   /* перескок фокуса из-за щелчка — не событие клавиатуры */
   if(kbH && kbBaseH && !kbUp()) predict(kbBaseH - kbH, kbH, 'p');   /* клавиатура придёт — ужимаемся и сдвигаемся сейчас */
   watch(1500);
  });
  addEventListener('focusout', e=>{
-  if(!isText(e.target)) return;
+  if(hapting || !isText(e.target)) return;
   /* Клавиатура уйдёт — разворачиваемся сейчас. А если её и не было (фокус ушёл раньше,
      чем она поднялась), догадка ужатия снимается принудительно: иначе контейнер стоял
      ужатым и сдвинутым при закрытой клавиатуре до конца окна догадки. */
@@ -1760,9 +1762,20 @@ function sendMsg(){
 }
 sendBtn.onclick = sendMsg;
 msg.onkeydown = e => { if(e.key==='Enter'){ e.preventDefault(); sendMsg(); } };
-/* клавиатура уходит по касанию или прокрутке самой переписки */
-thread.addEventListener('pointerdown', ()=>{ if(document.activeElement===msg) msg.blur(); });
-thread.addEventListener('touchmove', ()=>{ if(document.activeElement===msg) msg.blur(); }, {passive:true});
+/* Клавиатура в чате остаётся, пока идёт переписка: прокрутка ленты её не трогает. Раньше
+   фокус снимался по началу касания — любая попытка прокрутить сворачивала клавиатуру.
+   Убирают её касание без движения (click, у протяжки его нет) и сильная протяжка вниз
+   (>90 px), когда лента уже в самом верху или палец начал у самой клавиатуры, — как
+   interactive dismiss в iOS. */
+thread.addEventListener('click', ()=>{ if(document.activeElement===msg) msg.blur(); });
+let ty0 = null, tTop = 0;
+thread.addEventListener('touchstart', e=>{ if(e.touches.length!==1){ ty0=null; return; } ty0=e.touches[0].clientY; tTop=thread.scrollTop; }, {passive:true});
+thread.addEventListener('touchmove', e=>{
+ if(ty0===null || document.activeElement!==msg) return;
+ const dy = e.touches[0].clientY - ty0;
+ const nearKb = ty0 > thread.getBoundingClientRect().bottom - 120;
+ if(dy > 90 && (tTop <= 0 || nearKb)){ msg.blur(); ty0=null; }
+}, {passive:true});
 
 /* ---------- скрепка ----------
    В чате вложение уходит с ближайшим сообщением. У строки новой задачи цели ещё нет:

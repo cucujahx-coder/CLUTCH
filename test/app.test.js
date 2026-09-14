@@ -139,6 +139,14 @@ async function common(file){
  $('msg').blur();
  assert(pd()===true&&d.activeElement===$('msg'),'тап по полю чата: фокус поставлен программно, действие iOS отменено');
  assert(pd()===false,'тап по полю в фокусе не перехватывается — каретка ставится как обычно');
+ /* прокрутка ленты клавиатуру не трогает; тап и сильная протяжка вниз от верха — убирают */
+ const tt=(type,y)=>{ const e=new w.Event(type,{bubbles:true}); e.touches=y==null?[]:[{clientX:100,clientY:y}]; $('thread').dispatchEvent(e); };
+ tt('touchstart',300); tt('touchmove',340); tt('touchend');
+ assert(d.activeElement===$('msg'),'обычная прокрутка ленты фокус не снимает');
+ tt('touchstart',300); tt('touchmove',420); tt('touchend');
+ assert(d.activeElement!==$('msg'),'сильная протяжка вниз от верха ленты убирает клавиатуру');
+ $('msg').focus(); $('thread').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+ assert(d.activeElement!==$('msg'),'касание по ленте без движения убирает клавиатуру');
  $('msg').blur();
  $('hctl').click();
  assert($('cm').textContent==='выполнена','круглая кнопка шапки выполняет задачу');
@@ -635,6 +643,7 @@ async function haptics(file){
  $('nt').value='Проверка отдачи'; $('add').click();
  await wait(150);
  assert(!(d.activeElement&&d.activeElement.closest&&d.activeElement.closest('.hapt')),'после отправки задачи фокус не остался на переключателе отдачи');
+ assert(/if\(hapting \|\| !isText\(e\.target\)\) return;/.test(read('app.js')),'перескоки фокуса из-за щелчка логика клавиатуры не считает потерей фокуса');
 
  /* отправка в чате: отдача идёт при живом фокусе, и он должен остаться в поле */
  w.app.S.cur={k:'t',id:w.app.S.ts[0].id};
