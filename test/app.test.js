@@ -23,7 +23,8 @@ async function common(file){
  const rows=()=>[...d.querySelectorAll('#list .row')], txt=r=>r.querySelector('.t1').textContent, $=i=>d.getElementById(i);
  assert(rows().length===7,'5 задач + 2 проекта');
  const kinds=rows().map(r=>r.dataset.kind).join(',');
- assert(kinds==='payment,call,meeting,task,purchase,project,project','тип каждой строки угадан: '+kinds);
+ /* порядок хронологический, задачи и проекты одним рядом: в демо-наборе проекты созданы первыми */
+ assert(kinds==='project,project,payment,call,meeting,task,purchase','тип каждой строки угадан: '+kinds);
  const t2=n=>{const r=rows().find(r=>txt(r)===n); return r&&r.querySelector('.t2')?r.querySelector('.t2').textContent:'';};
  assert(t2('Разобрать фото с поездки')==='без диалога · без срока','нет диалога и срока — так и написано: '+t2('Разобрать фото с поездки'));
  assert(t2('Оплатить хостинг').includes('черновик письма')&&!t2('Оплатить хостинг').includes('без'),'где есть диалог и срок — пустоты не пишутся');
@@ -67,7 +68,7 @@ async function common(file){
  assert(w.app.openIn(w.app.S.cur.id).length===1,'шаг закрыт из чата');
 
  /* приоритет долгим нажатием */
- const row0=rows()[0], name0=txt(row0);
+ const row0=rows().find(r=>r.dataset.id), name0=txt(row0);   /* задача, не проект */
  row0.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true}));
  assert(!!d.querySelector('.pri'),'долгое нажатие открывает выбор приоритета');
  assert(d.querySelectorAll('.pri button').length===5,'пять ступеней: нет и четыре цвета');
@@ -78,9 +79,9 @@ async function common(file){
  again().click();
  assert(w.app.S.cur.k==='t'&&w.app.byId(w.app.S.cur.id).t!==name0||true,'после долгого нажатия строка сама не открывается');
 
- /* порядок по приоритету — по умолчанию: срочное внизу, у большой кнопки */
+ /* порядок по приоритету — по умолчанию: срочное поднимается вверх, новое остаётся внизу у кнопки */
  assert($('sort').classList.contains('on'),'сортировка по приоритету включена с самого начала');
- assert(txt(rows()[rows().length-1])===name0,'приоритетная задача сразу внизу, ближе к кнопке');
+ assert(txt(rows()[0])===name0,'приоритетная задача поднялась наверх');
  $('sort').click();
  assert(!$('sort').classList.contains('on'),'кнопка возвращает порядок добавления');
  $('sort').click();
@@ -101,6 +102,7 @@ async function common(file){
  assert(w.app.S.ts.every(x=>x.t!==''),'пустой ввод ничего не добавляет');
  $('nt').value='<b>x</b>'; $('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter'}));
  assert(w.app.S.ts.some(x=>x.t==='<b>x</b>')&&!d.querySelector('#list b'),'Enter добавляет, текст экранирован');
+ assert(txt(rows()[rows().length-1])==='<b>x</b>','новая задача — в самом низу, ниже проектов и приоритетных');
  assert($('composer').classList.contains('mini'),'после добавления строка сворачивается');
 
  /* выполнение задачи: плашка с откатом.

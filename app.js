@@ -717,7 +717,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v28';
+const APP_V='tasks-v29';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1046,8 +1046,8 @@ function settings(){
 
 /* ---------- список ----------
    Список растёт снизу вверх: он прижат к строке ввода, самое свежее ближе к пальцу. */
-/* Список по умолчанию идёт в порядке приоритетов: самое срочное внизу, у большой кнопки.
-   Кнопка в шапке этот порядок выключает, возвращая порядок добавления. */
+/* Список по умолчанию идёт в порядке приоритетов: срочное выше, новое — в самом низу,
+   у большой кнопки. Кнопка в шапке этот порядок выключает, оставляя чистый порядок добавления. */
 let sorted = true, undoBuf = null, toastTimer = null, suppressRow = false, priPop = null;
 let list, scroll, thread;
 
@@ -1096,15 +1096,16 @@ function paint(keep){
   if(!dn.length) list.innerHTML = '<div class="empty">Пока ничего не сделано.</div>';
  } else {
   const items = [];
-  S.ts.filter(x=>!x.done && !x.del && x.pj===null).forEach(x=>items.push({x,isP:0,pri:x.pri||0}));
+  S.ts.filter(x=>!x.done && !x.del && x.pj===null).forEach(x=>items.push({x,isP:0,pri:x.pri||0,id:x.id}));
   S.pr.filter(p=>!p.del).forEach(p=>{
    const all = inPj(p.id), op = openIn(p.id);
    if(!op.length) return;
-   items.push({x:p, isP:1, next:op[0], left:op.length, pri:p.pri||0});
+   items.push({x:p, isP:1, next:op[0], left:op.length, pri:p.pri||0, id:p.id});
   });
-  /* Сортировка устойчивая: самое срочное уезжает вниз, ближе к большой кнопке.
-     Порядок по умолчанию — этот, а не порядок добавления. */
-  if(sorted) items.sort((a,b)=>(a.pri||0)-(b.pri||0));
+  /* Новое — всегда в самом низу, у большой кнопки: задачи и проекты идут одним рядом по
+     времени добавления (id общий), а не задачи-потом-проекты. По умолчанию сверху ещё и
+     приоритетные: чем срочнее, тем выше; внутри одного приоритета — по времени. */
+  items.sort((a,b)=>(sorted ? (b.pri - a.pri) : 0) || (a.id - b.id));
   items.forEach(i=>list.appendChild(rowEl(i.x, i.isP, i.next, i.left)));
   if(!items.length) list.innerHTML = '<div class="empty">Входящие пусты. Нажми большую кнопку.</div>';
  }
@@ -1650,8 +1651,10 @@ addEventListener('keydown', e=>{ if(e.key==='Escape' && priPop) closePri(); });
 addEventListener('pagehide', flush); addEventListener('beforeunload', flush);
 armRubber(scroll); armRubber(thread);
 paint();
-/* Шрифт приезжает после первой отрисовки и меняет высоту строк — доводим список ещё раз */
+/* Шрифт приезжает после первой отрисовки и меняет высоту строк — доводим список ещё раз.
+   pageshow — возврат к вкладке из кэша назад-вперёд, там раскладка тоже может быть старой */
 addEventListener('load', toBottom);
+addEventListener('pageshow', toBottom);
 try{ document.fonts && document.fonts.ready.then(toBottom); }catch(e){}
 
 /* Поверхность для тестов и консоли: S переприсваивается при загрузке, поэтому отдаётся геттером */

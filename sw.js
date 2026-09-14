@@ -1,6 +1,6 @@
 /* Оффлайн-кэш. Сеть в приоритете: так обновление приезжает сразу,
    а кэш выручает только когда сети нет. Версию поднимать при смене состава файлов. */
-const V='tasks-v28';
+const V='tasks-v29';
 const ASSETS=['./','./index.html','./panels.html','./app.css','./app.js','./Pixelizer.ttf','./play-cyrillic-400-normal.woff2','./play-cyrillic-700-normal.woff2','./play-latin-400-normal.woff2','./play-latin-700-normal.woff2','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(V).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));
