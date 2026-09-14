@@ -42,6 +42,10 @@ async function common(file){
  assert(segs[0].classList.contains('on')&&segs[0].getAttribute('aria-selected')==='true','по умолчанию FLOW');
  /* одна плашка на три вида: подложка активного одна и ездит между третями */
  assert(d.querySelectorAll('.dockrow .segbar').length===1&&d.querySelector('.dockrow').style.getPropertyValue('--seg-i')==='0','активный вид отмечен общей подложкой, стоящей на первой трети');
+ /* активная — стеклянная, как кнопка выполненных; ряд под ней плоский */
+ const cssSeg=read('app.css').replace(/\/\*[\s\S]*?\*\//g,'');
+ assert(/\.segbar\{[^}]*backdrop-filter:blur\(8px\);\s*box-shadow:var\(--glass\)/.test(cssSeg),'активная капсула в том же стекле, что .rnd44 и таблетка логотипа');
+ assert(!/\.dockrow\{[^}]*(--glass|backdrop-filter)/.test(cssSeg),'ряд под ней плоский: ни канта, ни размытия');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
  /* кнопка и строка ввода — одна капсула: кнопка внутри неё, свёрнутый вид — красный круг на месте кнопки в доке */
  assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');
