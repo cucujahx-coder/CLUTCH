@@ -131,9 +131,18 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .shutter .sw svg{display:block;width:100%;height:auto}
 .shutter .eye{fill:#FFE3C2}
 .shutter .eye-b{fill:#FFE3C2;opacity:0}
-.dockrow{display:flex;align-items:center;justify-content:flex-end;gap:12px;width:100%}
+.dockrow{display:flex;align-items:center;gap:8px;width:100%;
+  transition:opacity var(--t-tap) var(--e-out)}
+.dockrow.busy{opacity:0;pointer-events:none}   /* плашка о выполненном встаёт ровно на это место */
+/* капсула вида: та же стеклянная геометрия, что у строк, только 44 в высоту */
+.seg{flex:1 1 0;min-width:0;height:44px;padding:0 6px;border:0;border-radius:22px;cursor:pointer;
+  font-family:var(--font-head);font-size:16px;letter-spacing:1px;line-height:1;color:var(--muted);
+  background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  box-shadow:var(--glass);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  transition:background var(--t-tap) var(--e-out),color var(--t-tap) var(--e-out),box-shadow var(--t-tap) var(--e-out),transform var(--t-base) var(--e-over)}
+.seg.on{background:var(--blue);color:var(--on-blue);box-shadow:none}
+@media (hover:hover){.seg:not(.on):hover{background:rgba(36,36,36,.78);color:var(--text)}}
 /* кружок стоит по одной оси с кружками задач: у строки внутренний отступ справа 11 */
-.dockrow #find{transform:translateX(-11px)}
 .rnd44{flex:none;width:44px;height:44px;border:0;border-radius:50%;color:var(--text);
   background:rgba(30,30,30,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:var(--glass);
   display:grid;place-items:center;cursor:pointer;transition:background var(--t-tap) var(--e-out),color var(--t-tap) var(--e-out)}
@@ -322,7 +331,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .toast .undo{flex:none;height:34px;padding:0 14px;border:0;border-radius:17px;
   background:var(--inv);color:var(--on-inv);font-size:14px;font-weight:700;cursor:pointer}
 /* пока плашка на месте кружка, сам кружок не виден */
-#find.busy{opacity:0;pointer-events:none;transition:opacity var(--t-tap) var(--e-out)}
+
 
 
 

@@ -35,7 +35,11 @@ async function common(file){
 
  /* строки — стеклянные капсулы, ни шапки со списком, ни фильтров, ни меню действий */
  assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet'),'ни шапки «Входящие», ни фильтров, ни меню действий');
- assert(!!d.querySelector('.brand img')&&!!$('sort'),'сверху таблетка с логотипом и кнопка сортировки');
+ assert(!!d.querySelector('.brand img')&&!!$('find')&&$('find').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
+ /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
+ const segs=[...d.querySelectorAll('.dockrow .seg')];
+ assert(!$('sort')&&segs.map(b=>b.dataset.tab).join(',')==='flow,process,focus'&&segs.map(b=>b.textContent).join(',')==='FLOW,PROCESS,FOCUS','вместо сортировки — три капсулы FLOW / PROCESS / FOCUS');
+ assert(segs[0].classList.contains('on')&&segs[0].getAttribute('aria-selected')==='true','по умолчанию FLOW');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
  /* кнопка и строка ввода — одна капсула: кнопка внутри неё, свёрнутый вид — красный круг на месте кнопки в доке */
  assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');
@@ -91,12 +95,18 @@ async function common(file){
  again().click();
  assert(w.app.S.cur.k==='t'&&w.app.byId(w.app.S.cur.id).t!==name0||true,'после долгого нажатия строка сама не открывается');
 
- /* порядок по приоритету — по умолчанию: срочное поднимается вверх, новое остаётся внизу у кнопки */
- assert($('sort').classList.contains('on'),'сортировка по приоритету включена с самого начала');
+ /* порядок один и всегда: срочное вверху, новое внизу у кнопки — выключить его нечем */
  assert(txt(rows()[0])===name0,'приоритетная задача поднялась наверх');
- $('sort').click();
- assert(!$('sort').classList.contains('on'),'кнопка возвращает порядок добавления');
- $('sort').click();
+
+ /* капсулы: PROCESS — только проекты, FOCUS — только с приоритетом, FLOW — всё */
+ const seg=t=>d.querySelector('.dockrow .seg[data-tab="'+t+'"]');
+ seg('process').click();
+ assert(w.app.S.tab==='process'&&rows().length&&rows().every(r=>r.dataset.pj),'PROCESS показывает только проекты');
+ assert(seg('process').classList.contains('on')&&!seg('flow').classList.contains('on'),'активна капсула PROCESS');
+ seg('focus').click();
+ assert(rows().length&&rows().every(r=>{const x=w.app.byId(+r.dataset.id)||w.app.prById(+r.dataset.pj); return (x.pri||0)>0}),'FOCUS показывает только то, чему проставлен приоритет');
+ seg('flow').click();
+ assert(w.app.S.tab==='flow'&&rows().length>1,'FLOW возвращает всё');
 
  /* выполненные ↔ входящие */
  const openN=rows().length, doneN=w.app.S.ts.filter(x=>x.done).length;
@@ -104,8 +114,12 @@ async function common(file){
  assert(w.app.S.showDone===1&&rows().length===doneN,'переключатель показывает выполненные: '+rows().length);
  rows()[0].querySelector('.ck').click();
  assert(rows().length===doneN-1,'снятая отметка уходит из выполненных');
+ assert(!d.querySelector('.dockrow .seg.on'),'в выполненных ни одна капсула не подсвечена');
  $('find').click();
  assert(w.app.S.showDone===0&&rows().length>=openN,'обратно во входящие');
+ /* нажатие на капсулу из выполненных возвращает к списку */
+ $('find').click(); seg('flow').click();
+ assert(w.app.S.showDone===0&&seg('flow').classList.contains('on'),'капсула уводит из выполненных обратно в список');
 
  /* добавление задачи через строку ввода */
  $('shutter').click();

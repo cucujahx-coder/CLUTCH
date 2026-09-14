@@ -749,7 +749,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v57';
+const APP_V='tasks-v58';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1094,9 +1094,17 @@ function settings(){
 
 /* ---------- список ----------
    Список растёт снизу вверх: он прижат к строке ввода, самое свежее ближе к пальцу. */
-/* Список по умолчанию идёт в порядке приоритетов: срочное выше, новое — в самом низу,
-   у большой кнопки. Кнопка в шапке этот порядок выключает, оставляя чистый порядок добавления. */
-let sorted = true, undoBuf = null, toastTimer = null, suppressRow = false, priPop = null;
+/* Порядок один и всегда: срочное выше, новое — в самом низу, у большой кнопки. Переключателя
+   сортировки нет — владелец убрал, его место в шапке заняли «Выполненные».
+   Три капсулы в доке выбирают, что показывать (S.tab): FLOW — всё открытое, PROCESS — только
+   проекты, FOCUS — только то, чему проставлен приоритет. Порядок внутри любого вида один и тот же. */
+const TABS = {
+ flow:    {all:()=>true,          empty:'Входящие пусты. Нажми большую кнопку.'},
+ process: {all:i=>i.isP,          empty:'Проектов нет. Задачу разбивают на шаги из чата.'},
+ focus:   {all:i=>(i.pri||0)>0,   empty:'Ничего срочного. Приоритет — долгим нажатием по задаче.'}
+};
+const curTab = () => TABS[S.tab] ? S.tab : 'flow';
+let undoBuf = null, toastTimer = null, suppressRow = false, priPop = null;
 let list, scroll, thread;
 
 /* Подпись строки: состояние или «без диалога», затем срок или «без срока» */
@@ -1152,13 +1160,15 @@ function paint(keep){
    items.push({x:p, isP:1, next:op[0], left:op.length, pri:p.pri||0, id:p.id});
   });
   /* Новое — всегда в самом низу, у большой кнопки: задачи и проекты идут одним рядом по
-     времени добавления (id общий), а не задачи-потом-проекты. По умолчанию сверху ещё и
-     приоритетные: чем срочнее, тем выше; внутри одного приоритета — по времени. */
-  items.sort((a,b)=>(sorted ? (b.pri - a.pri) : 0) || (a.id - b.id));
-  items.forEach(i=>list.appendChild(rowEl(i.x, i.isP, i.next, i.left)));
-  if(!items.length) list.innerHTML = '<div class="empty">Входящие пусты. Нажми большую кнопку.</div>';
+     времени добавления (id общий), а не задачи-потом-проекты. Сверху приоритетные: чем
+     срочнее, тем выше; внутри одного приоритета — по времени. Порядок один на все виды. */
+  items.sort((a,b)=>(b.pri - a.pri) || (a.id - b.id));
+  const tab = TABS[curTab()];
+  const shown = items.filter(tab.all);
+  shown.forEach(i=>list.appendChild(rowEl(i.x, i.isP, i.next, i.left)));
+  if(!shown.length) list.innerHTML = '<div class="empty">'+esc(tab.empty)+'</div>';
  }
- drawFind();
+ drawFind(); drawTabs();
  if(MODE==='two' || view==='detail') paintDetail();   /* закрытый экран чата не перерисовываем */
  if(!keep) toBottom();
 }
@@ -1274,7 +1284,7 @@ function showToast(text){
  if(kbOpen()) return;
  if(Date.now() - Math.max(kbAtTap, kbLast) < 1200) return;
  $('toast-t').textContent = text;
- $('find').classList.add('busy');
+ document.querySelector('.dockrow').classList.add('busy');   /* плашка встаёт ровно на место капсул */
  $('toast').classList.add('on');
  clearTimeout(toastTimer);
  toastTimer = setTimeout(hideToast, 4000);
@@ -1282,7 +1292,7 @@ function showToast(text){
 function hideToast(){
  clearTimeout(toastTimer);
  $('toast').classList.remove('on');
- setTimeout(()=>$('find').classList.remove('busy'), 220);
+ setTimeout(()=>document.querySelector('.dockrow').classList.remove('busy'), 220);
 }
 
 /* ---------- приоритет ----------
@@ -1630,22 +1640,30 @@ list = $('list'); scroll = $('scroll'); thread = $('thread');
 trackSafe(); trackVH();
 (MODE==='nav' ? shellNav : shellTwo)();
 
-/* верхняя кнопка — сортировка по приоритету, включена с самого начала */
-$('sort').innerHTML = Ic(P.sort,18);
-function drawSort(){
- $('sort').classList.toggle('on', sorted);
- $('sort').setAttribute('aria-label', sorted ? 'Вернуть порядок добавления' : 'Сортировать по приоритету');
+/* Три капсулы в доке: чем показан список. Выбор живёт в S — переживает перезагрузку.
+   Выполненные идут поверх вида, поэтому при переключении капсулы список возвращается к ним. */
+function drawTabs(){
+ const t = curTab();
+ document.querySelectorAll('.seg').forEach(b=>{
+  const on = !S.showDone && b.dataset.tab === t;
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-selected', on ? 'true' : 'false');
+ });
 }
-drawSort();
-$('sort').onclick = () => {
- sorted = !sorted;
- drawSort();
- tap(8); paint(1);
- /* доводка: строки садятся друг за другом с шагом LAG */
- if(!RM) [...list.children].forEach((r,i)=>{ r.style.animationDelay=(i*LAG)+'ms'; r.classList.add('land');
-   setTimeout(()=>{ r.classList.remove('land'); r.style.animationDelay=''; },460+i*LAG); });
-};
-/* правый нижний кружок переключает входящие ↔ выполненные */
+/* доводка: строки садятся друг за другом с шагом LAG */
+function landRows(){
+ if(RM) return;
+ [...list.children].forEach((r,i)=>{ r.style.animationDelay=(i*LAG)+'ms'; r.classList.add('land');
+  setTimeout(()=>{ r.classList.remove('land'); r.style.animationDelay=''; },460+i*LAG); });
+}
+document.querySelectorAll('.seg').forEach(b=>{
+ b.onclick = () => {
+  const t = b.dataset.tab;
+  if(curTab() === t && !S.showDone) return;
+  S.tab = t; S.showDone = 0; save(); tap(8); paint(); landRows();
+ };
+});
+/* круглая кнопка в шапке переключает входящие ↔ выполненные */
 function drawFind(){
  const f = $('find');
  f.classList.toggle('on', !!S.showDone);
