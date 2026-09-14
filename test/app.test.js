@@ -644,6 +644,16 @@ async function haptics(file){
  assert(css('--foot')==='8px'&&css('--safe-b')==='0px','поле в фокусе и область ниже базы — клавиатура, отступ снят');
  kbw.document.getElementById('msg').blur();
  Object.defineProperty(kbw,'innerHeight',{value:768,configurable:true});
+ /* Высота клавиатуры запомнена; при следующем фокусе контейнер ужимается сразу, до resize —
+    чтобы iOS не панорамировала экран. Без resize догадка живёт 700 мс и снимается */
+ kbw.visualViewport.height=768; vvL.resize();
+ assert(kbw.localStorage.getItem('kbh:'+kbw.innerWidth)==='368','высота клавиатуры запомнена по ширине окна');
+ assert(css('--vh')==='768px','без клавиатуры контейнер полный');
+ kbw.document.getElementById('msg').focus();
+ assert(css('--vh')==='400px'&&kbw.document.querySelector('.phone').classList.contains('snap'),'фокус — контейнер ужат сразу и без перехода, до прихода resize');
+ await wait(900);
+ assert(css('--vh')==='768px'&&!kbw.document.querySelector('.phone').classList.contains('snap'),'клавиатура не пришла — догадка снята, переход вернулся');
+ kbw.document.getElementById('msg').blur();
  kbw.visualViewport.height=400; vvL.resize();
  assert(!/--kb/.test(read('app.css'))&&!/--kb/.test(read('app.js')),'высоты клавиатуры в раскладке нет: поднимать композер на неё — проверенный тупик');
  /* контейнер меняет высоту плавно, а смещение — мгновенно: оно компенсирует пан iOS */

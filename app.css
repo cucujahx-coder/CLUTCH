@@ -66,6 +66,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
      плавность даём переходом на height. На top перехода нет и быть не должно: он компенсирует
      панорамирование, и любая задержка на нём уводит шапку за край на время перехода. */
   transition:height .28s var(--ease-ios)}
+.phone.snap{transition:none}   /* мгновенное ужатие при фокусе, чтобы iOS не панорамировала */
 .screen{position:absolute;inset:0;padding:0 16px;
   padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));
   transition:transform .3s var(--ease-ios);background:var(--bg)}

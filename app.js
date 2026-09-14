@@ -717,7 +717,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v35';
+const APP_V='tasks-v36';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1412,12 +1412,24 @@ let view = 'list', open, back;
    пока идёт ввод ИЛИ пока клавиатура на экране — сверяемся с фактическими размерами
    каждый кадр. Второе условие важнее первого: цикл не остановится, пока высота не
    вернулась. Вне ввода — обычные события. */
-let vvTrace = [];
+let vvTrace = [], kbH = 0;
 function trackVH(){
- const vv = window.visualViewport;
- let lastH = null, until = 0, ticking = false;
+ const vv = window.visualViewport, phone = document.querySelector('.phone');
+ let lastH = null, until = 0, ticking = false, predictUntil = 0;
+ /* Высота клавиатуры на устройстве постоянна — помним её (по ширине окна: у поворота своя).
+    Зачем: в момент фокуса iOS видит строку ввода внизу окна и панорамирует экран на высоту
+    клавиатуры, чтобы её показать; мы сдвиг компенсируем через --vvtop, но с задержкой в
+    кадр — на это время шапка уезжает за край и резко возвращается. Если ужать контейнер
+    сразу при фокусе, до решения iOS, строка уже над будущей клавиатурой, и панорамировать
+    нечего. Догадка живёт до первого настоящего resize или 700 мс, дальше — только факты. */
+ try{ kbH = +localStorage.getItem('kbh:' + innerWidth) || 0; }catch(e){}
  const apply = src => {
-  const h = vv ? vv.height : innerHeight, t = vv ? vv.offsetTop : 0;
+  let h = vv ? vv.height : innerHeight;
+  const t = vv ? vv.offsetTop : 0;
+  if(predictUntil){
+   if(kbUp() || Date.now() > predictUntil) predictUntil = 0;
+   else if(kbBaseH && kbH) h = Math.min(h, kbBaseH - kbH);
+  }
   root.setProperty('--vh', h + 'px');
   root.setProperty('--vvtop', t + 'px');
   /* Клавиатура на экране — индикатор «домой» под ней, отступ под него ничего не защищает,
@@ -1425,6 +1437,7 @@ function trackVH(){
   const kb = kbUp();
   root.setProperty('--safe-b', kb ? '0px' : safeB);
   root.setProperty('--foot', kb ? '8px' : '16px');
+  if(kb && kbBaseH){ const k = kbBaseH - (vv ? vv.height : h); if(k > 80 && k !== kbH){ kbH = k; try{ localStorage.setItem('kbh:' + innerWidth, k); }catch(e){} } }
   if(lastH !== null && h !== lastH){
    /* Высота изменилась — держим низ содержимого на месте, иначе список и лента съезжают
       вверх на высоту клавиатуры. Чтение offsetHeight заставляет браузер применить новую
@@ -1457,8 +1470,17 @@ function trackVH(){
  addEventListener('resize', ()=>apply('w'));
  addEventListener('orientationchange', ()=>setTimeout(()=>apply('o'), 150));
  /* Фокус и его потеря — моменты, когда клавиатура появляется и убирается */
- addEventListener('focusin', e=>{ if(e.target && e.target.tagName === 'INPUT') watch(1500); });
- addEventListener('focusout', e=>{ if(e.target && e.target.tagName === 'INPUT') watch(1500); });
+ addEventListener('focusin', e=>{
+  if(!e.target || e.target.tagName !== 'INPUT') return;
+  if(kbH && kbBaseH && !kbUp() && phone){
+   /* Ужимаем сразу и без перехода: iOS решает про панорамирование по положению поля в этот момент */
+   predictUntil = Date.now() + 700;
+   phone.classList.add('snap'); apply('p'); void phone.offsetHeight;
+   requestAnimationFrame(()=>phone.classList.remove('snap'));
+  }
+  watch(1500);
+ });
+ addEventListener('focusout', e=>{ if(e.target && e.target.tagName === 'INPUT'){ predictUntil = 0; watch(1500); } });
 }
 /* Безопасные зоны меряем один раз пробником: env() в calc() из JS не прочитать */
 let safeB = '0px';   /* измеренный отступ под индикатор «домой»; trackVH обнуляет его на время клавиатуры */
@@ -1738,7 +1760,7 @@ if(DEBUG){
    'перем.   --vh '+(cs.getPropertyValue('--vh').trim()||'—')+'  --vvtop '+(cs.getPropertyValue('--vvtop').trim()||'—')+'\n'+
    'phone    '+rect(document.querySelector('.phone'))+'\n'+
    'композер '+rect(document.querySelector('#scr-detail.on .composer') || $('composer'))+'\n'+
-   'фокус    '+((document.activeElement && document.activeElement.id) || 'нет')+'   клавиатура '+(kbUp()?'да':'нет')+'  база '+n(kbBaseH)+'\n'+
+   'фокус    '+((document.activeElement && document.activeElement.id) || 'нет')+'   клавиатура '+(kbUp()?'да':'нет')+'  база '+n(kbBaseH)+'  высота '+n(kbH)+'\n'+
    'низ      --safe-b '+(cs.getPropertyValue('--safe-b').trim()||'—')+'  --foot '+(cs.getPropertyValue('--foot').trim()||'—')+'\n'+
    'трасса   '+vvTrace.join(' ');
   requestAnimationFrame(tick);
