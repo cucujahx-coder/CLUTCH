@@ -124,6 +124,18 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   box-shadow:var(--glass)}
 .brand img{display:block;height:18px;width:auto}
+/* эмблема — тот же круг с пауком, что внизу, только 30 px, слева от надписи; нажатие на неё
+   раскрывает строку ввода: капсула стартует с места эмблемы и летит вниз (openComposer(from)),
+   эмблема на это время гаснет, потому что капсула стартует ровно поверх неё */
+.brand{padding-left:7px}
+.emblem{flex:none;width:30px;height:30px;margin-right:10px;padding:0;border:0;border-radius:50%;background:var(--hot);
+  display:grid;place-items:center;cursor:pointer;box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--g3a);
+  transition:opacity .12s var(--ease-ios)}
+.emblem.gone{opacity:0;pointer-events:none}
+.emblem .sw{display:block;width:22px;line-height:0;color:#14100E;pointer-events:none}
+.emblem .sw svg{display:block;width:100%;height:auto}
+.emblem .eye{fill:#FFE3C2}
+.emblem .eye-b{fill:#FFE3C2;opacity:0}
 
 /* кнопка сортировки — та же, что выполненные, только в правом верхнем углу и по той же оси */
 .topbtn{position:absolute;top:calc(16px + var(--safe-t));right:16px;z-index:6;transform:translateX(-11px)}
@@ -210,7 +222,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    Так нет стыка двух анимаций: раньше док гас, а строка всплывала из своего mini отдельно.
    Геометрия едет по --ease-ios (отскок на ширине вылезал бы за поля), подъём — по --bounce.
    Список переходов вынесен в --tr-composer: .easing добавляет к нему bottom, не теряя остальное. */
-.composer{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + var(--safe-b));z-index:5;
+.composer{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + var(--safe-b));z-index:7;   /* выше таблетки логотипа: капсула стартует с эмблемы */
   height:68px;padding:11px;border-radius:28px;display:flex;align-items:center;gap:6px;
   background:rgba(36,36,36,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:var(--glass);
   --tr-composer:left .3s var(--ease-ios),right .3s var(--ease-ios),height .3s var(--ease-ios),

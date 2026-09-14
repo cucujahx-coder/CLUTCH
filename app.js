@@ -722,7 +722,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v43';
+const APP_V='tasks-v44';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1629,10 +1629,30 @@ function drawSend(){
  sendBtn.innerHTML = Ic(has ? P.up : P.mic, 18);
 }
 let ntFocused = false;
-function openComposer(){
+/* Открытие строки ввода. Без from морф стартует с нижнего круга; с from — с переданной
+   кнопки (эмблема в таблетке логотипа): капсула принимает её геометрию и летит вниз.
+   Фокус ниже ужмёт контейнер под клавиатуру мгновенно, и капсула вместе с ним подпрыгнула
+   бы на её высоту ещё до начала движения. Поэтому до фокуса ставим капсуле точку старта с
+   поправкой на высоту клавиатуры и фиксируем reflow-ом: после ужатия это ровно то место,
+   где стояла кнопка. Снятие инлайна в конце запускает переход из этой точки в строку.
+   Фокус ставится синхронно, прямо в обработчике нажатия: iOS открывает клавиатуру только
+   внутри жеста. */
+function openComposer(from){
  if(!mini()) return;
  ntFocused = false;
- /* фокус ставим синхронно, прямо в обработчике нажатия: iOS открывает клавиатуру только внутри жеста */
+ const st = composer.style;
+ if(from && from.getBoundingClientRect){
+  const ph = document.querySelector('.phone').getBoundingClientRect(), r = from.getBoundingClientRect();
+  /* верх раскрытой строки после фокуса: контейнер ужат на kbH, низ — 8 при клавиатуре, иначе 16 + safe */
+  const openTop = ph.height - (kbH ? 8 : 16 + (parseFloat(safeB) || 0)) - 68 - (kbH || 0);
+  st.left = (r.left - ph.left) + 'px'; st.right = (ph.right - r.right) + 'px';
+  st.height = r.height + 'px'; st.borderRadius = (r.height / 2) + 'px';
+  st.transform = 'translateY(' + (r.top - ph.top - openTop) + 'px)';
+  from.classList.add('gone');
+ } else {
+  st.transform = 'translateY(' + (-75 + (kbH || 0)) + 'px)';
+ }
+ void composer.offsetHeight;
  composer.classList.remove('mini'); scroll.classList.add('tight');
  $('dock').classList.add('hide');
  $('veil-b').style.height = 'calc(68px + 24px + var(--foot) + var(--pend, 0px) + var(--safe-b))';
@@ -1641,11 +1661,13 @@ function openComposer(){
     иначе iOS не считает поле активным и клавиатуру не открывает. */
  tap(8);
  try{ nt.focus({preventScroll:true}); }catch(e){ nt.focus(); }
+ st.left = st.right = st.height = st.borderRadius = st.transform = '';
 }
 function closeComposer(){
  if(mini()) return;
  sweep(composer);                     /* та же вспышка, что при раскрытии: капсула гаснет и сворачивается разом */
  nt.value=''; nt.blur(); composer.classList.add('mini');
+ const em = $('emblem'); if(em) em.classList.remove('gone');   /* капсула ушла вниз — эмблема снова на месте */
  ntPick = []; paintNtPick();          /* отменили задачу — отменили и её вложения */
  $('dock').classList.remove('hide'); scroll.classList.remove('tight');
  $('veil-b').style.height = '';
@@ -1654,6 +1676,11 @@ function closeComposer(){
 /* Открываем по click, не по touchend: iOS отдаёт клавиатуру только из «настоящего» жеста,
    а touchend с preventDefault она за такой не считает */
 $('shutter').onclick = () => openComposer();
+/* эмблема в таблетке логотипа: та же строка ввода, но капсула стартует сверху; надпись рядом — настройки */
+if($('emblem')){
+ $('emblem').innerHTML = SPIDER_JUMP;
+ $('emblem').onclick = e => { e.stopPropagation(); openComposer($('emblem')); };
+}
 nt.oninput = drawAdd;
 /* Строку закрывает уход фокуса — но только если фокус вообще был получен: внутри
    превью-iframe и на части устройств focus() не проходит, и строка схлопывалась сразу,
