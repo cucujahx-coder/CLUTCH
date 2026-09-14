@@ -602,9 +602,6 @@ async function haptics(file){
 
  $('shutter').click();
  assert(!!d.querySelector('.hapt input'),'скрытый переключатель появился');
- /* строки выпрыгивают по очереди снизу вверх: ближняя к строке ввода без задержки, дальше по 40 мс */
- const hops=[...d.querySelectorAll('#list .row')];
- assert(hops.every(r=>r.classList.contains('hop'))&&hops[hops.length-1].style.animationDelay==='0ms'&&hops[0].style.animationDelay===((hops.length-1)*40)+'ms','при раскрытии строки задачи прыгают по очереди снизу вверх');
  assert(d.activeElement===$('nt'),'после разворота строки фокус в поле, а не в переключателе');
  /* отправка закрывает строку, а тяжёлая отдача повторяется через 45 и 90 мс — переключатель не должен остаться в фокусе */
  $('nt').value='Проверка отдачи'; $('add').click();

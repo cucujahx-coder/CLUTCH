@@ -315,7 +315,6 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 @keyframes land{from{transform:translateY(12px)}to{transform:none}}
 .rise{animation:rise .28s var(--ease-ios)}
 .land{animation:land .34s var(--bounce)}
-.hop{animation:land .34s var(--bounce) backwards}   /* та же посадка, но ждёт своей очереди (hopRows) */
 .ghost{position:absolute;z-index:21;border-radius:28px;pointer-events:none}
 .spark{position:absolute;z-index:19;width:6px;height:6px;border-radius:50%;pointer-events:none}
 .rflash{position:absolute;z-index:18;width:140px;height:140px;border-radius:50%;pointer-events:none;
