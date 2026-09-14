@@ -35,6 +35,11 @@ async function common(file){
  assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet'),'ни шапки «Входящие», ни фильтров, ни меню действий');
  assert(!!d.querySelector('.brand img')&&!!$('sort'),'сверху таблетка с логотипом и кнопка сортировки');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
+ /* кнопка и строка ввода — одна капсула: кнопка внутри неё, свёрнутый вид — красный круг на месте кнопки в доке */
+ assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');
+ const cssMini=read('app.css').replace(/\/\*[\s\S]*?\*\//g,'');
+ assert(/\.composer\.mini\{left:calc\(50% - 38px\);right:calc\(50% - 38px\);height:76px;[^}]*background:var\(--hot\)[^}]*transform:translateY\(-75px\)/.test(cssMini),'свёрнутая капсула — круг 76 цвета кнопки, поднятый на место кнопки трансформой');
+ assert(/\.composer\{[^}]*--tr-composer:left[^}]*transition:var\(--tr-composer\)/.test(cssMini)&&/\.phone\.easing \.composer\{transition:bottom \.25s var\(--ease-ios\),var\(--tr-composer\)\}/.test(cssMini),'геометрия капсулы едет одним списком переходов, .easing его дополняет, а не заменяет');
  /* resizes-content на iOS сдвигает экран на высоту клавиатуры всегда, и шапка дёргается; overlays — только когда поле под клавиатурой */
  assert(/interactive-widget=overlays-content/.test(read(file)),'viewport с overlays-content, а не resizes-content');
  /* Список перевёрнут: первый в разметке — у низа, колпак под шапку — над ним. Ноль прокрутки = низ,
@@ -103,6 +108,7 @@ async function common(file){
  /* добавление задачи через строку ввода */
  $('shutter').click();
  assert(!$('composer').classList.contains('mini')&&d.getElementById('scroll').classList.contains('tight'),'паук разворачивает строку ввода');
+ assert($('composer').style.transform==='','после разворота инлайновый сдвиг снят — переход идёт к раскрытой капсуле');
  $('add').click();
  assert(w.app.S.ts.every(x=>x.t!==''),'пустой ввод ничего не добавляет');
  $('nt').value='<b>x</b>'; $('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter'}));

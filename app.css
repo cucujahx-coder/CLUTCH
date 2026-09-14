@@ -71,7 +71,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    при потере фокуса, чтобы список ехал вниз вместе с клавиатурой iOS (~250 мс), а не падал
    под неё одним кадром. Низ едет тем же переходом, иначе строка ввода отстаёт от контейнера. */
 .phone.easing{transition:height .25s var(--ease-ios),top .25s var(--ease-ios)}
-.phone.easing .composer{transition:bottom .25s var(--ease-ios),opacity .2s var(--ease-ios),transform .42s var(--bounce),box-shadow .18s var(--ease-ios)}
+.phone.easing .composer{transition:bottom .25s var(--ease-ios),var(--tr-composer)}
 .phone.easing .dock{transition:bottom .25s var(--ease-ios),opacity .2s var(--ease-ios),transform .38s var(--bounce)}
 .phone.easing .scroll,.phone.easing .pend,.phone.easing .toast{transition:bottom .25s var(--ease-ios)}
 .screen{position:absolute;inset:0;padding:0 16px;
@@ -93,16 +93,19 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   transition:height .25s var(--ease-ios)}
 
 /* нижний блок управления: большая кнопка по центру, под ней кружок — переключатель — кружок */
+/* Док — только переключатель справа внизу. Большая кнопка теперь часть капсулы строки ввода
+   (см. .composer.mini), а место под неё в доке держит та же геометрия: 26 снизу, ряд 44,
+   зазор 21 — круг 76 стоит над рядом, и капсула в свёрнутом виде встаёт ровно туда. */
 .dock{position:absolute;left:16px;right:16px;bottom:calc(26px + var(--safe-b));z-index:3;
-  /* 21 = 16 видимых + 5 на внешнее кольцо кнопки: оно рисуется тенью и места не занимает */
   display:flex;flex-direction:column;align-items:center;gap:21px;
   transition:opacity .2s var(--ease-ios),transform .38s var(--bounce)}
 .dock.hide{opacity:0;transform:translateY(12px) scale(.96);pointer-events:none}
-.shutter{width:76px;height:76px;border:0;border-radius:50%;background:var(--hot);color:#fff;
-  display:grid;place-items:center;cursor:pointer;
-  box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--g3a),var(--glass)}
+/* кнопка-паук: в свёрнутой капсуле занимает весь круг, в раскрытой гаснет */
+.shutter{position:absolute;inset:0;border:0;border-radius:inherit;background:transparent;color:#fff;
+  display:grid;place-items:center;cursor:pointer;transition:opacity .18s var(--ease-ios)}
+.composer:not(.mini) .shutter{opacity:0;pointer-events:none}
 /* паук на кнопке: в прыжке он вылетает за край, поэтому кнопка ничего не обрезает */
-.shutter .sw{display:block;width:72%;line-height:0;color:#14100E;transform-origin:50% 100%;pointer-events:none}
+.shutter .sw{display:block;width:55px;line-height:0;color:#14100E;transform-origin:50% 100%;pointer-events:none}
 .shutter .sw svg{display:block;width:100%;height:auto}
 .shutter .eye{fill:#FFE3C2}
 .shutter .eye-b{fill:#FFE3C2;opacity:0}
@@ -200,26 +203,43 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 @keyframes pri-in{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
 .pri{animation:pri-in .24s var(--bounce)}
 
-/* ── композер: поднимается вместе с клавиатурой ───────────────── */
+/* ── композер: одна капсула — и кнопка, и строка ввода ─────────
+   Раскрытие — переход геометрии одного элемента: круг 76 на месте большой кнопки растёт до
+   капсулы 16…16, радиус 38 → 28, высота 76 → 68, красный → стекло; паук гаснет, на его месте
+   проявляются скрепка, поле и кнопка отправки. Обратно — те же свойства назад, одной кривой.
+   Так нет стыка двух анимаций: раньше док гас, а строка всплывала из своего mini отдельно.
+   Геометрия едет по --ease-ios (отскок на ширине вылезал бы за поля), подъём — по --bounce.
+   Список переходов вынесен в --tr-composer: .easing добавляет к нему bottom, не теряя остальное. */
 .composer{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + var(--safe-b));z-index:5;
   height:68px;padding:11px;border-radius:28px;display:flex;align-items:center;gap:6px;
   background:rgba(36,36,36,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:var(--glass);
-  transition:opacity .2s var(--ease-ios),transform .42s var(--bounce),box-shadow .18s var(--ease-ios)}
+  --tr-composer:left .42s var(--ease-ios),right .42s var(--ease-ios),height .42s var(--ease-ios),
+    border-radius .42s var(--ease-ios),padding .42s var(--ease-ios),background .3s var(--ease-ios),
+    transform .42s var(--bounce),box-shadow .18s var(--ease-ios);
+  transition:var(--tr-composer)}
 /* вспышка активации: белая полоса проходит по капсуле слева направо */
 .sweep{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;z-index:1}
 .sweep i{position:absolute;top:0;bottom:0;left:0;width:100%;
   background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.85) 50%,rgba(255,255,255,0))}
 /* строка в работе — синяя обводка по всей капсуле */
 .composer:focus-within{box-shadow:inset 0 0 0 2px var(--blue), var(--glass)}
-/* свёрнутый вид: та же капсула съезжает вправо до круга 68 — кнопка «+» в углу.
-   Съезжает margin-left, потому что left и right остаются на месте: так ширина анимируется честно */
-.composer.mini{opacity:0;transform:translateY(16px) scale(.98);pointer-events:none}
+/* Свёрнутый вид — красный круг 76 по центру, ровно на месте большой кнопки в доке:
+   низ дока 26 + ряд 44 + зазор 21 = 91 от низа, а низ капсулы — foot 16, разница 75 идёт
+   трансформой, а не bottom: bottom под клавиатуру не анимируется намеренно. Стекла нет:
+   backdrop-filter между none и blur не переходит, он появляется вместе с раскрытием. */
+.composer.mini{left:calc(50% - 38px);right:calc(50% - 38px);height:76px;padding:0;border-radius:38px;
+  background:var(--hot);-webkit-backdrop-filter:none;backdrop-filter:none;transform:translateY(-75px);
+  box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--g3a),var(--glass)}
 .composer.mini .inp{width:0;flex:0 0 0;padding:0;opacity:0;pointer-events:none}
-.composer.mini #clip{width:0;flex:0 0 0;opacity:0;pointer-events:none;box-shadow:none}
+.composer.mini #clip,.composer.mini #add{width:0;height:0;flex:0 0 0;opacity:0;pointer-events:none;box-shadow:none;overflow:hidden}
 .composer .inp,.composer #clip{transition:width .32s var(--ease-ios),opacity .18s var(--ease-ios),flex-basis .32s var(--ease-ios)}
-.rnd{flex:none;width:44px;height:44px;border-radius:22px;border:0;background:transparent;color:var(--muted);
+/* содержимое проявляется, когда капсула уже почти раскрылась — иначе поле и кнопки всплывали
+   на ещё красном круге; при сворачивании задержки нет, гаснут сразу */
+.composer:not(.mini) .inp,.composer:not(.mini) #clip{transition-delay:0s,.16s,0s}
+.composer:not(.mini) #add{transition-delay:0s,0s,0s,0s,.16s}
+.rnd{flex:none;width:44px;height:44px;padding:0;border-radius:22px;border:0;background:transparent;color:var(--muted);
   display:grid;place-items:center;cursor:pointer;box-shadow:inset 0 0 0 1px var(--g3a);
-  transition:background .18s var(--ease-ios),color .18s var(--ease-ios),width .32s var(--ease-ios),height .32s var(--ease-ios)}
+  transition:background .18s var(--ease-ios),color .18s var(--ease-ios),width .32s var(--ease-ios),height .32s var(--ease-ios),opacity .18s var(--ease-ios)}
 .rnd.solid{background:var(--g2a);box-shadow:none;color:var(--text)}
 .rnd.go{background:var(--blue);color:var(--on-blue);box-shadow:none}
 .rnd.rec{background:var(--danger);color:#fff;box-shadow:none}

@@ -33,13 +33,14 @@
       <div class="cap"></div>
     </div>
     <div class="dock" id="dock">
-      <button class="shutter press" id="shutter" aria-label="Новая задача"></button>
       <div class="dockrow">
         <button class="rnd44 press" id="find" aria-label="Выполненные"></button>
       </div>
     </div>
-    <!-- строка ввода вырастает из большой кнопки; в свёрнутом виде её нет -->
+    <!-- Кнопка и строка ввода — одна капсула: в свёрнутом виде это красный круг с пауком на месте
+         большой кнопки, при нажатии он сам вытягивается в строку ввода и обратно -->
     <div class="composer mini" id="composer">
+      <button class="shutter press" id="shutter" aria-label="Новая задача"></button>
       <button class="rnd press" id="clip" aria-label="Вложение"></button>
       <input class="inp" type="text" id="nt" placeholder="Новая задача" aria-label="Новая задача"
              autocomplete="off" autocorrect="off" autocapitalize="sentences" enterkeyhint="done">
