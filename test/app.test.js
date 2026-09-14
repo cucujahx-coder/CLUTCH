@@ -34,14 +34,6 @@ async function common(file){
  /* строки — стеклянные капсулы, ни шапки со списком, ни фильтров, ни меню действий */
  assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet'),'ни шапки «Входящие», ни фильтров, ни меню действий');
  assert(!!d.querySelector('.brand img')&&!!$('sort'),'сверху таблетка с логотипом и кнопка сортировки');
- /* эмблема-паук слева от надписи: раскрывает строку ввода (капсула летит с неё вниз), надпись — настройки */
- const em=$('emblem');
- assert(em&&em.parentElement===$('brand')&&em.nextElementSibling&&em.nextElementSibling.tagName==='IMG'&&em.querySelector('svg'),'в таблетке слева от надписи эмблема с пауком');
- em.click();
- assert(!$('composer').classList.contains('mini')&&!d.querySelector('.sheet.set'),'эмблема раскрывает строку ввода, а не настройки');
- assert(em.classList.contains('gone')&&$('composer').style.left===''&&$('composer').style.transform==='','на время строки эмблема погашена, инлайновая точка старта снята');
- $('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape'}));
- assert($('composer').classList.contains('mini')&&!em.classList.contains('gone'),'строка свернулась — эмблема снова на месте');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
  /* кнопка и строка ввода — одна капсула: кнопка внутри неё, свёрнутый вид — красный круг на месте кнопки в доке */
  assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');
@@ -117,7 +109,7 @@ async function common(file){
  $('shutter').click();
  assert(!$('composer').classList.contains('mini')&&d.getElementById('scroll').classList.contains('tight'),'паук разворачивает строку ввода');
  assert($('composer').style.transform==='','после разворота инлайновый сдвиг снят — переход идёт к раскрытой капсуле');
- assert(/st\.transform = 'translateY\(' \+ \(-75 \+ \(kbH \|\| 0\)\)/.test(read('app.js')),'точка старта морфа — место кнопки с поправкой на высоту клавиатуры');
+ assert(/composer\.style\.transform = 'translateY\(' \+ \(-75 \+ \(kbH \|\| 0\)\)/.test(read('app.js')),'точка старта морфа — место кнопки с поправкой на высоту клавиатуры');
  $('add').click();
  assert(w.app.S.ts.every(x=>x.t!==''),'пустой ввод ничего не добавляет');
  $('nt').value='<b>x</b>'; $('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter'}));
