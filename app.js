@@ -717,7 +717,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v34';
+const APP_V='tasks-v35';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1721,11 +1721,13 @@ window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, ad
 let DEBUG = /(^|[?&])debug(=|&|$)/.test(location.search);
 try{ DEBUG = DEBUG || localStorage.getItem('debug') === '1'; }catch(e){}
 if(DEBUG){
+ /* Слой живёт внутри .phone, а не на body: контейнер при клавиатуре уезжает на смещение
+    панорамирования, и слой на body оставался за краем — ровно в тот момент, когда нужен. */
  const box = document.createElement('pre');
- box.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;margin:0;padding:4px 6px;'+
+ box.style.cssText = 'position:absolute;left:0;top:var(--safe-t,0px);z-index:9999;margin:0;padding:4px 6px;'+
   'font:10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#0f0;'+
   'background:rgba(0,0,0,.82);white-space:pre;pointer-events:none;max-width:100%';
- document.body.appendChild(box);
+ (document.querySelector('.phone') || document.body).appendChild(box);
  const n = v => Math.round(v);
  const rect = e => { const b = e && e.getBoundingClientRect(); return b ? n(b.top)+'..'+n(b.bottom)+' ('+n(b.height)+')' : 'нет'; };
  const tick = () => {
