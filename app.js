@@ -717,7 +717,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v29';
+const APP_V='tasks-v30';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1148,9 +1148,11 @@ function armRubber(el){
 }
 
 /* Список прижат к строке ввода: самое свежее ближе к пальцу, добавил задачу — остальные
-   ушли вверх. Распорка .spacer держит короткий список внизу, прокрутка — длинный.
-   Чтение offsetHeight заставляет браузер применить новые размеры: без него scrollTop
-   обрежется по старым, и только что добавленная задача останется за краем. */
+   ушли вверх. Список перевёрнут (column-reverse), и его низ — ноль прокрутки: в покое он
+   у кнопки сам. toBottom остаётся для случая, когда пользователь ушёл вверх, а список
+   перерисовался: scrollTop=scrollHeight в перевёрнутом контейнере обрезается до нуля,
+   то есть до низа, — и это работает в обе стороны реализации. Чтение offsetHeight
+   заставляет браузер применить новые размеры до правки прокрутки. */
 function toBottom(){
  if(!scroll) return;
  const go = () => { void scroll.offsetHeight; scroll.scrollTop = scroll.scrollHeight; };
@@ -1387,7 +1389,11 @@ function trackVH(){
       вверх на высоту клавиатуры. Чтение offsetHeight заставляет браузер применить новую
       высоту: без него scrollTop обрежется по старым размерам. */
    const d = lastH - h;
-   document.querySelectorAll('.scroll').forEach(b=>{ void b.offsetHeight; b.scrollTop += d; });
+   /* У перевёрнутого (column-reverse) списка низ — это ноль прокрутки, он держится сам */
+   document.querySelectorAll('.scroll').forEach(b=>{
+    if(getComputedStyle(b).flexDirection === 'column-reverse') return;
+    void b.offsetHeight; b.scrollTop += d;
+   });
    if(vvTrace.length > 7) vvTrace.shift();
    vvTrace.push(src + Math.round(h));
   }

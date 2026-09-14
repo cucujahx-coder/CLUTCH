@@ -35,10 +35,13 @@ async function common(file){
  assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet'),'ни шапки «Входящие», ни фильтров, ни меню действий');
  assert(!!d.querySelector('.brand img')&&!!$('sort'),'сверху таблетка с логотипом и кнопка сортировки');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
- /* Распорка прижимает короткий список к строке ввода: без неё новые задачи уходят под док */
- assert(!!d.querySelector('#scroll .spacer')&&!!d.querySelector('#thread, .thread'),'список и лента прижаты к низу распоркой');
+ /* Список перевёрнут: первый в разметке — у низа, колпак под шапку — над ним. Ноль прокрутки = низ,
+    поэтому положение у кнопки не зависит от программной прокрутки, которую iOS при старте глотала */
+ const kids=[...$('scroll').children].map(e=>e.id||e.className);
+ assert(kids.join(',')==='list,cap','в разметке список первым, колпак вторым');
+ assert(/#scr-list \.scroll\{[^}]*flex-direction:column-reverse;padding-top:0;/.test(read('app.css').replace(/\/\*[\s\S]*?\*\//g,'')),'список рисуется снизу вверх, без padding-top');
  /* Первая задача упирается ровно в 16 px под таблеткой логотипа: 16 сверху + 44 таблетка + 16 зазор */
- assert(/#scr-list \.scroll\{top:0;bottom:0;gap:0;\s*padding-top:calc\(16px \+ 44px \+ 16px \+ var\(--safe-t\)\)/.test(read('app.css')),'над первой задачей ровно 16 px: без зазора у схлопнутой распорки');
+ assert(/\.cap\{flex:none;height:calc\(16px \+ 44px \+ 16px \+ var\(--safe-t\)\)\}/.test(read('app.css')),'над первой задачей ровно 16 px: колпак = 16 + таблетка 44 + 16');
  /* Резинка короткого списка — своя: в jsdom высоты нулевые, значит список «короткий», и тянуть его должен JS.
     TouchEvent в jsdom не собрать, поэтому обычное событие с touches, как в тесте свайпа */
  const sc=$('scroll'), tch=(type,y)=>{const e=new w.Event(type,{bubbles:true}); e.touches=y==null?[]:[{clientX:100,clientY:y}]; sc.dispatchEvent(e);};
