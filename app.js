@@ -8,6 +8,17 @@ const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
    in — уход, move — перемещение, over — прибытие с перелётом. Тест сверяет с CSS. */
 const EASE = {out:'cubic-bezier(.2,.8,.2,1)', in:'cubic-bezier(.4,0,.8,.4)', move:'cubic-bezier(.32,.72,0,1)', over:'cubic-bezier(.34,1.56,.64,1)'};
 const LAG = 40;   /* мс между элементами группы — доводка, как --lag в CSS */
+/* Смена иконки на кнопке — не подмена, а движение: новая выскакивает с перелётом. Меняем
+   только если иконка действительно другая (ключ в data-ic), иначе кнопка дёргалась бы на
+   каждой букве ввода; первую отрисовку не анимируем. */
+function swapIcon(btn, key, html){
+ if(!btn || btn.dataset.ic === key) return;
+ const first = !btn.dataset.ic;
+ btn.dataset.ic = key; btn.innerHTML = html;
+ const ic = btn.firstElementChild;
+ if(first || RM || !ic || !ic.animate) return;
+ ic.animate([{transform:'scale(.5)',opacity:0},{transform:'scale(1.18)',opacity:1,offset:.6},{transform:'none'}],{duration:220,easing:EASE.over});
+}
 const $ = id => document.getElementById(id);
 const root = document.documentElement.style;
 const esc = t => String(t).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -736,7 +747,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v50';
+const APP_V='tasks-v51';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1017,8 +1028,14 @@ function settings(){
   setEl=document.createElement('div');
   setEl.className='sheet set'; setEl.hidden=true;
   setEl.innerHTML='<div class="sheet-back"></div><div class="sheet-body" role="dialog" aria-label="Настройки"></div>';
-  setEl.querySelector('.sheet-back').onclick=()=>{setEl.hidden=true};
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&setEl&&!setEl.hidden)setEl.hidden=true});
+  /* уход — движением: лист уезжает вниз с ускорением, подложка гаснет; при reduced-motion сразу */
+  const hideSheet=()=>{
+   if(setEl.hidden)return;
+   if(RM){setEl.hidden=true;return;}
+   setEl.classList.add('out'); setTimeout(()=>{setEl.hidden=true; setEl.classList.remove('out');},200);
+  };
+  setEl.querySelector('.sheet-back').onclick=hideSheet;
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&setEl&&!setEl.hidden)hideSheet()});
   document.body.appendChild(setEl);
  }
  const body=setEl.querySelector('.sheet-body');
@@ -1200,7 +1217,9 @@ function toggle(x, row){
  undoBuf = {x};
  setTimeout(()=>{
   mark(x,1); save(); paint(1);
-  [...list.children].forEach(r=>{ if(!RM) r.classList.add('land'); setTimeout(()=>r.classList.remove('land'),210); });
+  /* доводка: строки садятся друг за другом, как при пересортировке */
+  if(!RM) [...list.children].forEach((r,i)=>{ r.style.animationDelay=(i*LAG)+'ms'; r.classList.add('land');
+    setTimeout(()=>{ r.classList.remove('land'); r.style.animationDelay=''; },460+i*LAG); });
   showToast('Выполнено · ' + x.t);
  }, RM?0:140);
 }
@@ -1266,7 +1285,13 @@ function hideToast(){
 /* ---------- приоритет ----------
    Долгое нажатие по строке открывает на её месте капсулу: «нет» и четыре ступени, каждая своего цвета. */
 const PRI = [{v:0},{v:1,c:'var(--pri1)'},{v:2,c:'var(--pri2)'},{v:3,c:'var(--pri3)'},{v:4,c:'var(--pri4)'}];
-function closePri(){ if(!priPop) return; priPop.back.remove(); priPop.el.remove(); priPop = null; }
+function closePri(){
+ if(!priPop) return;
+ const p = priPop; priPop = null;
+ if(RM || !p.el.animate){ p.back.remove(); p.el.remove(); return; }
+ p.el.classList.add('out'); p.back.style.pointerEvents = 'none';   /* уходит вниз с ускорением, потом снимается */
+ setTimeout(()=>{ p.back.remove(); p.el.remove(); }, 140);
+}
 function openPri(x, row){
  closePri();
  const host = row.closest('.screen'); if(!host) return;
@@ -1367,7 +1392,7 @@ function paintDetail(){
  /* правая круглая кнопка шапки: у задачи галочка, у проекта число открытых шагов */
  const h = $('hctl');
  h.className = 'rnd44 topbtn press' + (!isP && x.done ? ' on' : '');
- h.innerHTML = isP ? '<span class="num">'+op.length+'</span>' : Ic(P.check,18);
+ swapIcon(h, isP ? 'n'+op.length : 'check', isP ? '<span class="num">'+op.length+'</span>' : Ic(P.check,18));
  h.setAttribute('aria-label', isP ? ('Закрыть следующий шаг, осталось '+op.length) : (x.done?'Снять отметку':'Выполнить'));
  h.onclick = () => {
   if(isP){ const o = openIn(p.id); if(!o.length) return; tap(25); pop(); mark(o[0],1); save(); paint(1); return; }
@@ -1621,7 +1646,7 @@ $('sort').onclick = () => {
 function drawFind(){
  const f = $('find');
  f.classList.toggle('on', !!S.showDone);
- f.innerHTML = Ic(S.showDone ? P.list : P.check, 18);
+ swapIcon(f, S.showDone ? 'list' : 'check', Ic(S.showDone ? P.list : P.check, 18));
  f.setAttribute('aria-label', S.showDone ? 'Входящие' : 'Выполненные');
 }
 $('find').onclick = () => { tap(8); S.showDone = S.showDone?0:1; save(); paint(); };
@@ -1639,12 +1664,12 @@ const mini = () => composer.classList.contains('mini');
 function drawAdd(){
  const has = nt.value.trim().length > 0;
  addBtn.className = 'rnd press ' + (has ? 'go' : 'solid');
- addBtn.innerHTML = Ic(has ? P.up : P.mic, 18);
+ swapIcon(addBtn, has ? 'up' : 'mic', Ic(has ? P.up : P.mic, 18));
 }
 function drawSend(){
  const has = msg.value.trim().length > 0;
  sendBtn.className = 'rnd press ' + (has ? 'go' : 'solid');
- sendBtn.innerHTML = Ic(has ? P.up : P.mic, 18);
+ swapIcon(sendBtn, has ? 'up' : 'mic', Ic(has ? P.up : P.mic, 18));
 }
 let ntFocused = false;
 /* Морф стартует с места кнопки. Фокус ниже ужмёт контейнер под клавиатуру мгновенно, и
@@ -1739,6 +1764,9 @@ function drawChips(box, arr, redraw){
    '<span class="as">'+esc(fmtSize(a.size))+'</span>'+
    '<button class="ax" type="button" data-drop="'+i+'" aria-label="Убрать вложение">'+Ic(P.x,12)+'</button></span>').join('');
  box.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{ arr.splice(+b.dataset.drop,1); redraw(); tap(8); });
+ /* новый чип всплывает; при удалении соседей остальные не дёргаются */
+ if(arr.length > +(box.dataset.n || 0) && box.lastElementChild) box.lastElementChild.classList.add('rise');
+ box.dataset.n = arr.length;
  /* Чипы переносятся по строкам, поэтому высоту не угадать формулой — меряем и кладём
     в --pend своего экрана: на неё поднимается дно прокрутки, иначе лента лезет под чипы */
  const scr = box.closest('.screen');

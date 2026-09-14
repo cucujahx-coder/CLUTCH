@@ -112,6 +112,10 @@ async function common(file){
  assert(/composer\.style\.transform = 'translateY\(' \+ \(-75 \+ \(kbH \|\| 0\)\)/.test(read('app.js')),'точка старта морфа — место кнопки с поправкой на высоту клавиатуры');
  $('add').click();
  assert(w.app.S.ts.every(x=>x.t!==''),'пустой ввод ничего не добавляет');
+ $('nt').value='q'; $('nt').dispatchEvent(new w.Event('input'));
+ assert($('add').dataset.ic==='up','набрали текст — микрофон сменился стрелкой (ключ иконки)');
+ $('nt').value=''; $('nt').dispatchEvent(new w.Event('input'));
+ assert($('add').dataset.ic==='mic','стёрли — обратно микрофон');
  $('nt').value='<b>x</b>'; $('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter'}));
  assert(w.app.S.ts.some(x=>x.t==='<b>x</b>')&&!d.querySelector('#list b'),'Enter добавляет, текст экранирован');
  assert(txt(rows()[rows().length-1])==='<b>x</b>','новая задача — в самом низу, ниже проектов и приоритетных');
@@ -152,6 +156,12 @@ async function common(file){
  assert(/\.press:active\{transform:scale\(1\.05,\.92\)/.test(css)&&/scale\(1\.28,\.8\)/.test(js),'сжатие и растяжение: кнопка плющится под пальцем, кружок — при отметке');
  assert(/\.pri button:nth-child\(5\)\{animation-delay:calc\(var\(--lag\) \* 4\)\}/.test(css)&&/\n\.sheet-body > \*\{animation:rise[^}]*var\(--i, 0\) \* var\(--lag\)\)\}\n/.test(css)&&/@keyframes sheet-in\{from\{[^}]*\}to\{[^}]*\}\}\n/.test(css),'доводка: кнопки приоритета и разделы настроек догоняют друг друга');
  assert(/@keyframes toast-in\{0%\{[^}]*\}55%\{transform:translateY\(-6px\)\}/.test(css)&&/translate\('\+\(x\*\.6\)/.test(js),'дуги: плашка приподнимается по пути, искры летят по параболе');
+ /* система на всём интерактивном: отклик под пальцем, появление и уход у того, что не .press */
+ assert(/\.row:active\{transform:scale\(1\.01,\.965\)/.test(css)&&/\.ax:active,\.au:active,\.pri button:active\{transform:scale/.test(css)&&/\.mi:active,\.card:active\{transform:scale/.test(css),'отклик под пальцем у строк, кнопок настроек, ленты и приоритета');
+ assert(/\.title:focus-within\{box-shadow:inset 0 0 0 2px var\(--blue\)/.test(css),'заголовок задачи подсвечивается при правке');
+ assert(/\.sheet\.out \.sheet-body\{animation:sheet-out var\(--t-fast\) var\(--e-in\) forwards\}/.test(css)&&/\.pri\.out\{animation:pri-out var\(--t-tap\) var\(--e-in\) forwards\}/.test(css)&&/\.sheet-back\{animation:fade/.test(css),'лист настроек и капсула приоритета появляются и уходят движением');
+ assert(/body\.nav #scr-detail:not\(\.on\) \.scroll\{transform:translateX\(32px\)\}/.test(css)&&/body\.nav #scr-detail\.on \.scroll\{transition-delay:var\(--lag\)\}/.test(css),'лента догоняет экран чата на шаг позже, только в nav');
+ assert(/function swapIcon/.test(js)&&(js.match(/swapIcon\(/g)||[]).length>=5,'смена иконок на кнопках идёт через swapIcon');
  assert(/\.row\{[^}]*flex-direction:row-reverse[^}]*padding:11px 20px 11px 11px/.test(css)&&/\.step\{[^}]*flex-direction:row-reverse/.test(css),'кружки слева: строки и шаги перевёрнуты, отступ текста справа');
  assert(/@font-face\{font-family:"Play"/.test(css)&&/play-cyrillic-400-normal\.woff2/.test(css),'Play подключён файлами рядом с HTML');
  assert(/\.scroll\{[^}]*overflow-y:scroll/.test(css.replace(/\/\*[\s\S]*?\*\//g,'')),'прокрутка живая всегда: при auto короткий список стоит намертво');

@@ -335,6 +335,31 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* ── движение ─────────────────────────────────────────────────── */
 /* сжатие и растяжение: под пальцем кнопка плющится (шире и ниже), отпущенная — пружинит через
    лёгкое растяжение обратно к форме; перелёт даёт --e-over */
+/* ── правило системы: у всего, на что можно нажать, три движения — отклик под пальцем (сжатие),
+   появление (--e-out) и уход (--e-in). Ниже — всё, что не попало под .press. ── */
+.row{transform-origin:50% 50%;transition:background var(--t-tap) var(--e-out),transform var(--t-base) var(--e-over)}
+.row:active{transform:scale(1.01,.965);transition:transform var(--t-tap) var(--e-out)}   /* строка под пальцем чуть плющится */
+.ax,.au,.mi,.card,.pri button{transition:transform var(--t-base) var(--e-over),background var(--t-tap) var(--e-out),color var(--t-tap) var(--e-out),box-shadow var(--t-tap) var(--e-out)}
+.ax:active,.au:active,.pri button:active{transform:scale(1.08,.9);transition:transform var(--t-tap) var(--e-out)}
+.mi:active,.card:active{transform:scale(1.01,.96);transition:transform var(--t-tap) var(--e-out)}
+@media (hover:hover){.card:hover,.mi:hover{background:rgba(36,36,36,.78)}.ax:hover{background:var(--g3a)}.au:hover{filter:brightness(1.08)}}
+/* заголовок задачи правится на месте — фокус подсвечивает таблетку, как строку ввода */
+.title{transition:box-shadow var(--t-fast) var(--e-out)}
+.title:focus-within{box-shadow:inset 0 0 0 2px var(--blue),var(--glass)}
+/* уход: лист настроек и капсула приоритета не исчезают, а уходят вниз с ускорением */
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet-back{animation:fade var(--t-base) var(--e-out)}
+@keyframes sheet-out{to{transform:translateY(28px);opacity:0}}
+.sheet.out .sheet-body{animation:sheet-out var(--t-fast) var(--e-in) forwards}
+.sheet.out .sheet-body > *{animation:none}
+.sheet.out .sheet-back{animation:fade var(--t-fast) var(--e-in) reverse forwards}
+@keyframes pri-out{to{opacity:0;transform:translateY(6px) scale(.96)}}
+.pri.out{animation:pri-out var(--t-tap) var(--e-in) forwards}
+.pri.out button{animation:none}
+/* доводка при переходе в чат: лента догоняет экран на шаг позже; только в nav — в panels экран не едет */
+body.nav #scr-detail .scroll{transition:transform var(--t-base) var(--e-move)}
+body.nav #scr-detail:not(.on) .scroll{transform:translateX(32px)}
+body.nav #scr-detail.on .scroll{transition-delay:var(--lag)}
 .press{transition:transform var(--t-base) var(--e-over);transform-origin:50% 100%}
 .press:active{transform:scale(1.05,.92);transition:transform var(--t-tap) var(--e-out)}
 .shutter .sw{transition:transform var(--t-base) var(--e-over)}
