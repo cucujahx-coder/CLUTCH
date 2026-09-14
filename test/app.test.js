@@ -639,14 +639,13 @@ async function haptics(file){
  assert(css('--safe-b')==='0px'&&css('--foot')==='8px','клавиатура открыта: отступ под индикатор снят, зазор 8 px');
  kbw.visualViewport.height=kbw.innerHeight; vvL.resize();
  assert(css('--foot')==='16px','клавиатура ушла — зазор снова 16 px');
- /* Система ужала и само окно (resizes-content): окно и область равны, но поле в фокусе и
-    область ниже базы — это тоже клавиатура. Без фокуса та же высота — нет */
+ /* innerHeight в Safari равен видимой области: окно и область равны, признак — область ниже базы.
+    Он физический и от фокуса не зависит: в момент focusout фокуса уже нет, а клавиатура ещё на экране */
  Object.defineProperty(kbw,'innerHeight',{value:400,configurable:true});
  kbw.visualViewport.height=400; vvL.resize();
- assert(css('--foot')==='16px','окно ужалось вместе с областью, поля в фокусе нет — не клавиатура');
- kbw.document.getElementById('msg').focus(); vvL.resize();
- assert(css('--foot')==='8px'&&css('--safe-b')==='0px','поле в фокусе и область ниже базы — клавиатура, отступ снят');
- kbw.document.getElementById('msg').blur();
+ assert(css('--foot')==='8px'&&css('--safe-b')==='0px','окно равно области, область ниже базы — клавиатура и без фокуса');
+ kbw.visualViewport.height=kbw.innerHeight=700; Object.defineProperty(kbw,'innerHeight',{value:700,configurable:true}); vvL.resize();
+ assert(css('--foot')==='16px','область ниже базы меньше чем на 150 — полоса браузера, не клавиатура');
  Object.defineProperty(kbw,'innerHeight',{value:768,configurable:true});
  /* Высота клавиатуры запомнена; при следующем фокусе контейнер ужимается сразу, до resize —
     чтобы iOS не панорамировала экран. Без resize догадка живёт 700 мс и снимается */
@@ -666,6 +665,13 @@ async function haptics(file){
  assert(css('--vh')==='768px'&&css('--foot')==='16px'&&css('--vvtop')==='0px','фокус ушёл — контейнер, низ и сдвиг возвращены сразу, до resize');
  kbw.visualViewport.height=768; vvL.resize();
  assert(css('--vh')==='768px','пришёл настоящий resize — совпал с догадкой');
+ /* фокус ушёл раньше, чем поднялась клавиатура: догадка ужатия снимается сразу, а не через 1,5 с.
+    Клавиатуры нет — нет и панорамирования, у подменённой области сдвиг 0 */
+ kbw.visualViewport.offsetTop=0;
+ kbw.document.getElementById('msg').focus();
+ assert(css('--vh')==='400px'&&css('--vvtop')==='368px','фокус — догадка ужатия');
+ kbw.document.getElementById('msg').blur();
+ assert(css('--vh')==='768px'&&css('--vvtop')==='0px'&&css('--foot')==='16px','клавиатуры не было — после потери фокуса всё развёрнуто сразу');
  kbw.visualViewport.height=400; vvL.resize();
  assert(!/--kb/.test(read('app.css'))&&!/--kb/.test(read('app.js')),'высоты клавиатуры в раскладке нет: поднимать композер на неё — проверенный тупик');
  /* никаких переходов на раскладке под клавиатуру: она предвосхищает события, переход = запаздывание */
