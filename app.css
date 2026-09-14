@@ -153,7 +153,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
      резинку, но на iOS он гасил её вместе с перебросом — список не пружинил даже с
      переполнением. Защищать им нечего: ни один предок области не прокручивается, а
      pull-to-refresh глушит overscroll-behavior:none на body. */
-  overflow-y:scroll;-webkit-overflow-scrolling:touch;
+  overflow-y:scroll;overflow-x:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
   display:flex;flex-direction:column;gap:8px}
 .scroll::-webkit-scrollbar{width:0}
 .spacer{flex:1 0 auto}
@@ -338,10 +338,13 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* ── правило системы: у всего, на что можно нажать, три движения — отклик под пальцем (сжатие),
    появление (--e-out) и уход (--e-in). Ниже — всё, что не попало под .press. ── */
 .row{transform-origin:50% 50%;transition:background var(--t-tap) var(--e-out),transform var(--t-base) var(--e-over)}
-.row:active{transform:scale(1.01,.965);transition:transform var(--t-tap) var(--e-out)}   /* строка под пальцем чуть плющится */
+/* Полноширинное под пальцем сжимается внутрь, а не наружу: трансформа вширь расширяет
+   прокручиваемую область, и на iOS список начинал ездить влево-вправо, срезая края капсул.
+   Вширь плющатся только кнопки — у них вокруг есть место. */
+.row:active{transform:scale(.99,.965);transition:transform var(--t-tap) var(--e-out)}
 .ax,.au,.mi,.card,.pri button{transition:transform var(--t-base) var(--e-over),background var(--t-tap) var(--e-out),color var(--t-tap) var(--e-out),box-shadow var(--t-tap) var(--e-out)}
 .ax:active,.au:active,.pri button:active{transform:scale(1.08,.9);transition:transform var(--t-tap) var(--e-out)}
-.mi:active,.card:active{transform:scale(1.01,.96);transition:transform var(--t-tap) var(--e-out)}
+.mi:active,.card:active{transform:scale(.99,.96);transition:transform var(--t-tap) var(--e-out)}
 @media (hover:hover){.card:hover,.mi:hover{background:rgba(36,36,36,.78)}.ax:hover{background:var(--g3a)}.au:hover{filter:brightness(1.08)}}
 /* заголовок задачи правится на месте — фокус подсвечивает таблетку, как строку ввода */
 .title{transition:box-shadow var(--t-fast) var(--e-out)}
@@ -445,7 +448,7 @@ body.two #scr-detail,body.two #scr-list.away{transform:none}
 .sheet{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center}
 .sheet[hidden]{display:none}
 .sheet-back{position:absolute;inset:0;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
-.sheet-body{position:relative;width:100%;max-width:600px;max-height:88%;overflow-y:auto;-webkit-overflow-scrolling:touch;
+.sheet-body{position:relative;width:100%;max-width:600px;max-height:88%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;border-radius:28px 28px 0 0;padding:20px 16px calc(24px + var(--safe-b));
   background:var(--card);box-shadow:var(--glass);animation:sheet-in var(--t-base) var(--e-move)}
 @keyframes sheet-in{from{transform:translateY(28px);opacity:0}to{transform:none;opacity:1}}
