@@ -42,6 +42,10 @@
   --e-move:cubic-bezier(.32,.72,0,1);
   --e-over:cubic-bezier(.34,1.56,.64,1);
   --t-tap:.12s; --t-fast:.18s; --t-base:.3s; --t-slow:.42s; --t-kb:.25s; --lag:40ms;
+  /* кривая самой клавиатуры iOS (UIKit keyboard curve): медленный разгон, длинный хвост.
+     Только для движения вместе с клавиатурой — по --e-move содержимое её обгоняло,
+     и при схлопывании список оказывался там, где клавиатура ещё стояла (кадры с телефона) */
+  --e-kb:cubic-bezier(.38,.7,.125,1);
   --ease-ios:var(--e-move);   /* старые имена — псевдонимы, чтобы ничего не сломать */
   --bounce:var(--e-over);
   /* стеклянный кант: те же чёткие линии в пиксель, что и раньше, только повёрнуты по диагонали —
@@ -85,10 +89,10 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    Одно исключение — .easing: его вешает trackVH на 320 мс ровно на предсказанный разворот
    при потере фокуса, чтобы список ехал вниз вместе с клавиатурой iOS (~250 мс), а не падал
    под неё одним кадром. Низ едет тем же переходом, иначе строка ввода отстаёт от контейнера. */
-.phone.easing{transition:height var(--t-kb) var(--e-move),top var(--t-kb) var(--e-move)}
-.phone.easing .composer{transition:bottom var(--t-kb) var(--e-move),var(--tr-composer)}
-.phone.easing .dock{transition:bottom var(--t-kb) var(--e-move),opacity var(--t-fast) var(--e-move),transform var(--t-slow) var(--e-over)}
-.phone.easing .scroll,.phone.easing .pend,.phone.easing .toast{transition:bottom var(--t-kb) var(--e-move)}
+.phone.easing{transition:height var(--t-kb) var(--e-kb),top var(--t-kb) var(--e-kb)}
+.phone.easing .composer{transition:bottom var(--t-kb) var(--e-kb),var(--tr-composer)}
+.phone.easing .dock{transition:bottom var(--t-kb) var(--e-kb),opacity var(--t-fast) var(--e-move),transform var(--t-slow) var(--e-over)}
+.phone.easing .scroll,.phone.easing .pend,.phone.easing .toast{transition:bottom var(--t-kb) var(--e-kb)}
 .screen{position:absolute;inset:0;padding:0 16px;
   padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));
   transition:transform var(--t-base) var(--e-move);background:var(--bg)}

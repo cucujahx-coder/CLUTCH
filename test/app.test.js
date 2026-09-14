@@ -39,7 +39,7 @@ async function common(file){
  assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');
  const cssMini=read('app.css').replace(/\/\*[\s\S]*?\*\//g,'');
  assert(/\.composer\.mini\{left:calc\(50% - 38px\);right:calc\(50% - 38px\);height:76px;[^}]*background:var\(--hot\)[^}]*transform:translateY\(-75px\)/.test(cssMini),'свёрнутая капсула — круг 76 цвета кнопки, поднятый на место кнопки трансформой');
- assert(/\.composer\{[^}]*--tr-composer:left[^}]*transition:var\(--tr-composer\)/.test(cssMini)&&/\.phone\.easing \.composer\{transition:bottom var\(--t-kb\) var\(--e-move\),var\(--tr-composer\)\}/.test(cssMini),'геометрия капсулы едет одним списком переходов, .easing его дополняет, а не заменяет');
+ assert(/\.composer\{[^}]*--tr-composer:left[^}]*transition:var\(--tr-composer\)/.test(cssMini)&&/\.phone\.easing \.composer\{transition:bottom var\(--t-kb\) var\(--e-kb\),var\(--tr-composer\)\}/.test(cssMini),'геометрия капсулы едет одним списком переходов, .easing его дополняет, а не заменяет');
  /* resizes-content на iOS сдвигает экран на высоту клавиатуры всегда, и шапка дёргается; overlays — только когда поле под клавиатурой */
  assert(/interactive-widget=overlays-content/.test(read(file)),'viewport с overlays-content, а не resizes-content');
  /* Список перевёрнут: первый в разметке — у низа, колпак под шапку — над ним. Ноль прокрутки = низ,
@@ -720,6 +720,9 @@ async function haptics(file){
  const phoneRule=(cssClean.match(/\.phone\{[^}]*\}/)||[''])[0];
  const noEase=cssClean.replace(/\.phone\.easing[^{]*\{[^}]*\}/g,'');
  assert(!/transition/.test(phoneRule)&&!/bottom \.\d+s/.test(noEase),'ни у контейнера, ни у низа нет переходов — кроме .easing на предсказанный разворот');
+ /* всё, что едет вместе с клавиатурой, едет по её кривой — иначе содержимое её обгоняет */
+ const easing=cssClean.split('\n').filter(l=>l.startsWith('.phone.easing'));
+ assert(easing.length>=4&&easing.every(l=>/(bottom|height|top) var\(--t-kb\) var\(--e-kb\)/.test(l))&&!easing.some(l=>/(bottom|height|top) var\(--t-kb\) var\(--e-(move|out|over)\)/.test(l)),'разворот под клавиатуру — по кривой клавиатуры, не по общей');
  /* панорамирование iOS снимается событием scroll, а не resize — раскладка не должна протухать */
  kbw.visualViewport.offsetTop=0; vvL.scroll();
  assert(css('--vvtop')==='0px','смещение обновляется и по scroll: по одному resize оно протухает');
