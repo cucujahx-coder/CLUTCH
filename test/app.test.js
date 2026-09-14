@@ -615,7 +615,9 @@ async function haptics(file){
  const t=await common('index.html');
  const on=id=>t.d.getElementById(id).classList.contains('on');
  assert(on('scr-detail'),'экран задачи открыт');
+ t.$('msg').focus();
  t.d.getElementById('back').click(); assert(!on('scr-detail'),'назад к списку');
+ assert(t.d.activeElement!==t.$('msg'),'выход из чата снимает фокус — клавиатура уходит вместе с чатом');
  t.rows()[0].querySelector('.ck').click(); assert(!on('scr-detail'),'кружок не уводит со списка');
  await wait(220);
  t.rows()[1].click(); t.d.dispatchEvent(new t.w.KeyboardEvent('keydown',{key:'Escape'})); assert(!on('scr-detail'),'Esc закрывает экран');
@@ -652,15 +654,24 @@ async function haptics(file){
  assert(kbw.localStorage.getItem('kbh:'+kbw.innerWidth)==='368','высота клавиатуры запомнена по ширине окна');
  assert(css('--vh')==='768px','без клавиатуры контейнер полный');
  kbw.document.getElementById('msg').focus();
- assert(css('--vh')==='400px'&&kbw.document.querySelector('.phone').classList.contains('snap'),'фокус — контейнер ужат сразу и без перехода, до прихода resize');
+ assert(css('--vh')==='400px'&&css('--foot')==='8px','фокус — контейнер и низ ужаты сразу, до прихода resize');
+ assert(css('--vvtop')==='368px','и сдвиг на высоту клавиатуры выставлен заранее: iOS панорамирует ровно на неё');
  await wait(900);
- assert(css('--vh')==='768px'&&!kbw.document.querySelector('.phone').classList.contains('snap'),'клавиатура не пришла — догадка снята, переход вернулся');
+ assert(css('--vh')==='768px','клавиатура не пришла — догадка снята');
  kbw.document.getElementById('msg').blur();
+ /* обратная догадка: потеря фокуса разворачивает контейнер сразу, пока клавиатура ещё едет вниз */
+ kbw.document.getElementById('msg').focus(); kbw.visualViewport.height=400; vvL.resize();
+ assert(css('--vh')==='400px','клавиатура на экране');
+ kbw.document.getElementById('msg').blur();
+ assert(css('--vh')==='768px'&&css('--foot')==='16px'&&css('--vvtop')==='0px','фокус ушёл — контейнер, низ и сдвиг возвращены сразу, до resize');
+ kbw.visualViewport.height=768; vvL.resize();
+ assert(css('--vh')==='768px','пришёл настоящий resize — совпал с догадкой');
  kbw.visualViewport.height=400; vvL.resize();
  assert(!/--kb/.test(read('app.css'))&&!/--kb/.test(read('app.js')),'высоты клавиатуры в раскладке нет: поднимать композер на неё — проверенный тупик');
- /* контейнер меняет высоту плавно, а смещение — мгновенно: оно компенсирует пан iOS */
- const phoneRule=(read('app.css').replace(/\/\*[\s\S]*?\*\//g,'').match(/\.phone\{[^}]*\}/)||[''])[0];
- assert(/transition:height \.28s/.test(phoneRule)&&!/transition:[^}]*top/.test(phoneRule),'у контейнера переход по height и никакого по top');
+ /* никаких переходов на раскладке под клавиатуру: она предвосхищает события, переход = запаздывание */
+ const cssClean=read('app.css').replace(/\/\*[\s\S]*?\*\//g,'');
+ const phoneRule=(cssClean.match(/\.phone\{[^}]*\}/)||[''])[0];
+ assert(!/transition/.test(phoneRule)&&!/bottom \.\d+s/.test(cssClean),'ни у контейнера, ни у низа нет переходов');
  /* панорамирование iOS снимается событием scroll, а не resize — раскладка не должна протухать */
  kbw.visualViewport.offsetTop=0; vvL.scroll();
  assert(css('--vvtop')==='0px','смещение обновляется и по scroll: по одному resize оно протухает');

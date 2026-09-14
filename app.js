@@ -717,7 +717,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v37';
+const APP_V='tasks-v38';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1414,30 +1414,37 @@ let view = 'list', open, back;
    вернулась. Вне ввода — обычные события. */
 let vvTrace = [], kbH = 0;
 function trackVH(){
- const vv = window.visualViewport, phone = document.querySelector('.phone');
- let lastH = null, until = 0, ticking = false, predictUntil = 0;
- /* Высота клавиатуры на устройстве постоянна — помним её (по ширине окна: у поворота своя).
-    Зачем: в момент фокуса iOS видит строку ввода внизу окна и панорамирует экран на высоту
-    клавиатуры, чтобы её показать; мы сдвиг компенсируем через --vvtop, но с задержкой в
-    кадр — на это время шапка уезжает за край и резко возвращается. Если ужать контейнер
-    сразу при фокусе, до решения iOS, строка уже над будущей клавиатурой, и панорамировать
-    нечего. Догадка живёт до первого настоящего resize или 700 мс, дальше — только факты. */
+ const vv = window.visualViewport;
+ let lastH = null, until = 0, ticking = false, predictUntil = 0, predictH = 0, predictT = 0;
+ /* Раскладка предвосхищает клавиатуру, как приложение на iOS по keyboardWillShow. Высота
+    клавиатуры на устройстве постоянна — помним её (kbH, по ширине окна: у поворота своя).
+    При фокусе контейнер ужимается сразу, до событий iOS: поле уже над будущей клавиатурой,
+    панорамировать нечего, шапка стоит. При потере фокуса разворачивается сразу же, как
+    клавиатура пошла вниз, — иначе список после чата возвращался с запозданием. Догадка
+    живёт до первого настоящего resize в ту же сторону или 700 мс, дальше — только факты. */
  try{ kbH = +localStorage.getItem('kbh:' + innerWidth) || 0; }catch(e){}
+ /* Догадка задаёт сразу и высоту, и сдвиг. iOS при клавиатуре панорамирует экран ровно на её
+    высоту — снимки показали top 413 при высоте 413, и это не зависит от режима viewport.
+    Гнаться за сдвигом по факту значит опаздывать на кадры, а шапка на это время уезжает.
+    Ставим конечные значения до того, как iOS начнёт анимацию: ей остаётся только проехать
+    по уже готовой раскладке. resize приходит позже, чем кажется, — окно догадки 1,5 с. */
+ const predict = (h, t, src) => { predictH = h; predictT = t; predictUntil = Date.now() + 1500; apply(src); };
  const apply = src => {
-  let h = vv ? vv.height : innerHeight;
-  const t = vv ? vv.offsetTop : 0;
+  const real = vv ? vv.height : innerHeight;
+  let h = real, t = vv ? vv.offsetTop : 0;
   if(predictUntil){
-   if(kbUp() || Date.now() > predictUntil) predictUntil = 0;
-   else if(kbBaseH && kbH) h = Math.min(h, kbBaseH - kbH);
+   const arrived = predictH < kbBaseH ? kbUp() : !kbUp();   /* факт пришёл в ту же сторону */
+   if(arrived || Date.now() > predictUntil) predictUntil = 0; else { h = predictH; t = predictT; }
   }
   root.setProperty('--vh', h + 'px');
   root.setProperty('--vvtop', t + 'px');
   /* Клавиатура на экране — индикатор «домой» под ней, отступ под него ничего не защищает,
      а строка ввода висела на 50 px выше клавиатуры. Снимаем его и ужимаем зазор до 8. */
-  const kb = kbUp();
+  /* Низ живёт по той же догадке, что и высота, — иначе строка ввода едет отдельно от контейнера */
+  const kb = predictUntil ? predictH < kbBaseH : kbUp();
   root.setProperty('--safe-b', kb ? '0px' : safeB);
   root.setProperty('--foot', kb ? '8px' : '16px');
-  if(kb && kbBaseH){ const k = kbBaseH - (vv ? vv.height : h); if(k > 80 && k !== kbH){ kbH = k; try{ localStorage.setItem('kbh:' + innerWidth, k); }catch(e){} } }
+  if(kbUp() && kbBaseH){ const k = kbBaseH - real; if(k > 80 && k !== kbH){ kbH = k; try{ localStorage.setItem('kbh:' + innerWidth, k); }catch(e){} } }
   if(lastH !== null && h !== lastH){
    /* Высота изменилась — держим низ содержимого на месте, иначе список и лента съезжают
       вверх на высоту клавиатуры. Чтение offsetHeight заставляет браузер применить новую
@@ -1472,15 +1479,14 @@ function trackVH(){
  /* Фокус и его потеря — моменты, когда клавиатура появляется и убирается */
  addEventListener('focusin', e=>{
   if(!e.target || e.target.tagName !== 'INPUT') return;
-  if(kbH && kbBaseH && !kbUp() && phone){
-   /* Ужимаем сразу и без перехода: iOS решает про панорамирование по положению поля в этот момент */
-   predictUntil = Date.now() + 700;
-   phone.classList.add('snap'); apply('p'); void phone.offsetHeight;
-   requestAnimationFrame(()=>phone.classList.remove('snap'));
-  }
+  if(kbH && kbBaseH && !kbUp()) predict(kbBaseH - kbH, kbH, 'p');   /* клавиатура придёт — ужимаемся и сдвигаемся сейчас */
   watch(1500);
  });
- addEventListener('focusout', e=>{ if(e.target && e.target.tagName === 'INPUT'){ predictUntil = 0; watch(1500); } });
+ addEventListener('focusout', e=>{
+  if(!e.target || e.target.tagName !== 'INPUT') return;
+  if(kbUp() && kbBaseH) predict(kbBaseH, 0, 'q');                   /* клавиатура уйдёт — разворачиваемся сейчас */
+  watch(1500);
+ });
 }
 /* Безопасные зоны меряем один раз пробником: env() в calc() из JS не прочитать */
 let safeB = '0px';   /* измеренный отступ под индикатор «домой»; trackVH обнуляет его на время клавиатуры */
@@ -1502,7 +1508,11 @@ function shellTwo(){
 function shellNav(){
  const show = v => { view=v; $('scr-detail').classList.toggle('on', v==='detail'); $('scr-list').classList.toggle('away', v==='detail'); };
  open = () => { tap(8); show('detail'); paintDetail(); setTimeout(()=>{ thread.scrollTop = thread.scrollHeight; },320); };
- back = () => { show('list'); paint(1); };
+ back = () => {
+  /* Сначала снять фокус: иначе клавиатура остаётся висеть над уже показанным списком */
+  const a = document.activeElement; if(a && a.blur && a.tagName === 'INPUT') a.blur();
+  show('list'); paint(1);
+ };
  $('back').onclick = () => { tap(8); back(); };
  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !priPop && view==='detail') back(); });
  armSwipeBack();

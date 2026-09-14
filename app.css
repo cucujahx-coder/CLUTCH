@@ -61,12 +61,12 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    visualViewport.offsetTop. Композер лежит на его дне и оказывается над клавиатурой сам —
    поднимать его на вычисленную высоту клавиатуры пробовали, поле «гуляет» (см. CLAUDE.md) */
 .phone{position:fixed;left:0;right:0;top:var(--vvtop,0px);height:var(--vh);
-  max-width:600px;margin:0 auto;overflow:hidden;
-  /* Высоту iOS меняет одним скачком в разгар выезда клавиатуры, сама ничего не анимирует —
-     плавность даём переходом на height. На top перехода нет и быть не должно: он компенсирует
-     панорамирование, и любая задержка на нём уводит шапку за край на время перехода. */
-  transition:height .28s var(--ease-ios)}
-.phone.snap{transition:none}   /* мгновенное ужатие при фокусе, чтобы iOS не панорамировала */
+  max-width:600px;margin:0 auto;overflow:hidden}
+/* Переходов у контейнера нет намеренно. Раскладка предвосхищает клавиатуру (trackVH ужимает
+   контейнер при фокусе и разворачивает при его потере — до событий iOS), и любой переход
+   здесь превращается в запаздывание: при выходе из чата интерфейс возвращался с задержкой,
+   пока контейнер доезжал. Всё, что считает низ от --safe-b и --foot, тоже без переходов —
+   иначе низ едет отдельно от контейнера. */
 .screen{position:absolute;inset:0;padding:0 16px;
   padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));
   transition:transform .3s var(--ease-ios);background:var(--bg)}
@@ -89,7 +89,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .dock{position:absolute;left:16px;right:16px;bottom:calc(26px + var(--safe-b));z-index:3;
   /* 21 = 16 видимых + 5 на внешнее кольцо кнопки: оно рисуется тенью и места не занимает */
   display:flex;flex-direction:column;align-items:center;gap:21px;
-  transition:opacity .2s var(--ease-ios),transform .38s var(--bounce),bottom .25s var(--ease-ios)}
+  transition:opacity .2s var(--ease-ios),transform .38s var(--bounce)}
 .dock.hide{opacity:0;transform:translateY(12px) scale(.96);pointer-events:none}
 .shutter{width:76px;height:76px;border:0;border-radius:50%;background:var(--hot);color:#fff;
   display:grid;place-items:center;cursor:pointer;
@@ -129,14 +129,14 @@ button,.press,.row,.step,.t1,.t2,.lbl{
      переполнением. Защищать им нечего: ни один предок области не прокручивается, а
      pull-to-refresh глушит overscroll-behavior:none на body. */
   overflow-y:scroll;-webkit-overflow-scrolling:touch;
-  display:flex;flex-direction:column;gap:8px;transition:bottom .25s var(--ease-ios)}
+  display:flex;flex-direction:column;gap:8px}
 .scroll::-webkit-scrollbar{width:0}
 .spacer{flex:1 0 auto}
 .cap{flex:none;height:calc(16px + 44px + 16px + var(--safe-t))}   /* 16 сверху + таблетка 44 + зазор 16 */
 /* Резинка короткого списка — в JS (armRubber): iOS не даёт отдачи области, которой некуда
    прокручиваться, и ни переполнение на пиксель, ни overscroll-behavior этого не меняют.
    Пока палец ведёт, область сдвигается трансформой без перехода; отпустили — возвращается. */
-.scroll.rubber{transition:transform .4s var(--ease-ios),bottom .25s var(--ease-ios)}
+.scroll.rubber{transition:transform .4s var(--ease-ios)}
 .scroll.dragging{transition:none}
 #list{display:flex;flex-direction:column;gap:8px;flex:none}
 
@@ -197,7 +197,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .composer{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + var(--safe-b));z-index:5;
   height:68px;padding:11px;border-radius:28px;display:flex;align-items:center;gap:6px;
   background:rgba(36,36,36,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:var(--glass);
-  transition:bottom .25s var(--ease-ios),opacity .2s var(--ease-ios),transform .42s var(--bounce),box-shadow .18s var(--ease-ios)}
+  transition:opacity .2s var(--ease-ios),transform .42s var(--bounce),box-shadow .18s var(--ease-ios)}
 /* вспышка активации: белая полоса проходит по капсуле слева направо */
 .sweep{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;z-index:1}
 .sweep i{position:absolute;top:0;bottom:0;left:0;width:100%;
@@ -253,7 +253,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   height:44px;display:flex;align-items:center;gap:12px;border-radius:22px;padding:0 5px 0 18px;font-size:15px;
   background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:var(--glass);
   margin-left:calc(100% - 44px - 32px);opacity:0;pointer-events:none;
-  transition:margin-left .44s var(--bounce),opacity .18s var(--ease-ios),bottom .25s var(--ease-ios)}
+  transition:margin-left .44s var(--bounce),opacity .18s var(--ease-ios)}
 .toast.on{margin-left:0;opacity:1;pointer-events:auto}
 .toast .undo{transition:transform .3s var(--bounce)}
 .toast span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -326,7 +326,7 @@ body.two #scr-detail,body.two #scr-list.away{transform:none}
 /* ── вложения, изменения, разметка ответа ─────────────────────── */
 /* чипы выбранных файлов стоят над строкой ввода и поднимаются вместе с ней */
 .pend{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + 68px + 8px + var(--safe-b));z-index:5;
-  display:flex;flex-wrap:wrap;gap:6px;transition:bottom .25s var(--ease-ios)}
+  display:flex;flex-wrap:wrap;gap:6px}
 .att{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;max-width:100%;height:32px;
   padding:0 6px 0 12px;border-radius:16px;font-size:13px;color:var(--muted);
   background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:var(--glass)}
