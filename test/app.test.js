@@ -134,6 +134,12 @@ async function common(file){
 
  /* чат: галочка в шапке, отправка и ответ */
  rows()[0].click();
+ /* первое касание по полю — программный фокус без прокрутки, iOS не панорамирует; повторное — не перехватывается (каретка) */
+ const pd=()=>{ const e=new w.Event('pointerdown',{bubbles:true,cancelable:true}); $('msg').dispatchEvent(e); return e.defaultPrevented; };
+ $('msg').blur();
+ assert(pd()===true&&d.activeElement===$('msg'),'тап по полю чата: фокус поставлен программно, действие iOS отменено');
+ assert(pd()===false,'тап по полю в фокусе не перехватывается — каретка ставится как обычно');
+ $('msg').blur();
  $('hctl').click();
  assert($('cm').textContent==='выполнена','круглая кнопка шапки выполняет задачу');
  $('hctl').click();

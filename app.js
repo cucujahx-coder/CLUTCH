@@ -747,7 +747,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v53';
+const APP_V='tasks-v54';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1735,6 +1735,20 @@ function submitTask(){
 addBtn.onclick = submitTask;
 nt.onkeydown = e => { if(e.key==='Enter'){ e.preventDefault(); submitTask(); } };
 
+/* Фокус в поле — только программный, с preventScroll. Тап по полю iOS обрабатывает сама:
+   ставит фокус и «показывает» поле — панорамирует экран своей анимацией, которую мы не
+   контролируем, и шапка чата улетала и возвращалась. Программный focus() из того же жеста
+   клавиатуру открывает, а показывать ничего не пытается — так работает строка новой задачи,
+   у неё шапка стоит. Перехватываем только первое касание: у поля в фокусе тап ставит каретку. */
+function armFocus(el){
+ if(!el) return;
+ el.addEventListener('pointerdown', e => {
+  if(document.activeElement === el) return;
+  e.preventDefault();
+  try{ el.focus({preventScroll:true}); }catch(err){ el.focus(); }
+ });
+}
+armFocus(msg); armFocus(nt); armFocus(ct);
 /* чат: отправка не уводит фокус из поля, иначе iOS прячет клавиатуру */
 sendBtn.addEventListener('pointerdown', e => e.preventDefault());
 msg.oninput = drawSend;
