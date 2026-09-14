@@ -41,6 +41,7 @@
   --vh:100dvh;     /* высота видимой области, ставит JS из visualViewport */
   --vvtop:0px;     /* её смещение сверху: iOS панорамирует страницу при фокусе */
   --safe-b:0px; --safe-t:0px;
+  --foot:16px;     /* зазор под строкой ввода; при клавиатуре JS ужимает до 8, а --safe-b обнуляет */
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
@@ -116,7 +117,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 
 /* низ отсчитывается от клавиатуры: композер 68 + его отступ + зазор 16 */
 .scroll{position:absolute;left:16px;right:16px;top:calc(72px + var(--safe-t));
-  bottom:calc(68px + 32px + var(--pend, 0px) + var(--safe-b));
+  bottom:calc(68px + 16px + var(--foot) + var(--pend, 0px) + var(--safe-b));
   /* scroll, а не auto: при auto короткий список стоит намертво — жест не ловится и
      отдачи нет. overscroll-behavior здесь не ставить: по спецификации contain оставляет
      резинку, но на iOS он гасил её вместе с перебросом — список не пружинил даже с
@@ -144,7 +145,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 #scr-list .scroll{top:0;bottom:0;gap:0;flex-direction:column-reverse;padding-top:0;
   padding-bottom:calc(76px + 21px + 44px + 47px + var(--pend, 0px) + var(--safe-b))}   /* под доком, 16 px до кольца кнопки */
 /* строка ввода открыта: дока нет, между ней и последней задачей тот же зазор 8, что между задачами */
-#scr-list .scroll.tight{padding-bottom:calc(68px + 16px + 16px + var(--pend, 0px) + var(--safe-b))}
+#scr-list .scroll.tight{padding-bottom:calc(68px + 16px + var(--foot) + var(--pend, 0px) + var(--safe-b))}
 
 /* ── строка списка: текст слева, кружок справа под большой палец ─ */
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */
@@ -188,7 +189,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .pri{animation:pri-in .24s var(--bounce)}
 
 /* ── композер: поднимается вместе с клавиатурой ───────────────── */
-.composer{position:absolute;left:16px;right:16px;bottom:calc(16px + var(--safe-b));z-index:5;
+.composer{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + var(--safe-b));z-index:5;
   height:68px;padding:11px;border-radius:28px;display:flex;align-items:center;gap:6px;
   background:rgba(36,36,36,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:var(--glass);
   transition:bottom .25s var(--ease-ios),opacity .2s var(--ease-ios),transform .42s var(--bounce),box-shadow .18s var(--ease-ios)}
@@ -236,7 +237,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   border:0;background:transparent;color:var(--text);padding:0;width:100%;text-align:center;
   text-overflow:ellipsis;-webkit-user-select:text;user-select:text}
 .title .h1:focus{outline:none}
-#scr-detail .scroll{top:0;bottom:calc(68px + 32px + var(--pend, 0px) + var(--safe-b));
+#scr-detail .scroll{top:0;bottom:calc(68px + 16px + var(--foot) + var(--pend, 0px) + var(--safe-b));
   padding-top:calc(16px + 44px + 16px + var(--safe-t))}
 .empty{margin:auto;padding:24px;text-align:center;font-size:15px;color:var(--muted)}
 
@@ -319,7 +320,7 @@ body.two #scr-detail,body.two #scr-list.away{transform:none}
 
 /* ── вложения, изменения, разметка ответа ─────────────────────── */
 /* чипы выбранных файлов стоят над строкой ввода и поднимаются вместе с ней */
-.pend{position:absolute;left:16px;right:16px;bottom:calc(16px + 68px + 8px + var(--safe-b));z-index:5;
+.pend{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + 68px + 8px + var(--safe-b));z-index:5;
   display:flex;flex-wrap:wrap;gap:6px;transition:bottom .25s var(--ease-ios)}
 .att{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;max-width:100%;height:32px;
   padding:0 6px 0 12px;border-radius:16px;font-size:13px;color:var(--muted);

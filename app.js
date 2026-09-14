@@ -717,7 +717,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v30';
+const APP_V='tasks-v31';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1384,6 +1384,11 @@ function trackVH(){
   const h = vv ? vv.height : innerHeight, t = vv ? vv.offsetTop : 0;
   root.setProperty('--vh', h + 'px');
   root.setProperty('--vvtop', t + 'px');
+  /* Клавиатура на экране — индикатор «домой» под ней, отступ под него ничего не защищает,
+     а строка ввода висела на 50 px выше клавиатуры. Снимаем его и ужимаем зазор до 8. */
+  const kb = kbUp();
+  root.setProperty('--safe-b', kb ? '0px' : safeB);
+  root.setProperty('--foot', kb ? '8px' : '16px');
   if(lastH !== null && h !== lastH){
    /* Высота изменилась — держим низ содержимого на месте, иначе список и лента съезжают
       вверх на высоту клавиатуры. Чтение offsetHeight заставляет браузер применить новую
@@ -1420,13 +1425,15 @@ function trackVH(){
  addEventListener('focusout', e=>{ if(e.target && e.target.tagName === 'INPUT') watch(1500); });
 }
 /* Безопасные зоны меряем один раз пробником: env() в calc() из JS не прочитать */
+let safeB = '0px';   /* измеренный отступ под индикатор «домой»; trackVH обнуляет его на время клавиатуры */
 function trackSafe(){
  const probe = document.createElement('div');
  probe.style.cssText = 'position:fixed;top:0;left:0;width:0;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)';
  document.body.appendChild(probe);
  const cs = getComputedStyle(probe);
  root.setProperty('--safe-t', cs.paddingTop || '0px');
- root.setProperty('--safe-b', cs.paddingBottom || '0px');
+ safeB = cs.paddingBottom || '0px';
+ root.setProperty('--safe-b', safeB);
  probe.remove();
 }
 function shellTwo(){
@@ -1531,7 +1538,7 @@ function openComposer(){
  /* фокус ставим синхронно, прямо в обработчике нажатия: iOS открывает клавиатуру только внутри жеста */
  composer.classList.remove('mini'); scroll.classList.add('tight');
  $('dock').classList.add('hide');
- $('veil-b').style.height = 'calc(68px + 40px + var(--pend, 0px) + var(--safe-b))';
+ $('veil-b').style.height = 'calc(68px + 24px + var(--foot) + var(--pend, 0px) + var(--safe-b))';
  drawAdd(); toBottom();          /* .tight меняет запас снизу — доводим список до строки ввода */
  /* Отклик — до фокуса: последним действием жеста должен остаться именно focus(),
     иначе iOS не считает поле активным и клавиатуру не открывает. */

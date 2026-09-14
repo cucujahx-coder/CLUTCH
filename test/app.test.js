@@ -607,6 +607,11 @@ async function haptics(file){
  const vvL={}, kbw=load('index.html',w2=>{w2.visualViewport={height:400,offsetTop:186,addEventListener:(n,f)=>{vvL[n]=f;}};}).w;
  const css=n=>kbw.document.documentElement.style.getPropertyValue(n);
  assert(css('--vh')==='400px'&&css('--vvtop')==='186px','контейнер = видимая область: её высота и смещение');
+ /* при клавиатуре индикатор «домой» под ней: отступ под него снят, зазор под строкой ввода 8 */
+ assert(css('--safe-b')==='0px'&&css('--foot')==='8px','клавиатура открыта: отступ под индикатор снят, зазор 8 px');
+ kbw.visualViewport.height=kbw.innerHeight; vvL.resize();
+ assert(css('--foot')==='16px','клавиатура ушла — зазор снова 16 px');
+ kbw.visualViewport.height=400; vvL.resize();
  assert(!/--kb/.test(read('app.css'))&&!/--kb/.test(read('app.js')),'высоты клавиатуры в раскладке нет: поднимать композер на неё — проверенный тупик');
  /* панорамирование iOS снимается событием scroll, а не resize — раскладка не должна протухать */
  kbw.visualViewport.offsetTop=0; vvL.scroll();
