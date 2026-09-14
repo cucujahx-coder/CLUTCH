@@ -646,6 +646,9 @@ async function haptics(file){
  Object.defineProperty(kbw,'innerHeight',{value:768,configurable:true});
  kbw.visualViewport.height=400; vvL.resize();
  assert(!/--kb/.test(read('app.css'))&&!/--kb/.test(read('app.js')),'высоты клавиатуры в раскладке нет: поднимать композер на неё — проверенный тупик');
+ /* контейнер меняет высоту плавно, а смещение — мгновенно: оно компенсирует пан iOS */
+ const phoneRule=(read('app.css').replace(/\/\*[\s\S]*?\*\//g,'').match(/\.phone\{[^}]*\}/)||[''])[0];
+ assert(/transition:height \.28s/.test(phoneRule)&&!/transition:[^}]*top/.test(phoneRule),'у контейнера переход по height и никакого по top');
  /* панорамирование iOS снимается событием scroll, а не resize — раскладка не должна протухать */
  kbw.visualViewport.offsetTop=0; vvL.scroll();
  assert(css('--vvtop')==='0px','смещение обновляется и по scroll: по одному resize оно протухает');

@@ -61,7 +61,11 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    visualViewport.offsetTop. Композер лежит на его дне и оказывается над клавиатурой сам —
    поднимать его на вычисленную высоту клавиатуры пробовали, поле «гуляет» (см. CLAUDE.md) */
 .phone{position:fixed;left:0;right:0;top:var(--vvtop,0px);height:var(--vh);
-  max-width:600px;margin:0 auto;overflow:hidden}
+  max-width:600px;margin:0 auto;overflow:hidden;
+  /* Высоту iOS меняет одним скачком в разгар выезда клавиатуры, сама ничего не анимирует —
+     плавность даём переходом на height. На top перехода нет и быть не должно: он компенсирует
+     панорамирование, и любая задержка на нём уводит шапку за край на время перехода. */
+  transition:height .28s var(--ease-ios)}
 .screen{position:absolute;inset:0;padding:0 16px;
   padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));
   transition:transform .3s var(--ease-ios);background:var(--bg)}
