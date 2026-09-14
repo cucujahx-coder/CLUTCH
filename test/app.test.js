@@ -29,6 +29,7 @@ async function common(file){
  const pj=n=>rows().find(r=>r.dataset.pj&&r.querySelector('.t2')&&r.querySelector('.t2').textContent===n);
  assert(rows().filter(r=>r.dataset.id).every(r=>!r.querySelector('.t2')),'у задач подзаголовка нет');
  assert(pj('Запуск лендинга')&&txt(pj('Запуск лендинга'))==='Написать текст оффера','у проекта заголовок — ближайший открытый шаг, снизу — имя проекта');
+ assert(/\.t2\{font-size:14px;color:var\(--text-2\)/.test(read('app.css'))&&/--text-2:#B4B4B4/.test(read('app.css')),'имя проекта читается: своя ступень цвета, а не приглушённый --muted');
  assert(w.app.kindOf({t:'Каждый день звонить маме',pj:null})==='routine'&&w.app.kindOf({t:'Напомнить про паспорт',pj:null})==='reminder','рутина и напоминание по словам');
  assert(w.app.kindOf({t:'Купить молоко',pj:null,kind:'idea'})==='idea'&&w.app.kindOf({t:'Вычитка',pj:3})==='step','явный kind важнее догадки, шаг — по проекту');
 
