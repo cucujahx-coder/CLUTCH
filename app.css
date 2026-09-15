@@ -14,7 +14,7 @@
   unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215}
 
 :root{
-  /* Retro-Tech: #1A1A1A корпус, #E0E0E0 экран, #FF4500 свечение. Фиолетовый из палитры не берём */
+  /* Retro-Tech: #1A1A1A корпус, #E0E0E0 экран, #E50006 свечение. Фиолетовый из палитры не берём */
   --bg:#101010; --card:#242424; --line:#3A3A3A; --text:#E0E0E0; --muted:#8E8E8E;
   --text-2:#B4B4B4;   /* вторая строка: читается с одного взгляда, но тише названия. Приглушённый
                          --muted для неё не годится — на телефоне название проекта под шагом
@@ -24,12 +24,12 @@
   --g2b:#2F2F2F;   /* реплика пользователя */
   --g3a:#3A3A3A;   /* обводка круглых кнопок */
   --inv:#E0E0E0; --on-inv:#1A1A1A;
-  --hot:#FF4500;   /* прогресс, срочное, запись, искры, большая кнопка */
+  --hot:#E50006;   /* прогресс, срочное, запись, искры, большая кнопка */
   --blue:#0000FF;  /* активное состояние: фокус строки ввода, включённые кнопки, свои реплики */
   --on-blue:#fff;
-  --danger:#FF4500;
+  --danger:#E50006;
   /* четыре ступени приоритета, все плотные и разного тона */
-  --pri1:#2EC27E; --pri2:#FFD400; --pri3:#FF9500; --pri4:#FF4500;
+  --pri1:#2EC27E; --pri2:#FFD400; --pri3:#FF9500; --pri4:#E50006;
   /* ── движение: одна система на все страницы ──
      Кривые выбираются по роли, а не по вкусу (смягчение — slow in / slow out):
        --e-out  появление и остановка: быстрый старт, мягкое торможение
@@ -424,6 +424,21 @@ body.nav #scr-detail.on .scroll{transition-delay:var(--lag)}
 .shutter:active .sw{transform:scale(1.14,.8);transition:transform var(--t-tap) var(--e-out)}
 .composer.mini{transform-origin:50% 100%}
 .composer.mini:has(.shutter:active){transform:translateY(-75px) scale(1.06,.9);transition:transform var(--t-tap) var(--e-out)}
+/* Резинка списка: пока тянешь, кнопка и паук сжимаются ровно на долю тяги (--pull ставит JS,
+   переход выключен — идёт за пальцем); отпустил — подпрыгивает на высоту, пропорциональную
+   тяге, с перелётом и садится. Та же геометрия, что у нажатия. */
+.composer.mini.pull{transform:translateY(-75px) scale(calc(1 + .06 * var(--pull, 0)), calc(1 - .1 * var(--pull, 0)));transition:none}
+.composer.mini.pull .shutter .sw{transform:scale(calc(1 + .14 * var(--pull, 0)), calc(1 - .2 * var(--pull, 0)));transition:none}
+@keyframes jump{
+  0%{transform:translateY(-75px) scale(calc(1 + .06 * var(--pull, 0)), calc(1 - .1 * var(--pull, 0)))}
+  45%{transform:translateY(calc(-75px - 28px * var(--pull, 0))) scale(.96,1.06)}
+  100%{transform:translateY(-75px) scale(1,1)}}
+@keyframes jump-sw{
+  0%{transform:scale(calc(1 + .14 * var(--pull, 0)), calc(1 - .2 * var(--pull, 0)))}
+  45%{transform:scale(.94,1.1)}
+  100%{transform:scale(1,1)}}
+.composer.mini.jump{animation:jump var(--t-slow) var(--e-over) both}
+.composer.mini.jump .shutter .sw{animation:jump-sw var(--t-slow) var(--e-over) both}
 /* своя реплика: без отскока и без скачка — просто мягко всплывает */
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes land{from{transform:translateY(12px)}to{transform:none}}
@@ -433,7 +448,7 @@ body.nav #scr-detail.on .scroll{transition-delay:var(--lag)}
 .spark{position:absolute;z-index:19;width:6px;height:6px;border-radius:50%;pointer-events:none}
 .rflash{position:absolute;z-index:18;width:140px;height:140px;border-radius:50%;pointer-events:none;
   background:var(--hot);opacity:.5}
-.ringfx{position:absolute;z-index:17;border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px rgba(255,69,0,.7)}
+.ringfx{position:absolute;z-index:17;border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px rgba(229,0,6,.7)}
 .hapt{position:absolute;width:0;height:0;opacity:0;pointer-events:none;overflow:hidden}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 

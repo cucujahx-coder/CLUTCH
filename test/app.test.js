@@ -72,8 +72,22 @@ async function common(file){
  assert(!sc.style.transform,'сдвиг меньше 6 px — не тяга, список на месте');
  tch('touchmove',380);
  assert(/translateY\(-?\d/.test(sc.style.transform)&&sc.classList.contains('dragging'),'палец ведёт — список едет за ним без перехода');
+ /* Большая кнопка привязана к резинке: тянешь — сжимается на долю тяги, отпустил — прыгает */
+ const cmp=$('composer'), pullV=()=>+cmp.style.getPropertyValue('--pull');
+ assert(cmp.classList.contains('pull')&&pullV()>0&&pullV()<=1,'пока тянешь, кнопка сжата на долю тяги (--pull)');
+ const p1=pullV(); tch('touchmove',420);
+ assert(pullV()>p1,'тянешь сильнее — сжимается сильнее');
  tch('touchend');
  assert(sc.style.transform===''&&!sc.classList.contains('dragging'),'отпустили — список возвращается');
+ assert(!cmp.classList.contains('pull')&&!cmp.classList.contains('jump')&&!cmp.style.getPropertyValue('--pull'),'отпустили — сжатие снято; здесь reduced-motion, поэтому без прыжка');
+ { /* с анимациями — прыжок */
+  const {w:wj,d:dj}=load('index.html',w2=>{ w2.matchMedia=()=>({matches:false}); });
+  const scj=dj.getElementById('scroll'), cj=dj.getElementById('composer');
+  const tj=(type,y)=>{const e=new wj.Event(type,{bubbles:true}); e.touches=y==null?[]:[{clientX:100,clientY:y}]; scj.dispatchEvent(e);};
+  tj('touchstart',300); tj('touchmove',380); tj('touchend');
+  assert(!cj.classList.contains('pull')&&cj.classList.contains('jump')&&+cj.style.getPropertyValue('--pull')>0,'отпустили — кнопка прыгает, высота прыжка по --pull');
+ }
+ assert(/\.composer\.mini\.pull\{[^}]*var\(--pull, 0\)[^}]*transition:none/.test(read('app.css'))&&/\.composer\.mini\.jump\{animation:jump var\(--t-slow\) var\(--e-over\)/.test(read('app.css')),'сжатие идёт за пальцем без перехода, прыжок — с перелётом по токенам');
  tch('touchstart',300); tch('touchmove',380); tch('touchcancel');
  assert(sc.style.transform==='','обрыв касания тоже возвращает');
 
@@ -189,7 +203,7 @@ async function common(file){
  /* оформление */
  const css=read('app.css');
  assert(!/prefers-color-scheme/.test(css)&&/--bg:#101010/.test(css),'тема одна, тёмная');
- assert(/--pri1:#2EC27E/.test(css)&&/--pri4:#FF4500/.test(css),'четыре плотных цвета приоритета');
+ assert(/--pri1:#2EC27E/.test(css)&&/--pri4:#E50006/.test(css),'четыре плотных цвета приоритета');
  /* движение — одна система: кривые по роли в CSS и в EASE движка совпадают, сырых кривых и секунд в переходах нет */
  const js=read('app.js'), tokOf=n=>(css.match(new RegExp('--'+n+':(cubic-bezier\\([^)]*\\))'))||[])[1];
  const ease=eval('('+(js.match(/const EASE = (\{[^}]*\})/)||[])[1]+')');

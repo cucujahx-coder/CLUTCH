@@ -221,7 +221,7 @@ function burst(row, keepRow){
  rf.animate([{opacity:.5,transform:'scale(.6)'},{opacity:0,transform:'scale(2.6)'}],{duration:390,easing:EASE.out});
  setTimeout(()=>rf.remove(),400);
 
- const cols=['#FF4500','#FF7A3D','#E0E0E0','#FFA073'];
+ const cols=['#E50006','#FF4A44','#E0E0E0','#FF8A86'];
  for(let i=0;i<10;i++){
   const a=(i/10)*Math.PI*2+Math.random(), d=34+Math.random()*40, s=document.createElement('span');
   s.className='spark'; s.style.cssText += 'left:'+cx+'px;top:'+cy+'px;background:'+cols[i%4];
@@ -764,7 +764,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v72';
+const APP_V='tasks-v73';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1254,9 +1254,19 @@ function paint(keep){
    ни overscroll-behavior этого не меняют — проверено на устройстве. Поэтому пока
    содержимое помещается, тянем область за пальцем сами с затуханием, как у UIScrollView,
    и отпускаем с возвратом. Длинный список сюда не попадает — он пружинит нативно. */
+/* Большая кнопка привязана к резинке списка: пока тянешь — сжимается, как под пальцем,
+   отпустил — подпрыгивает. Степень сжатия — доля от PULL_FULL пикселей тяги, в --pull. */
+const PULL_FULL = 90;
 function armRubber(el){
- let y0 = null, live = false, snapT = 0;
+ let y0 = null, live = false, snapT = 0, jumpT = 0;
  const short = () => el.scrollHeight - el.clientHeight <= 1;
+ const btn = () => el.closest('#scr-list') && composer.classList.contains('mini') ? composer : null;
+ const pull = p => { const b = btn(); if(!b) return; b.style.setProperty('--pull', p.toFixed(3)); b.classList.add('pull'); b.classList.remove('jump'); clearTimeout(jumpT); };
+ const jump = () => { const b = composer; if(!b.classList.contains('pull')) return;
+   b.classList.remove('pull');
+   if(RM || !b.classList.contains('mini')){ b.style.removeProperty('--pull'); return; }
+   b.classList.add('jump');
+   jumpT = setTimeout(()=>{ b.classList.remove('jump'); b.style.removeProperty('--pull'); }, 500); };
  /* затухание как у iOS: чем дальше тянешь, тем медленнее едет, предел — чуть больше половины */
  const damp = d => { const h = el.clientHeight || 1, c = 0.55, a = Math.abs(d);
    return Math.sign(d) * h * c * (1 - 1 / (a * c / h + 1)); };
@@ -1269,6 +1279,7 @@ function armRubber(el){
   const dy = e.touches[0].clientY - y0;
   if(!live){ if(Math.abs(dy) < 6) return; live = true; clearTimeout(snapT); el.classList.add('dragging'); el.classList.remove('rubber'); }
   el.style.transform = 'translateY(' + damp(dy).toFixed(1) + 'px)';
+  pull(Math.min(1, Math.abs(dy) / PULL_FULL));   /* по пути пальца, не по затухшему сдвигу */
  }, {passive:true});
  const release = () => {
   if(y0 === null) return;
@@ -1278,6 +1289,7 @@ function armRubber(el){
   el.classList.remove('dragging'); if(!RM) el.classList.add('rubber');
   el.style.transform = '';
   snapT = setTimeout(()=>el.classList.remove('rubber'), 450);
+  jump();
  };
  el.addEventListener('touchend', release);
  el.addEventListener('touchcancel', release);
