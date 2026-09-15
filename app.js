@@ -80,7 +80,8 @@ const P = {
   sort:'M4 7h13M4 12h9M4 17h5M17 13v7M17 20l3-3M17 20l-3-3',
   x:'M6 6l12 12M18 6L6 18',
   trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
-  file:'M14 3v5h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'
+  file:'M14 3v5h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+  edit:'M4 20h4L18 10l-4-4L4 16v4M13 7l4 4'
 };
 const Ic = (d,s=16) => '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="'+d+'"/></svg>';
 
@@ -749,7 +750,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v60';
+const APP_V='tasks-v61';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1230,9 +1231,6 @@ function toggle(x, row){
  undoBuf = {x};
  setTimeout(()=>{
   mark(x,1); save(); paint(1);
-  /* доводка: строки садятся друг за другом, как при пересортировке */
-  if(!RM) [...list.children].forEach((r,i)=>{ r.style.animationDelay=(i*LAG)+'ms'; r.classList.add('land');
-    setTimeout(()=>{ r.classList.remove('land'); r.style.animationDelay=''; },460+i*LAG); });
   showToast('Выполнено · ' + x.t);
  }, RM?0:140);
 }
@@ -1312,15 +1310,40 @@ function openPri(x, row){
  const back = document.createElement('div'); back.className = 'pri-back';
  const el = document.createElement('div'); el.className = 'pri';
  el.innerHTML = PRI.map(p => '<button class="press'+(Number(x.pri||0)===p.v?' on':'')+'" data-v="'+p.v+'" '+
-   'aria-label="Приоритет '+(p.v||'нет')+'">'+(p.c?'<span class="dotc" style="background:'+p.c+'"></span>':'—')+'</button>').join('');
+   'aria-label="Приоритет '+(p.v||'нет')+'">'+(p.c?'<span class="dotc" style="background:'+p.c+'"></span>':'—')+'</button>').join('')+
+   '<button class="press edit" data-edit="1" aria-label="Переименовать">'+Ic(P.edit,18)+'</button>';
  el.style.top = Math.max(16, Math.min(rb.top - hb.top, hb.height - 68 - 16)) + 'px';
  host.appendChild(back); host.appendChild(el);
  priPop = {el, back};
  tap(14);
  back.onclick = closePri;
- el.querySelectorAll('button').forEach(b => b.onclick = () => {
+ el.querySelectorAll('button[data-v]').forEach(b => b.onclick = () => {
   x.pri = Number(b.dataset.v); save(); tap(8); closePri(); paint(1);
  });
+ el.querySelector('[data-edit]').onclick = () => { tap(8); closePri(); editRow(row, x); };
+}
+/* Правка названия прямо в строке: карандаш в капсуле долгого нажатия. Заголовок строки
+   заменяется полем, Enter или уход фокуса сохраняют, Escape отменяет. У проекта правится
+   имя проекта (как в шапке чата), у задачи — название. Сокращать до двух слов не надо:
+   человек правит руками и знает, что пишет. Касания внутри поля не доходят до строки —
+   иначе клик открывал бы чат, а долгое нажатие снова звало бы капсулу. */
+function editRow(row, x){
+ const isP = !!row.dataset.pj, cell = row.querySelector('.cell'); if(!cell) return;
+ const was = isP ? x.n : x.t;
+ cell.innerHTML = '<input class="t1 edit" type="text" aria-label="Название" autocomplete="off" enterkeyhint="done">';
+ const inp = cell.querySelector('input'); inp.value = was;
+ ['click','pointerdown','touchstart','keydown'].forEach(ev => inp.addEventListener(ev, e => e.stopPropagation()));
+ let done = false;
+ const finish = ok => {
+  if(done) return; done = true;
+  const v = inp.value.trim();
+  if(ok && v && v !== was){ if(isP) x.n = v; else x.t = v; save(); }
+  paint(1);
+ };
+ inp.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); finish(true); } if(e.key === 'Escape'){ e.preventDefault(); finish(false); } });
+ inp.addEventListener('blur', () => finish(true));
+ try{ inp.focus({preventScroll:true}); }catch(e){ inp.focus(); }
+ try{ inp.setSelectionRange(inp.value.length, inp.value.length); }catch(e){}
 }
 /* 500 мс — столько же держит iOS до своего меню; сдвиг больше 10 px это прокрутка */
 function armPri(row, x){
@@ -1654,17 +1677,11 @@ function drawTabs(){
  const row = segs[0] && segs[0].parentElement;
  if(row) row.classList.toggle('none', !!S.showDone);
 }
-/* доводка: строки садятся друг за другом с шагом LAG */
-function landRows(){
- if(RM) return;
- [...list.children].forEach((r,i)=>{ r.style.animationDelay=(i*LAG)+'ms'; r.classList.add('land');
-  setTimeout(()=>{ r.classList.remove('land'); r.style.animationDelay=''; },460+i*LAG); });
-}
 document.querySelectorAll('.seg').forEach(b=>{
  b.onclick = () => {
   const t = b.dataset.tab;
   if(curTab() === t && !S.showDone) return;
-  S.tab = t; S.showDone = 0; save(); tap(8); paint(); landRows();
+  S.tab = t; S.showDone = 0; save(); tap(8); paint();
  };
 });
 /* круглая кнопка в шапке переключает входящие ↔ выполненные */
@@ -1688,13 +1705,40 @@ const composer = $('composer');
 const mini = () => composer.classList.contains('mini');
 function drawAdd(){
  const has = nt.value.trim().length > 0;
- addBtn.className = 'rnd press ' + (has ? 'go' : 'solid');
+ addBtn.className = 'rnd press ' + (has ? 'go' : 'solid') + (recBtn === addBtn ? ' rec' : '');
  swapIcon(addBtn, has ? 'up' : 'mic', Ic(has ? P.up : P.mic, 18));
 }
 function drawSend(){
  const has = msg.value.trim().length > 0;
- sendBtn.className = 'rnd press ' + (has ? 'go' : 'solid');
+ sendBtn.className = 'rnd press ' + (has ? 'go' : 'solid') + (recBtn === sendBtn ? ' rec' : '');
  swapIcon(sendBtn, has ? 'up' : 'mic', Ic(has ? P.up : P.mic, 18));
+}
+/* Голосовой набор на кнопке-микрофоне (она показывается, пока поле пустое). Web Speech API:
+   в Safari — webkitSpeechRecognition, есть с iOS 14.5. Текст подставляется в поле по мере
+   распознавания, кнопка на это время красная, повторное нажатие останавливает; отправлять
+   человек будет сам — так можно поправить. Где API нет, подсказываем микрофон на клавиатуре
+   (он у iOS свой) и ставим фокус в поле. */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+let rec = null, recBtn = null;
+function dictate(input, btn, redraw){
+ if(rec){ try{ rec.stop(); }catch(e){} return; }
+ if(!SR){
+  const ph = input.placeholder; input.placeholder = 'Микрофон — на клавиатуре';
+  setTimeout(()=>{ input.placeholder = ph; }, 2200);
+  try{ input.focus({preventScroll:true}); }catch(e){ input.focus(); }
+  return;
+ }
+ const r = new SR();
+ r.lang = navigator.language || 'ru-RU'; r.interimResults = true; r.continuous = false;
+ const base = input.value.trim();
+ r.onresult = e => {
+  let t = ''; for(const res of e.results) t += res[0].transcript;
+  input.value = (base ? base + ' ' : '') + t.trim(); redraw();
+ };
+ r.onend = () => { rec = null; recBtn = null; redraw(); };
+ r.onerror = () => { if(rec === r) r.onend(); };
+ rec = r; recBtn = btn; redraw(); tap(8);
+ try{ r.start(); }catch(e){ r.onend(); }
 }
 let ntFocused = false;
 /* Морф стартует с места кнопки. Фокус ниже ужмёт контейнер под клавиатуру мгновенно, и
@@ -1743,10 +1787,9 @@ scroll.addEventListener('pointerdown', ()=>{ if(!mini() && !nt.value.trim()) clo
 nt.addEventListener('keydown', e=>{ if(e.key==='Escape') closeComposer(); });
 function submitTask(){
  const v = nt.value.trim();
- if(!v){ addBtn.classList.add('rec'); tap(12); setTimeout(()=>{ addBtn.classList.remove('rec'); drawAdd(); },900); return; }
+ if(!v){ dictate(nt, addBtn, drawAdd); return; }   /* поле пустое — кнопка это микрофон */
  const t = addTask(v);
  nt.value=''; S.showDone=0; save(); paint();
- fly(list.querySelector('.row[data-id="'+t.id+'"]'));
  tap(14);
  closeComposer();
  shortenTitle(t);                    /* пишут как придётся — в списке имя в два слова */
@@ -1779,7 +1822,7 @@ sendBtn.addEventListener('pointerdown', e => e.preventDefault());
 msg.oninput = drawSend;
 function sendMsg(){
  const v = msg.value.trim();
- if(!v){ sendBtn.classList.add('rec'); tap(12); setTimeout(()=>{ sendBtn.classList.remove('rec'); drawSend(); },900); return; }
+ if(!v){ dictate(msg, sendBtn, drawSend); return; }
  msg.value=''; drawSend(); tap(14); ask(v);
  if(document.activeElement !== msg){ try{ msg.focus({preventScroll:true}); }catch(e){} }
 }

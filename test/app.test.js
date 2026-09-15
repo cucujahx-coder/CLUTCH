@@ -93,7 +93,7 @@ async function common(file){
  const row0=rows().find(r=>r.dataset.id), name0=txt(row0);   /* задача, не проект */
  row0.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true}));
  assert(!!d.querySelector('.pri'),'долгое нажатие открывает выбор приоритета');
- assert(d.querySelectorAll('.pri button').length===5,'пять ступеней: нет и четыре цвета');
+ assert(d.querySelectorAll('.pri button[data-v]').length===5&&!!d.querySelector('.pri [data-edit]'),'пять ступеней: нет и четыре цвета, плюс карандаш правки');
  d.querySelector('.pri button[data-v="3"]').click();
  assert(!d.querySelector('.pri'),'выбор закрывает капсулу');
  const again=()=>rows().find(r=>txt(r)===name0);
@@ -135,6 +135,9 @@ async function common(file){
  assert(/composer\.style\.transform = 'translateY\(' \+ \(-75 \+ \(kbH \|\| 0\)\)/.test(read('app.js')),'точка старта морфа — место кнопки с поправкой на высоту клавиатуры');
  $('add').click();
  assert(w.app.S.ts.every(x=>x.t!==''),'пустой ввод ничего не добавляет');
+ assert(/Микрофон/.test($('nt').placeholder),'без Web Speech кнопка-микрофон подсказывает микрофон на клавиатуре');
+ await wait(2300);
+ assert($('nt').placeholder==='Новая задача','подсказка возвращается к обычной');
  $('nt').value='q'; $('nt').dispatchEvent(new w.Event('input'));
  assert($('add').dataset.ic==='up','набрали текст — микрофон сменился стрелкой (ключ иконки)');
  $('nt').value=''; $('nt').dispatchEvent(new w.Event('input'));
@@ -622,6 +625,51 @@ async function clips(file){
 }
 
 
+/* ---------- правка названия из строки ---------- */
+async function editing(){
+ console.log('правка из строки');
+ const {w,d}=load('index.html');
+ const A=w.app, rows=()=>[...d.querySelectorAll('#list .row')], $=i=>d.getElementById(i);
+ const row=rows().find(r=>r.dataset.id), x=A.byId(+row.dataset.id), was=x.t;
+ row.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true}));
+ d.querySelector('.pri [data-edit]').click();
+ const inp=d.querySelector('#list .row[data-id="'+x.id+'"] input.edit');
+ assert(inp&&inp.value===was&&d.activeElement===inp,'карандаш ставит поле на место заголовка с текущим названием и фокусом');
+ inp.dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+ assert(!$('scr-detail').classList.contains('on'),'клик внутри поля не открывает чат');
+ inp.value='Новое имя'; inp.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter'}));
+ assert(x.t==='Новое имя'&&rows().find(r=>+r.dataset.id===x.id).querySelector('.t1').textContent==='Новое имя','Enter сохраняет и перерисовывает строку');
+ const pr=rows().find(r=>r.dataset.pj), p=A.prById(+pr.dataset.pj);
+ pr.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true})); d.querySelector('.pri [data-edit]').click();
+ const pi=d.querySelector('#list .row[data-pj="'+p.id+'"] input.edit');
+ assert(pi.value===p.n,'у проекта правится имя проекта, а не шаг');
+ pi.value='Другое'; pi.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape'}));
+ assert(p.n!=='Другое'&&!d.querySelector('#list input.edit'),'Escape отменяет');
+ /* после Escape строка перерисована — берём её заново, старый элемент уже отвязан */
+ rows().find(r=>+r.dataset.pj===p.id).dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true})); d.querySelector('.pri [data-edit]').click();
+ const pi2=d.querySelector('#list input.edit'); pi2.value='Проект Икс'; pi2.blur();
+ assert(p.n==='Проект Икс','уход фокуса сохраняет');
+}
+
+/* ---------- голосовой набор ---------- */
+function voice(){
+ console.log('голосовой набор');
+ const starts=[]; let live=null;
+ const {w,d}=load('index.html',w2=>{
+  w2.SpeechRecognition=function(){ live=this; this.start=()=>starts.push(this.lang); this.stop=()=>{ if(this.onend)this.onend(); }; };
+ });
+ const $=i=>d.getElementById(i);
+ $('shutter').click();
+ $('add').click();
+ assert(starts.length===1&&$('add').classList.contains('rec'),'пустое поле: кнопка-микрофон запускает распознавание, кнопка красная');
+ live.onresult({results:[[{transcript:'купить '}],[{transcript:'молоко'}]]});
+ assert($('nt').value==='купить молоко'&&$('add').classList.contains('rec'),'текст подставляется по мере распознавания, кнопка остаётся красной');
+ live.onend();
+ assert(!$('add').classList.contains('rec')&&$('add').dataset.ic==='up','распознавание кончилось — кнопка снова обычная, со стрелкой отправки');
+ $('add').click();
+ assert(w.app.S.ts.some(x=>x.t==='купить молоко'),'надиктованное отправляется той же кнопкой');
+}
+
 /* ---------- паук в ленте ----------
    Один на всю ленту, в конце последнего ответа, внутри последнего текстового блока разметки —
    иначе он падал бы на новую строку под абзацем. При prefers-reduced-motion его нет вовсе. */
@@ -795,6 +843,8 @@ async function haptics(file){
  await clips('index.html');
  await clips('panels.html');
  spiderTest();
+ await editing();
+ voice();
  await haptics('index.html');
  await haptics('panels.html');
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
