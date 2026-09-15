@@ -237,6 +237,9 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    от кнопки, под шапкой 44 в режиме под логотипом */
 #scr-list.top .scroll{flex-direction:column;padding-bottom:calc(76px + 21px + 44px + 47px + var(--pend, 0px) + var(--safe-b))}
 #scr-list.top .cap{order:-1;height:calc(16px + 44px + 44px + var(--safe-t))}
+/* при открытой строке ввода запас снизу тот же, что и в режиме от кнопки: правило .top выше по
+   порядку перебивало бы .tight (одинаковая специфичность) — поэтому повтор здесь */
+#scr-list.top .scroll.tight{padding-bottom:calc(68px + 44px + var(--foot) + var(--pend, 0px) + var(--safe-b))}
 
 /* ── строка списка: кружок слева, текст справа ─ */
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */
