@@ -243,9 +243,11 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .row .ck{width:36px;height:36px}
 .row .t1{font-size:15px}
 /* точка слева от названия, как в списке недавних у Claude (референс владельца, v93): 6 px,
-   приглушённая, на кромке текста; в поле правки её нет — это псевдоэлемент текста */
-.row .t1::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);
-  margin-right:12px;vertical-align:middle;position:relative;top:-1px}
+   едва заметная (v95); когда ассистент ждёт ответа (.row.ask) — фирменная синяя.
+   В поле правки её нет — это псевдоэлемент текста */
+.row .t1::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba(224,224,224,.16);
+  margin-right:12px;vertical-align:middle;position:relative;top:-1px;transition:background var(--t-fast) var(--e-out)}
+.row.ask .t1::before{background:var(--blue)}
 .row .t1.edit::before{content:none}
 @media (hover:hover){.row:hover{background:rgba(30,30,30,.8)}}
 .cell{min-width:0;flex:1}

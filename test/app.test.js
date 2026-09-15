@@ -31,7 +31,15 @@ async function common(file){
  assert(rows().some(r=>r.dataset.pj&&r.querySelector('.sr-only+.t1+.sr-only')),'имя проекта остаётся диктору');
  assert(/\.row\{[^}]*height:44px;padding:4px 4px 4px 16px[^}]*border-radius:22px/.test(read('app.css'))&&/\.pri\{[^}]*height:44px/.test(read('app.css')),'строка 44 — минимальная цель нажатия, 36 + 4×2, радиус 22, капсула приоритета той же высоты');
  assert(/\.row \.ck\{width:36px;height:36px\}/.test(read('app.css'))&&/\.row \.t1\{font-size:15px\}/.test(read('app.css'))&&/#list\{[^}]*gap:4px/.test(read('app.css')),'кружок 36, шрифт 15, зазор 4');
- assert(/\.row \.t1::before\{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var\(--muted\)/.test(read('app.css')),'слева от названия — точка 6 px, как в списке недавних у Claude');
+ assert(/\.row \.t1::before\{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba\(224,224,224,\.16\)/.test(read('app.css'))&&/\.row\.ask \.t1::before\{background:var\(--blue\)\}/.test(read('app.css')),'слева от названия — едва заметная точка 6 px; когда ассистент ждёт ответа — синяя');
+ { const t0=w.app.S.ts.find(x=>x.pj===null&&!x.done);
+   t0.chat=[{u:'что делать?'},{a:'Перенести на пятницу или оставить?'}]; w.app.paint();
+   assert(rows().find(r=>+r.dataset.id===t0.id).classList.contains('ask'),'последняя реплика ассистента кончается вопросом — строка помечена');
+   t0.chat.push({u:'оставить'}); w.app.paint();
+   assert(!rows().find(r=>+r.dataset.id===t0.id).classList.contains('ask'),'ответили — пометка снята');
+   t0.chat.push({a:'Хорошо, оставил.'}); w.app.paint();
+   assert(!rows().find(r=>+r.dataset.id===t0.id).classList.contains('ask'),'реплика без вопроса не ждёт ответа');
+   t0.chat=[]; w.app.paint(); }
  assert(pj('Запуск лендинга')&&txt(pj('Запуск лендинга'))==='Написать текст оффера','у проекта заголовок — ближайший открытый шаг, снизу — имя проекта');
  assert(/\.t2\{font-size:14px;color:var\(--text-2\)/.test(read('app.css'))&&/--text-2:#B4B4B4/.test(read('app.css')),'имя проекта читается: своя ступень цвета, а не приглушённый --muted');
  assert(w.app.kindOf({t:'Каждый день звонить маме',pj:null})==='routine'&&w.app.kindOf({t:'Напомнить про паспорт',pj:null})==='reminder','рутина и напоминание по словам');

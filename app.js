@@ -767,7 +767,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v94';
+const APP_V='tasks-v95';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1200,10 +1200,16 @@ function ckHTML(x, left){
   return '<button class="'+cls+'" aria-label="'+(x.done?'Снять отметку':'Выполнить')+': '+esc(x.t||x.n||'')+'">'+Ic(P.check,18)+'</button>';
  return '<button class="'+cls+'" aria-label="Закрыть следующий шаг, осталось '+left+'"><span class="num">'+left+'</span></button>';
 }
+/* Ассистент ждёт ответа: последняя реплика в переписке — его, и она кончается вопросом.
+   Такая строка получает синюю точку вместо едва заметной. */
+function needsReply(x){
+ const last = (x.chat || []).filter(m => !m.typing && !m.err).at(-1);
+ return !!(last && last.a !== undefined && last.u === undefined && /\?[^.!?]*$/.test(String(last.a).trim()));
+}
 /* Строка списка: задача или проект */
 function rowEl(x, isP, next, left){
  const r = document.createElement('div');
- r.className = 'row' + (x.done ? ' done' : '');
+ r.className = 'row' + (x.done ? ' done' : '') + (needsReply(x) ? ' ask' : '');
  if(isP) r.dataset.pj = x.id; else r.dataset.id = x.id;
  r.dataset.kind = kindOf(x, isP);
  r.tabIndex = 0;
@@ -2129,7 +2135,7 @@ try{ document.fonts && document.fonts.ready.then(toBottom); }catch(e){}
 window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, addTask, addStep, makeProject,
   delItem, fmtDue, flush, paint, openPri, closePri, showToast, hideToast,
   chatPayload, chatMessages, md, runTool, undoAct, byShort, shortId, fileBody, fmtSize, attach,
-  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles,
+  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles, needsReply,
   get pending(){return pending}, get undos(){return undos}, get undoNote(){return undoNote}};
 
 /* Открыть страницу с ?debug — поверх интерфейса появятся живые числа: размеры окна и
