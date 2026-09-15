@@ -424,21 +424,10 @@ body.nav #scr-detail.on .scroll{transition-delay:var(--lag)}
 .shutter:active .sw{transform:scale(1.14,.8);transition:transform var(--t-tap) var(--e-out)}
 .composer.mini{transform-origin:50% 100%}
 .composer.mini:has(.shutter:active){transform:translateY(-75px) scale(1.06,.9);transition:transform var(--t-tap) var(--e-out)}
-/* Резинка списка: пока тянешь, кнопка и паук сжимаются ровно на долю тяги (--pull ставит JS,
-   переход выключен — идёт за пальцем); отпустил — подпрыгивает на высоту, пропорциональную
-   тяге, с перелётом и садится. Та же геометрия, что у нажатия. */
-.composer.mini.pull{transform:translateY(-75px) scale(calc(1 + .06 * var(--pull, 0)), calc(1 - .1 * var(--pull, 0)));transition:none}
-.composer.mini.pull .shutter .sw{transform:scale(calc(1 + .14 * var(--pull, 0)), calc(1 - .2 * var(--pull, 0)));transition:none}
-@keyframes jump{
-  0%{transform:translateY(-75px) scale(calc(1 + .06 * var(--pull, 0)), calc(1 - .1 * var(--pull, 0)))}
-  45%{transform:translateY(calc(-75px - 28px * var(--pull, 0))) scale(.96,1.06)}
-  100%{transform:translateY(-75px) scale(1,1)}}
-@keyframes jump-sw{
-  0%{transform:scale(calc(1 + .14 * var(--pull, 0)), calc(1 - .2 * var(--pull, 0)))}
-  45%{transform:scale(.94,1.1)}
-  100%{transform:scale(1,1)}}
-.composer.mini.jump{animation:jump var(--t-slow) var(--e-over) both}
-.composer.mini.jump .shutter .sw{animation:jump-sw var(--t-slow) var(--e-over) both}
+/* Резинка списка: пока тянешь, кнопка и паук сжаты на долю тяги — трансформу ставит JS
+   inline, здесь только выключен переход, чтобы шло за пальцем; прыжок на отпускании —
+   animate() в JS. calc() в scale() и var() в @keyframes Safari не отрисовал. */
+.composer.mini.pull,.composer.mini.pull .shutter .sw{transition:none}
 /* своя реплика: без отскока и без скачка — просто мягко всплывает */
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes land{from{transform:translateY(12px)}to{transform:none}}

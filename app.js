@@ -764,7 +764,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v73';
+const APP_V='tasks-v74';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1255,18 +1255,28 @@ function paint(keep){
    содержимое помещается, тянем область за пальцем сами с затуханием, как у UIScrollView,
    и отпускаем с возвратом. Длинный список сюда не попадает — он пружинит нативно. */
 /* Большая кнопка привязана к резинке списка: пока тянешь — сжимается, как под пальцем,
-   отпустил — подпрыгивает. Степень сжатия — доля от PULL_FULL пикселей тяги, в --pull. */
+   отпустил — подпрыгивает. Степень сжатия — доля от PULL_FULL пикселей пути пальца.
+   Геометрия считается в JS и ставится inline (сжатие) и через animate() (прыжок): calc()
+   внутри scale() и var() в @keyframes Safari на телефоне не отрисовал — кнопка стояла. */
 const PULL_FULL = 90;
 function armRubber(el){
- let y0 = null, live = false, snapT = 0, jumpT = 0;
+ let y0 = null, live = false, snapT = 0, pulled = 0;
  const short = () => el.scrollHeight - el.clientHeight <= 1;
  const btn = () => el.closest('#scr-list') && composer.classList.contains('mini') ? composer : null;
- const pull = p => { const b = btn(); if(!b) return; b.style.setProperty('--pull', p.toFixed(3)); b.classList.add('pull'); b.classList.remove('jump'); clearTimeout(jumpT); };
+ const sw = () => composer.querySelector('.shutter .sw');
+ const squash = p => ({b:'translateY(-75px) scale(' + (1 + .06*p).toFixed(3) + ',' + (1 - .1*p).toFixed(3) + ')',
+                       s:'scale(' + (1 + .14*p).toFixed(3) + ',' + (1 - .2*p).toFixed(3) + ')'});
+ const pull = p => { const b = btn(); if(!b) return;
+   pulled = p; const q = squash(p);
+   b.classList.add('pull'); b.style.transform = q.b; const s = sw(); if(s) s.style.transform = q.s; };
  const jump = () => { const b = composer; if(!b.classList.contains('pull')) return;
-   b.classList.remove('pull');
-   if(RM || !b.classList.contains('mini')){ b.style.removeProperty('--pull'); return; }
-   b.classList.add('jump');
-   jumpT = setTimeout(()=>{ b.classList.remove('jump'); b.style.removeProperty('--pull'); }, 500); };
+   const p = pulled, q = squash(p), s = sw(); pulled = 0;
+   b.classList.remove('pull'); b.style.transform = ''; if(s) s.style.transform = '';
+   if(RM || !b.classList.contains('mini') || !b.animate) return;
+   /* прыжок: из сжатого — вверх с растяжением, высота по тяге — и сесть с перелётом */
+   b.animate([{transform:q.b},{transform:'translateY(' + (-75 - 28*p).toFixed(1) + 'px) scale(.96,1.06)',offset:.45},{transform:'translateY(-75px)'}],
+     {duration:420, easing:EASE.over});
+   if(s && s.animate) s.animate([{transform:q.s},{transform:'scale(.94,1.1)',offset:.45},{transform:'none'}],{duration:420, easing:EASE.over}); };
  /* затухание как у iOS: чем дальше тянешь, тем медленнее едет, предел — чуть больше половины */
  const damp = d => { const h = el.clientHeight || 1, c = 0.55, a = Math.abs(d);
    return Math.sign(d) * h * c * (1 - 1 / (a * c / h + 1)); };
