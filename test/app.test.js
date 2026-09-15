@@ -564,6 +564,38 @@ async function blocks(){
  assert(m2.at(-1).content[0].is_error===true,'ошибка инструмента помечена для модели');
 }
 
+/* ---------- сеть: ход с поиском хранится блоками, источники под ответом ---------- */
+async function web(){
+ console.log('сеть');
+ const {w,d}=load('index.html');
+ const A=w.app;
+ const t=A.S.ts.find(x=>x.pj===null);
+ const HIT={type:'web_search_result',url:'https://a.ru/x',title:'Грузчики',encrypted_content:'abc'};
+ const raw=[{type:'text',text:'Смотрю.'},{type:'server_tool_use',id:'srvtoolu_1',name:'web_search',input:{query:'грузчики'}},
+  {type:'web_search_tool_result',tool_use_id:'srvtoolu_1',content:[HIT]},{type:'text',text:'От 500.'}];
+ t.chat=[{u:'сколько стоят грузчики?'},{a:'Смотрю.\n\nОт 500.',raw,src:[{url:'https://a.ru/x',title:'<b>Грузчики'},{url:'javascript:alert(1)',title:'зло'}]}];
+ let m=await A.chatMessages(t);
+ assert(m[1].role==='assistant'&&m[1].content.map(b=>b.type).join()==='text,server_tool_use,web_search_tool_result,text','ход с поиском уходит в историю блоками как есть');
+ assert(m[1].content[2].content[0].encrypted_content==='abc','шифрованное содержимое результата не тронуто');
+ /* Старые ходы с поиском ужимаются до текста: результаты объёмные */
+ for(let i=0;i<3;i++)t.chat.push({u:'ещё '+i},{a:'ответ '+i,raw:[{type:'text',text:'ответ '+i}]});
+ m=await A.chatMessages(t);
+ assert(m[1].content.length===1&&m[1].content[0].text==='Смотрю.\n\nОт 500.','ход старше WEB_TURNS ужат до текста');
+ assert(!t.chat[1].raw,'и блоки у него стёрты, чтобы не копить в localStorage');
+ assert(t.chat.at(-1).raw,'у свежих ходов блоки на месте');
+ /* Источники в ленте */
+ A.paint(); [...d.querySelectorAll('#list .row')].find(r=>r.textContent.includes(t.t)).click();
+ const links=[...d.querySelectorAll('.srcs a.src')];
+ assert(links.length===1&&links[0].getAttribute('href')==='https://a.ru/x','под ответом капсула источника, не-http ссылка отброшена');
+ assert(links[0].textContent.includes('<b>Грузчики')&&!links[0].querySelector('b'),'заголовок источника экранирован');
+ assert(links[0].getAttribute('target')==='_blank'&&links[0].getAttribute('rel')==='noopener','открывается в новой вкладке без opener');
+ assert(links[0].textContent.includes('a.ru'),'рядом хост');
+ /* Поиск платный поштучно */
+ const before=A.spendUsd(A.S.spend);
+ A.addSpend({output_tokens:0,server_tool_use:{web_search_requests:2}});
+ assert(Math.abs(A.spendUsd(A.S.spend)-before-0.02)<1e-9,'два поиска — два цента в расходе');
+}
+
 /* ---------- разметка в ленте ---------- */
 function markdown(){
  console.log('разметка');
@@ -884,6 +916,7 @@ async function haptics(file){
  await memory();
  await files();
  await blocks();
+ await web();
  markdown();
  await clips('index.html');
  await clips('panels.html');

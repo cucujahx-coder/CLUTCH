@@ -96,7 +96,7 @@ ok(tu.name==='task_set_due'&&tu.input.date==='2026-09-18','аргументы с
 ok(tu.id==='tu_1','идентификатор вызова сохранён — по нему вернётся результат');
 ok(out.includes('"stop":"tool_use"'),'в done видно, что ход закончился вызовом');
 ok(Array.isArray(sent.body.tools)&&sent.body.tools.length>=12,'описания инструментов уходят модели');
-ok(sent.body.tools.every(t=>t.name&&t.input_schema),'у каждого инструмента имя и схема');
+ok(sent.body.tools.every(t=>t.name&&(t.input_schema||t.type)),'у каждого инструмента имя и схема — либо серверный тип');
 
 /* ход с вызовом и ответ с результатом — блочные сообщения, пробрасываются как есть */
 upstream(текст('Готово.'));
@@ -108,6 +108,72 @@ await post({...base(),messages:[
 const m=sent.body.messages;
 ok(m.length===3&&m[1].content[1].type==='tool_use','ход модели с вызовом дошёл блоками');
 ok(m[2].content[0].type==='tool_result'&&m[2].content[0].tool_use_id==='tu_1','результат дошёл с тем же идентификатором');
+
+/* ---------- сеть ---------- */
+const blk=(index,content_block)=>({type:'content_block_start',index,content_block});
+const stop=index=>({type:'content_block_stop',index});
+const HIT={type:'web_search_result',url:'https://a.ru/x',title:'Грузчики',encrypted_content:'abc',page_age:null};
+const searchTurn=[
+ blk(0,{type:'text',text:''}),{type:'content_block_delta',index:0,delta:{type:'text_delta',text:'Смотрю.'}},stop(0),
+ blk(1,{type:'server_tool_use',id:'srvtoolu_1',name:'web_search',input:{}}),
+ {type:'content_block_delta',index:1,delta:{type:'input_json_delta',partial_json:'{"query":"грузчики'}},
+ {type:'content_block_delta',index:1,delta:{type:'input_json_delta',partial_json:' москва цена"}'}},stop(1),
+ blk(2,{type:'web_search_tool_result',tool_use_id:'srvtoolu_1',content:[HIT]}),stop(2),
+ blk(3,{type:'text',text:''}),{type:'content_block_delta',index:3,delta:{type:'text_delta',text:'От 500 ₽ в час.'}},
+ {type:'content_block_delta',index:3,delta:{type:'citations_delta',citation:{type:'web_search_result_location',url:'https://a.ru/x',title:'Грузчики',cited_text:'…',encrypted_index:'q'}}},
+ {type:'content_block_delta',index:3,delta:{type:'citations_delta',citation:{type:'web_search_result_location',url:'https://a.ru/x',title:'Грузчики',cited_text:'…',encrypted_index:'w'}}},stop(3)
+];
+upstream(...searchTurn,{type:'message_delta',delta:{stop_reason:'end_turn'},usage:{output_tokens:20,server_tool_use:{web_search_requests:1}}});
+out=await read(await post(base()));
+const doneOf=o=>JSON.parse(o.split('event: done\ndata: ')[1].split('\n')[0]);
+let dn=doneOf(out);
+ok(sent.body.tools.some(t=>t.type==='web_search_20260209'&&t.max_uses>0)&&sent.body.tools.some(t=>t.type==='web_fetch_20260209'&&t.max_uses>0),'поиск и загрузка страниц объявлены, у обоих потолок вызовов — каждый платный');
+ok(sent.body.tools.find(t=>t.name==='web_fetch').max_content_tokens>0,'текст страницы ограничен — он ляжет в историю у клиента');
+ok(sent.body.tools.find(t=>t.name==='web_search').user_location.timezone==='Europe/Moscow','поиск знает пояс пользователя');
+ok(!sent.body.tools.some(t=>/^code_execution/.test(t.type)),'отдельного code_execution рядом с сетью нет — вторая среда исполнения путает модель');
+ok(out.includes('event: srv')&&out.includes('грузчики москва цена'),'ход поиска доходит до клиента подписью с готовым запросом');
+ok(out.includes('"Смотрю."')&&out.includes('"От 500 ₽ в час."'),'текст до и после поиска идёт кусками как раньше');
+ok(Array.isArray(dn.content)&&dn.content.map(b=>b.type).join()==='text,server_tool_use,web_search_tool_result,text','в done — ход целиком, блоками и по порядку');
+ok(dn.content[1].input.query==='грузчики москва цена','аргументы серверного вызова собраны из кусков');
+ok(dn.content[2].content[0].encrypted_content==='abc','результаты поиска сохранены как есть — иначе цитаты не соберутся');
+ok(dn.src&&dn.src.length===1&&dn.src[0].url==='https://a.ru/x'&&dn.src[0].title==='Грузчики','источники собраны из цитат без повторов');
+ok(dn.usage.server_tool_use.web_search_requests===1,'число поисков в расходе');
+upstream(текст('Просто ответ.'),{type:'message_delta',delta:{stop_reason:'end_turn'},usage:{output_tokens:3}});
+dn=doneOf(await read(await post(base())));
+ok(dn.content===undefined&&dn.src===undefined,'ход без сети блоками не отдаётся — клиент хранит его как раньше');
+
+/* кривой пояс не подставляется — API вернул бы 400 */
+upstream(текст('x'));
+await post({...base(),tz:'Не/Пояс'});
+ok(!sent.body.tools.find(t=>t.name==='web_search').user_location,'кривой пояс в поиск не уходит');
+
+/* pause_turn: воркер продолжает ход сам, в тот же поток */
+let calls=[];
+const streams=[
+ sse(...searchTurn,{type:'message_delta',delta:{stop_reason:'pause_turn'},usage:{output_tokens:20,server_tool_use:{web_search_requests:1}}}),
+ sse(текст('Итого: 500.'),{type:'message_delta',delta:{stop_reason:'end_turn'},usage:{output_tokens:5}})
+];
+globalThis.fetch=async(url,init)=>{calls.push(JSON.parse(init.body));return new Response(streams.shift(),{status:200})};
+out=await read(await post(base()));
+dn=doneOf(out);
+ok(calls.length===2,'после pause_turn воркер сам делает второй запрос');
+const cont=calls[1].messages.at(-1);
+ok(cont.role==='assistant'&&cont.content.map(b=>b.type).join()==='text,server_tool_use,web_search_tool_result,text','продолжение уходит с уже полученным ходом ассистента, без добавочного сообщения');
+ok(calls[1].messages.length===calls[0].messages.length+1,'история та же плюс ход ассистента');
+ok(out.split('event: done').length===2&&out.includes('"Итого: 500."'),'клиент видит один поток и один done');
+ok(dn.stop==='end_turn'&&dn.usage.output_tokens===25&&dn.usage.server_tool_use.web_search_requests===1,'расход суммируется по проходам, стоп — от последнего');
+ok(dn.content.length===5&&dn.content[4].text==='Итого: 500.','в done оба прохода одним ходом');
+
+/* ход с серверными вызовами возвращается в историю как есть */
+upstream(текст('Ещё.'));
+await post({...base(),messages:[
+ {role:'user',content:'сколько стоят грузчики?'},
+ {role:'assistant',content:[{type:'text',text:'Смотрю.'},{type:'server_tool_use',id:'srvtoolu_1',name:'web_search',input:{query:'грузчики'}},
+  {type:'web_search_tool_result',tool_use_id:'srvtoolu_1',content:[HIT]},{type:'text',text:'От 500.'}]},
+ {role:'user',content:'а в час?'}
+]});
+ok(sent.body.messages[1].content.map(b=>b.type).join()==='text,server_tool_use,web_search_tool_result,text','серверные блоки истории проходят без потерь');
+ok(sent.body.messages[1].content[2].content[0].encrypted_content==='abc','шифрованное содержимое результата не тронуто');
 
 /* мусор внутри блоков отбрасывается, а не ломает запрос */
 upstream(текст('x'));

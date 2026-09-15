@@ -470,6 +470,12 @@ body.two #scr-detail,body.two #scr-list.away{transform:none}
   background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:var(--glass)}
 .att>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .att .as{flex:none;opacity:.7}
+/* источники из сети под ответом и подпись «ищу…» под точками */
+.srcs{display:flex;flex-wrap:wrap;gap:6px;max-width:100%}
+.att.src{text-decoration:none;flex:0 1 auto;min-width:0}
+.att.src svg{flex:none}
+.ans .st{display:block;font-size:14px;color:var(--muted);margin-top:4px;animation:fade var(--t-fast) var(--e-out)}
+.ans.typing .st{margin:0 0 0 4px}
 .ax{flex:none;width:24px;height:24px;border:0;border-radius:12px;background:var(--g2a);color:var(--text);
   display:grid;place-items:center;cursor:pointer}
 /* карточка изменения, сделанного ассистентом, с кнопкой отмены */

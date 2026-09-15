@@ -77,6 +77,7 @@ const P = {
   plus:'M12 5v14M5 12h14',
   check:'M4 12l5 5L20 6',
   list:'M4 6h16M4 12h16M4 18h16',
+  globe:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M3 12h18M12 3c-3 3.5-3 14.5 0 18M12 3c3 3.5 3 14.5 0 18',
   sort:'M4 7h13M4 12h9M4 17h5M17 13v7M17 20l3-3M17 20l-3-3',
   x:'M6 6l12 12M18 6L6 18',
   trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
@@ -762,7 +763,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v65';
+const APP_V='tasks-v66';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -773,18 +774,28 @@ const SUM_AFTER=24, SUM_KEEP=10;
 /* Расход считаем в деньгах, а не в токенах: у чтения кэша, записи кэша, входа и
    выхода разные цены. Цены Sonnet 5 за миллион токенов; поменяется модель — поменять тут. */
 const PRICE={in:2,out:10,cr:0.2,cw:2.5};
+const PRICE_WS=0.01;              /* поиск в сети — за запрос, не за токены */
 function addSpend(u){
  if(!u)return;
  const sp=S.spend||(S.spend={in:0,out:0,cr:0,cw:0,at:Date.now()});
  sp.in+=u.input_tokens||0; sp.out+=u.output_tokens||0;
  sp.cr+=u.cache_read_input_tokens||0; sp.cw+=u.cache_creation_input_tokens||0;
+ sp.ws=(sp.ws||0)+((u.server_tool_use&&u.server_tool_use.web_search_requests)||0);
  save();
 }
-const spendUsd=sp=>!sp?0:(sp.in*PRICE.in+sp.out*PRICE.out+sp.cr*PRICE.cr+sp.cw*PRICE.cw)/1e6;
+const spendUsd=sp=>!sp?0:(sp.in*PRICE.in+sp.out*PRICE.out+sp.cr*PRICE.cr+sp.cw*PRICE.cw)/1e6+(sp.ws||0)*PRICE_WS;
+
+/* Ход с поиском в сети хранится блоками как есть (raw) и в историю возвращается целиком —
+   иначе модель забывает, что искала. Но результаты объёмные, поэтому целиком уходят только
+   последние WEB_TURNS ходов; у более старых блоки стираются, остаётся текст. */
+const WEB_TURNS=3;
 
 async function chatMessages(item){
  const out=[];
  const from=item.sumTo||0;
+ const answers=item.chat.filter(m=>m.a!==undefined&&!m.err&&!m.typing);
+ const rawFrom=answers.length>WEB_TURNS?answers[answers.length-WEB_TURNS]:null;
+ let rawOk=!rawFrom;
  /* Ходы пользователя считаем с конца: вложение старше ATT_TURNS уходит из контекста
     ссылкой — иначе его base64 уезжает заново каждый ход и быстро съедает окно. */
  const turns=item.chat.slice(from).filter(m=>m.u!==undefined).length;
@@ -806,9 +817,14 @@ async function chatMessages(item){
    }else out.push({role:'user',content:m.u});
    continue;
   }
+  if(m===rawFrom)rawOk=true;
+  if(m.raw&&!rawOk){delete m.raw; save();}
   const blocks=[];
-  if(m.a)blocks.push({type:'text',text:m.a});
-  if(m.tu)for(const t of m.tu)blocks.push({type:'tool_use',id:t.id,name:t.name,input:t.input||{}});
+  if(m.raw)blocks.push(...m.raw);
+  else{
+   if(m.a)blocks.push({type:'text',text:m.a});
+   if(m.tu)for(const t of m.tu)blocks.push({type:'tool_use',id:t.id,name:t.name,input:t.input||{}});
+  }
   if(blocks.length)out.push({role:'assistant',content:blocks});
   if(m.res&&m.res.length)out.push({role:'user',
    content:m.res.map(r=>({type:'tool_result',tool_use_id:r.id,content:r.out,...(r.err?{is_error:true}:{})}))});
@@ -851,7 +867,16 @@ async function chatPayload(item,isP){
 /* Один проход потока. Текст отдаётся кусками через onDelta — лента дорисовывается
    на ходу, а не появляется целиком в конце. Вызовы инструментов копятся и отдаются
    в конце: их аргументы приходят кусками и собираются воркером. */
-async function streamOnce(body,onDelta){
+/* Подпись под точками, пока модель ищет: что именно ищет или какую страницу читает */
+function srvLabel(d){
+ const inp=(d&&d.input)||{};
+ if(d.error)return 'Поиск не удался';
+ if(d.name==='web_search')return 'Ищу в сети'+(inp.query?': '+inp.query:'');
+ if(d.name==='web_fetch'){let h=''; try{h=new URL(inp.url).host.replace(/^www\./,'')}catch(e){} return 'Читаю'+(h?' '+h:' страницу');}
+ return '';
+}
+
+async function streamOnce(body,onDelta,onStatus){
  const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
  if(!r.ok){
   let why=''; try{why=(await r.json()).error||''}catch(e){}
@@ -861,7 +886,7 @@ async function streamOnce(body,onDelta){
  }
  if(!r.body)throw new Error('поток недоступен');
  const rd=r.body.getReader(), dec=new TextDecoder();
- let buf='', out='', got=false; const tools=[];
+ let buf='', out='', got=false, raw=null, src=null; const tools=[];
  for(;;){
   const {value,done}=await rd.read();
   if(done)break;
@@ -874,7 +899,8 @@ async function streamOnce(body,onDelta){
    let d; try{d=JSON.parse(dl)}catch(e){continue}
    if(ev==='text'){out+=d; got=true; onDelta&&onDelta(out);}
    else if(ev==='tool_use'){tools.push(d); got=true;}
-   else if(ev==='done'){addSpend(d&&d.usage);}
+   else if(ev==='srv'){const l=srvLabel(d); if(l&&onStatus)onStatus(l);}
+   else if(ev==='done'){addSpend(d&&d.usage); if(d&&Array.isArray(d.content))raw=d.content; if(d&&Array.isArray(d.src))src=d.src;}
    else if(ev==='error'){
     const e=new Error(d.error||'ошибка потока');
     e.retry=!got;                       /* повторяем только если ничего не успели показать */
@@ -883,14 +909,14 @@ async function streamOnce(body,onDelta){
   }
  }
  if(!got){const e=new Error('пустой ответ'); e.retry=true; throw e;}
- return {text:out.trim(),tools};
+ return {text:out.trim(),tools,raw,src};
 }
 
-async function askOnce(item,isP,onDelta){
+async function askOnce(item,isP,onDelta,onStatus){
  const body=await chatPayload(item,isP);
  let pause=600;
  for(let n=0;n<3;n++){
-  try{return await streamOnce(body,onDelta);}
+  try{return await streamOnce(body,onDelta,onStatus);}
   catch(e){
    /* Перегрузка модели и обрыв потока — повторяем с нарастающей паузой. Остальное
       показываем сразу: смысла ждать нет, а молчание хуже понятной ошибки. */
@@ -944,24 +970,33 @@ async function turn(item,isP){
  for(let round=0;round<6;round++){
   const ph={typing:1}; item.chat.push(ph); paint(); save();
   let res;
+  const last=()=>{ if(curKey()!==key)return null; const el=thread.lastElementChild; return el&&el.classList.contains('ans')?el:null; };
   try{
    res=await askOnce(item,isP,t=>{
     ph.typing=0; ph.a=t;
-    if(curKey()!==key)return;
-    const el=thread.lastElementChild;
-    if(el&&el.classList.contains('ans')){
-     el.classList.remove('typing');
-     /* Пишем внутрь .tx, чтобы не ломать разметку элемента ленты */
-     const tx=el.querySelector('.tx');
-     if(tx)tx.innerHTML=md(t); else el.innerHTML='<span class="tx">'+md(t)+'</span>';
-     spiderRun(el);
-     thread.scrollTop=thread.scrollHeight;
-    }
+    const el=last(); if(!el)return;
+    el.classList.remove('typing');
+    const st=el.querySelector('.st'); if(st)st.remove();
+    /* Пишем внутрь .tx, чтобы не ломать разметку элемента ленты */
+    const tx=el.querySelector('.tx');
+    if(tx)tx.innerHTML=md(t); else el.innerHTML='<span class="tx">'+md(t)+'</span>';
+    spiderRun(el);
+    thread.scrollTop=thread.scrollHeight;
+   },label=>{
+    /* Модель ушла в сеть: подпись под точками или под уже написанным текстом.
+       Живёт до следующего куска текста — в состояние не пишется. */
+    const el=last(); if(!el)return;
+    let st=el.querySelector('.st');
+    if(!st){st=document.createElement('span'); st.className='st'; el.appendChild(st);}
+    st.textContent=label;
+    thread.scrollTop=thread.scrollHeight;
    });
   }catch(e){
    ph.typing=0; ph.err=1; ph.a=(e&&e.message)||String(e); paint(); save(); return;
   }
   ph.typing=0; ph.a=res.text;
+  if(res.raw)ph.raw=res.raw;
+  if(res.src&&res.src.length)ph.src=res.src;
   if(!res.tools.length){
    if(!res.text)item.chat.pop();
    paint(); save(); squeeze(item); return;
@@ -1484,6 +1519,11 @@ function paintDetail(){
    const el = add('<div class="ans"><span class="tx">'+(m===typeNext?'':md(m.a))+'</span></div>');
    if(m===typeNext) typeEl = el;
   }
+  /* Источники из сети — капсулами под ответом; в тексте модель ссылки не перечисляет */
+  if(m.src&&m.src.length)add('<div class="srcs">'+m.src.filter(x=>/^https?:/i.test(x.url)).map(x=>{
+   let h=''; try{h=new URL(x.url).host.replace(/^www\./,'')}catch(e){}
+   return '<a class="att src press" href="'+esc(x.url)+'" target="_blank" rel="noopener">'+Ic(P.globe,12)+'<span>'+esc(x.title||h)+'</span>'+(x.title&&h?'<span class="as">'+esc(h)+'</span>':'')+'</a>';
+  }).join('')+'</div>');
   /* Карточка каждого изменения с отменой. Стек живёт до перезагрузки: после неё
      записи о вызове нет, и кнопка просто не рисуется — так честнее, чем мёртвая. */
   if(m.cards)for(const c of m.cards){

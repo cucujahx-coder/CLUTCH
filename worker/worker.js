@@ -9,8 +9,20 @@ const DEFAULT_MODEL='claude-sonnet-5';   /* разговор */
 const DEFAULT_SUM_MODEL='claude-haiku-4-5';  /* выжимки старой переписки — дешёвая модель */
 const MAX_TOKENS=4096;
 const EFFORT='low';                      /* чат должен отвечать быстро; поднять при поверхностных ответах */
-const MAX_BODY=256*1024;
+const MAX_BODY=1024*1024;                /* история несёт результаты поиска — они объёмные */
 const MAX_MSGS=40;
+
+/* Сеть: поиск и загрузка страниц исполняются на стороне Anthropic и приходят в том же
+   потоке. Версии _20260209 сами фильтруют выдачу кодом, отдельный code_execution рядом
+   объявлять нельзя — модель получает две среды исполнения. Каждый поиск платный, поэтому
+   потолок вызовов на ответ; текст страницы ограничен, потому что ляжет в историю у клиента. */
+const WEB_USES=3;
+const FETCH_TOKENS=6000;
+const WEB_TOOLS=[
+ {type:'web_search_20260209',name:'web_search',max_uses:WEB_USES},
+ {type:'web_fetch_20260209',name:'web_fetch',max_uses:WEB_USES,max_content_tokens:FETCH_TOKENS}
+];
+const PAUSES=3;                          /* сколько раз продолжаем ход после pause_turn */
 
 const ALLOW=[
  'https://cucujahx-coder.github.io',
@@ -110,6 +122,11 @@ export default {
    if(x.type==='text')return {type:'text',text:cut(x.text,8000)};
    if(x.type==='tool_use')return {type:'tool_use',id:cut(x.id,80),name:cut(x.name,60),input:x.input&&typeof x.input==='object'?x.input:{}};
    if(x.type==='tool_result')return {type:'tool_result',tool_use_id:cut(x.tool_use_id,80),content:cut(x.content,4000),...(x.is_error?{is_error:true}:{})};
+   /* Серверные вызовы и их результаты — как есть: в результатах поиска лежит шифрованное
+      содержимое, по которому модель собирает цитаты, его не обрезать и не пересобирать. */
+   if(x.type==='server_tool_use')return {type:'server_tool_use',id:cut(x.id,80),name:cut(x.name,60),input:x.input&&typeof x.input==='object'?x.input:{}};
+   if(x.type==='web_search_tool_result'||x.type==='web_fetch_tool_result')
+    return {type:x.type,tool_use_id:cut(x.tool_use_id,80),content:x.content};
    /* Вложения пользователя: картинка и PDF идут как есть, base64 не режем */
    if((x.type==='image'||x.type==='document')&&x.source&&x.source.type==='base64')
     return {type:x.type,source:{type:'base64',media_type:cut(x.source.media_type,80),data:String(x.source.data||'')}};
@@ -130,71 +147,141 @@ export default {
   if(!hist.length)return json({error:'empty history'},400,h);
   if(hist[hist.length-1].role!=='user')return json({error:'last message must be user'},400,h);
 
+  /* Поиск учитывает, где пользователь: «клиника рядом» без этого ищется где попало.
+     Пояс приходит от клиента; кривой — не подставляем, иначе API вернёт 400. */
+  const tools=[...TOOLS,...WEB_TOOLS.map(t=>t.name==='web_search'&&validTz(b.tz)
+   ?{...t,user_location:{type:'approximate',timezone:b.tz}}:t)];
+  const system=buildSystem({...b,today});
+  const call=messages=>fetch('https://api.anthropic.com/v1/messages',{
+   method:'POST',
+   headers:{
+    'content-type':'application/json',
+    'anthropic-version':'2023-06-01',
+    'x-api-key':env.ANTHROPIC_API_KEY
+   },
+   body:JSON.stringify({
+    model,
+    max_tokens:MAX_TOKENS,
+    stream:true,
+    system,
+    tools,
+    output_config:{effort:EFFORT},
+    messages
+   })
+  });
+
   let up;
-  try{
-   up=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{
-     'content-type':'application/json',
-     'anthropic-version':'2023-06-01',
-     'x-api-key':env.ANTHROPIC_API_KEY
-    },
-    body:JSON.stringify({
-     model,
-     max_tokens:MAX_TOKENS,
-     stream:true,
-     system:buildSystem({...b,today}),
-     tools:TOOLS,
-     output_config:{effort:EFFORT},
-     messages:hist
-    })
-   });
-  }catch(e){return json({error:'сеть до Anthropic: '+cut(e&&e.message||e,200)},502,h);}
+  try{up=await call(hist);}
+  catch(e){return json({error:'сеть до Anthropic: '+cut(e&&e.message||e,200)},502,h);}
 
   if(!up.ok)return json({error:'anthropic '+up.status,detail:cut(await up.text(),500)},502,h);
 
-  return new Response(relay(up.body),{
+  /* Серверный цикл упёрся в свой лимит итераций (pause_turn) — продолжаем ход сами,
+     в тот же поток: переотправляем историю с уже полученным ходом ассистента, без
+     добавочного сообщения. Клиент про паузу не знает. */
+  const again=async content=>{
+   try{const r=await call([...hist,{role:'assistant',content}]); return r.ok?r.body:null;}
+   catch(e){return null;}
+  };
+
+  return new Response(relay(up.body,again),{
    headers:{...h,'content-type':'text/event-stream; charset=utf-8','cache-control':'no-cache','connection':'keep-alive'}
   });
  }
 };
 
-/* Пересобираем поток Anthropic в свой: клиенту нужны только text, error и done.
+const validTz=tz=>{if(typeof tz!=='string'||!tz||tz.length>60)return false;try{new Intl.DateTimeFormat('en',{timeZone:tz});return true}catch(e){return false}};
+
+/* Расход суммируется по проходам: после pause_turn ход тот же, а запросов два */
+const acc=(a,b)=>{
+ if(!b||typeof b!=='object')return a;
+ a=a&&typeof a==='object'?a:{};
+ for(const k in b){
+  if(typeof b[k]==='number')a[k]=(a[k]||0)+b[k];
+  else if(b[k]&&typeof b[k]==='object')a[k]=acc(a[k],b[k]);
+ }
+ return a;
+};
+
+/* Пересобираем поток Anthropic в свой: клиенту нужны text, tool_use, srv, error и done.
    Свой формат, а не проброс как есть, — чтобы клиент не зависел от внутренних
-   типов событий API и не ломался при их изменении. */
-function relay(body){
+   типов событий API и не ломался при их изменении.
+   Ход с серверными вызовами (поиск, загрузка страницы) клиент должен вернуть в истории
+   целиком и в том же порядке, иначе на следующем ходу модель забудет, что искала, —
+   поэтому такой ход отдаётся в done блоками (content), а источники из цитат — списком (src). */
+function relay(body,again){
  const dec=new TextDecoder(), enc=new TextEncoder();
- let buf='', usage=null, stop=null, blocks={};
- const send=(c,ev,data)=>c.enqueue(enc.encode('event: '+ev+'\ndata: '+JSON.stringify(data)+'\n\n'));
- return body.pipeThrough(new TransformStream({
-  transform(chunk,c){
-   buf+=dec.decode(chunk,{stream:true});
-   const parts=buf.split('\n\n'); buf=parts.pop();
-   for(const p of parts){
-    const line=p.split('\n').find(x=>x.startsWith('data:'));
-    if(!line)continue;
-    let d; try{d=JSON.parse(line.slice(5).trim())}catch(e){continue}
-    if(d.type==='content_block_start'&&d.content_block&&d.content_block.type==='tool_use')
-     blocks[d.index]={id:d.content_block.id,name:d.content_block.name,json:''};
-    else if(d.type==='content_block_delta'&&d.delta&&d.delta.type==='text_delta')send(c,'text',d.delta.text);
-    else if(d.type==='content_block_delta'&&d.delta&&d.delta.type==='input_json_delta'&&blocks[d.index])
-     blocks[d.index].json+=d.delta.partial_json||'';
-    else if(d.type==='content_block_stop'&&blocks[d.index]){
-     /* Аргументы приходят кусками; клиенту отдаём одно событие с готовым JSON */
-     const b=blocks[d.index]; delete blocks[d.index];
-     let input={}; try{input=b.json?JSON.parse(b.json):{}}catch(e){}
-     send(c,'tool_use',{id:b.id,name:b.name,input});
+ return new ReadableStream({async start(c){
+  const send=(ev,data)=>c.enqueue(enc.encode('event: '+ev+'\ndata: '+JSON.stringify(data)+'\n\n'));
+  let usage=null, stop=null, srv=false;
+  const content=[], src=[], seen={};
+  const cite=x=>{
+   if(!x||typeof x.url!=='string'||!/^https?:/i.test(x.url)||seen[x.url])return;
+   seen[x.url]=1; src.push({url:cut(x.url,500),title:cut(x.title||'',120)});
+  };
+  const handle=(d,blocks)=>{
+   const i=d.index;
+   if(d.type==='content_block_start'&&d.content_block){
+    const cb=d.content_block;
+    if(cb.type==='text'){const b={type:'text',text:''}; blocks[i]=b; content.push(b);}
+    else if(cb.type==='tool_use'||cb.type==='server_tool_use'){
+     const b={type:cb.type,id:cb.id,name:cb.name,input:{}}; blocks[i]=b; b.json=''; content.push(b);
+     if(cb.type==='server_tool_use')srv=true;
+    }else if(cb.type==='web_search_tool_result'||cb.type==='web_fetch_tool_result'){
+     srv=true; content.push({type:cb.type,tool_use_id:cb.tool_use_id,content:cb.content});
+     const err=cb.content&&!Array.isArray(cb.content)&&cb.content.error_code;
+     if(err)send('srv',{name:cb.type,error:cut(err,60)});
     }
-    else if(d.type==='message_delta'){
-     if(d.usage)usage=d.usage;
-     if(d.delta&&d.delta.stop_reason)stop=d.delta.stop_reason;
-    }
-    else if(d.type==='error')send(c,'error',{error:(d.error&&d.error.message)||'ошибка потока',code:(d.error&&d.error.type)||''});
    }
-  },
-  flush(c){
-   if(stop==='refusal')send(c,'error',{error:'Модель отказалась отвечать на это.',code:'refusal'});
-   send(c,'done',{usage,stop});
+   else if(d.type==='content_block_delta'&&d.delta){
+    const dl=d.delta;
+    if(dl.type==='text_delta'){
+     let b=blocks[i];
+     if(!b||b.type!=='text'){b={type:'text',text:''}; blocks[i]=b; content.push(b);}
+     b.text+=dl.text||''; send('text',dl.text);
+    }
+    else if(dl.type==='input_json_delta'&&blocks[i]&&blocks[i].json!==undefined)blocks[i].json+=dl.partial_json||'';
+    else if(dl.type==='citations_delta')cite(dl.citation);
+   }
+   else if(d.type==='content_block_stop'&&blocks[i]){
+    const b=blocks[i]; delete blocks[i];
+    if(b.json===undefined)return;
+    /* Аргументы приходят кусками; наружу отдаём одно событие с готовым JSON */
+    let input={}; try{input=b.json?JSON.parse(b.json):{}}catch(e){}
+    delete b.json; b.input=input;
+    if(b.type==='tool_use')send('tool_use',{id:b.id,name:b.name,input});
+    else send('srv',{name:b.name,input});
+   }
+   else if(d.type==='message_delta'){
+    if(d.usage)usage=acc(usage,d.usage);
+    if(d.delta&&d.delta.stop_reason)stop=d.delta.stop_reason;
+   }
+   else if(d.type==='error')send('error',{error:(d.error&&d.error.message)||'ошибка потока',code:(d.error&&d.error.type)||''});
+  };
+  for(let pass=0;pass<=PAUSES;pass++){
+   const blocks={}; let buf='';
+   const rd=body.getReader();
+   for(;;){
+    const {value,done}=await rd.read();
+    if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    const parts=buf.split('\n\n'); buf=parts.pop();
+    for(const p of parts){
+     const line=p.split('\n').find(x=>x.startsWith('data:'));
+     if(!line)continue;
+     let d; try{d=JSON.parse(line.slice(5).trim())}catch(e){continue}
+     handle(d,blocks);
+    }
+   }
+   if(stop!=='pause_turn'||!again||pass===PAUSES)break;
+   body=await again(content.filter(b=>b.type!=='text'||b.text));
+   if(!body)break;
+   stop=null;
   }
- }));
+  if(stop==='refusal')send('error',{error:'Модель отказалась отвечать на это.',code:'refusal'});
+  send('done',{usage,stop,
+   ...(srv?{content:content.filter(b=>b.type!=='text'||b.text)}:{}),
+   ...(src.length?{src}:{})});
+  c.close();
+ }});
 }
