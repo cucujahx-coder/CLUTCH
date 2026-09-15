@@ -61,7 +61,7 @@ async function common(file){
  assert($('sort').classList.contains('topbtn')&&!$('scr-list').classList.contains('top'),'сверху справа — порядок списка; по умолчанию снизу вверх, от кнопки');
  { const before=rows().map(txt).join('|'); $('sort').click();
    assert(w.app.S.up===1&&$('scr-list').classList.contains('top'),'переключили — список под логотипом, сверху вниз');
-   assert(rows().map(txt).join('|')===before.split('|').reverse().join('|'),'под логотипом порядок зеркальный: срочное наверху, у якоря');
+   assert(rows().map(txt).join('|')===before,'под логотипом порядок тот же: приоритет растёт сверху вниз, срочное внизу');
    assert(/#scr-list\.top \.scroll\{flex-direction:column;padding-bottom:calc\(76px \+ 53px \+ 44px \+ 47px/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1;height:calc\(16px \+ 44px \+ var\(--rowh\) \+ var\(--safe-t\)\)\}/.test(read('app.css')),'под логотипом: колпак первым и в одну строку (44) от шапки, снизу обычные 16');
    assert(/#scr-list \.scroll\{[^}]*padding-bottom:calc\(76px \+ 53px \+ 44px \+ 31px \+ var\(--rowh\)/.test(read('app.css')),'от кнопки: одна строка (--rowh) до кольца кнопки');
    assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ var\(--rowh\)/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight #list\{margin-top:auto\}/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight\{padding-bottom:calc\(68px \+ var\(--rowh\)/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи одна строка, и под логотипом список прижат к строке ввода');
