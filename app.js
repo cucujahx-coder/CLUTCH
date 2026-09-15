@@ -190,7 +190,38 @@ addEventListener('focusin', e => { if(e.target.matches && e.target.matches('.inp
 /* ---------- вспышка выполнения ----------
    Одна и та же у задачи в списке и у шага в чате. keepRow — строка остаётся на месте
    (шаг проекта закрывают кольцом), тогда вместо призрака вспыхивает сама плашка. */
-function burst(row, keepRow){
+/* Лазер (v103, вариант 1): паук на большой кнопке «прицеливается» — глаза вспыхивают
+   красным — и из обоих глаз за LASER_MS вытягиваются два луча к кружку строки; в момент
+   попадания зовётся обычный взрыв, только крупнее (big). Только на экране списка и только
+   пока кнопка свёрнута и не в режиме голоса: в чате паука нет — там взрыв как раньше.
+   Возвращает задержку до попадания, чтобы отметка и хлопок пришлись на удар. */
+const LASER_MS = 120;
+function laser(row){
+ if(RM || !row || !row.animate) return 0;
+ const host = row.closest('#scr-list');
+ if(!host || !composer.classList.contains('mini') || composer.classList.contains('voice')) return 0;
+ const eyes = [...composer.querySelectorAll('.shutter .eye use')]; if(eyes.length < 2) return 0;
+ const ck = row.querySelector('.ck'); if(!ck) return 0;
+ const hb = host.getBoundingClientRect(), cb = ck.getBoundingClientRect();
+ const tx = cb.left - hb.left + cb.width/2, ty = cb.top - hb.top + cb.height/2;
+ const sh = $('shutter'); sh.classList.add('zap'); setTimeout(()=>sh.classList.remove('zap'), LASER_MS + 160);
+ for(const e of eyes){
+  const eb = e.getBoundingClientRect();
+  const x = eb.left - hb.left + eb.width/2, y = eb.top - hb.top + eb.height/2;
+  const dx = tx - x, dy = ty - y, len = Math.hypot(dx, dy), ang = (Math.atan2(dy, dx) * 180 / Math.PI).toFixed(2);
+  const b = document.createElement('div'); b.className = 'laser';
+  b.style.cssText += 'left:'+x.toFixed(1)+'px;top:'+y.toFixed(1)+'px;width:'+len.toFixed(1)+'px;transform:rotate('+ang+'deg) scaleX(0)';
+  host.appendChild(b);
+  /* луч вытягивается от глаза к цели с ускорением (уход — --e-in), долетает к LASER_MS, гаснет */
+  b.animate([{transform:'rotate('+ang+'deg) scaleX(0)',opacity:1},
+             {transform:'rotate('+ang+'deg) scaleX(1)',opacity:1,offset:.55},
+             {transform:'rotate('+ang+'deg) scaleX(1)',opacity:0}],
+    {duration:LASER_MS + 100, easing:EASE.in, fill:'forwards'});
+  setTimeout(()=>b.remove(), LASER_MS + 120);
+ }
+ return LASER_MS;
+}
+function burst(row, keepRow, big){
  if(RM || !row || !row.animate) return;
  const ck = row.querySelector('.ck'); if(!ck) return;
  const host = row.closest('.screen'); if(!host) return;
@@ -221,12 +252,13 @@ function burst(row, keepRow){
  const rf = document.createElement('div'); rf.className='ringfx';
  rf.style.cssText += 'left:'+(cx-22)+'px;top:'+(cy-22)+'px;width:44px;height:44px';
  host.appendChild(rf);
- rf.animate([{opacity:.5,transform:'scale(.6)'},{opacity:0,transform:'scale(2.6)'}],{duration:390,easing:EASE.out});
+ rf.animate([{opacity:.5,transform:'scale(.6)'},{opacity:0,transform:'scale('+(big?3.4:2.6)+')'}],{duration:390,easing:EASE.out});
  setTimeout(()=>rf.remove(),400);
 
- const cols=['#E50006','#FF4A44','#E0E0E0','#FF8A86'];
- for(let i=0;i<10;i++){
-  const a=(i/10)*Math.PI*2+Math.random(), d=34+Math.random()*40, s=document.createElement('span');
+ /* после лазера взрыв крупнее: искр больше и разлёт шире */
+ const cols=['#E50006','#FF4A44','#E0E0E0','#FF8A86'], n=big?16:10, spread=big?70:40;
+ for(let i=0;i<n;i++){
+  const a=(i/n)*Math.PI*2+Math.random(), d=34+Math.random()*spread, s=document.createElement('span');
   s.className='spark'; s.style.cssText += 'left:'+cx+'px;top:'+cy+'px;background:'+cols[i%4];
   host.appendChild(s);
   /* дуги: искра летит по параболе — на полпути выше прямой, к концу проседает под тяжестью */
@@ -767,7 +799,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v102';
+const APP_V='tasks-v103';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1368,27 +1400,33 @@ function toBottom(){
 /* ---------- выполнение ---------- */
 function toggle(x, row){
  if(x.done){ mark(x,0); save(); paint(1); tap(10); return; }
- tap(25); pop();
- row.querySelector('.ck').classList.add('on');
- burst(row);
+ tap(25);
+ /* сначала лазер из глаз паука, на попадании — галочка, хлопок и взрыв */
+ const hit = laser(row);
+ const impact = ()=>{ pop(); row.querySelector('.ck').classList.add('on'); burst(row, false, !!hit); };
+ if(hit) setTimeout(impact, hit); else impact();   /* без лазера — сразу, синхронно, как раньше */
  undoBuf = {x};
  setTimeout(()=>{
   mark(x,1); save(); paint(1);
   showToast('Выполнено · ' + x.t);
- }, RM?0:140);
+ }, RM?0:140+hit);
 }
 /* Кольцо проекта закрывает ближайший открытый шаг; строка остаётся на месте */
 function ringTap(p, row){
  const op = openIn(p.id);
  if(!op.length) return;
- tap(25); pop();
+ tap(25);
  const ck = row.querySelector('.ck');
- burst(row, true);
- /* сжатие и растяжение: кружок плющится под нажатием, растягивается и садится */
- if(!RM && ck && ck.animate) ck.animate([{transform:'scale(1)'},{transform:'scale(1.28,.8)',offset:.3},
-   {transform:'scale(.9,1.16)',offset:.65},{transform:'scale(1)'}],{duration:320,easing:EASE.over});
+ const hit = laser(row);
+ const impact = ()=>{
+  pop(); burst(row, true, !!hit);
+  /* сжатие и растяжение: кружок плющится под ударом, растягивается и садится */
+  if(!RM && ck && ck.animate) ck.animate([{transform:'scale(1)'},{transform:'scale(1.28,.8)',offset:.3},
+    {transform:'scale(.9,1.16)',offset:.65},{transform:'scale(1)'}],{duration:320,easing:EASE.over});
+ };
+ if(hit) setTimeout(impact, hit); else impact();
  undoBuf = {x:op[0]};
- setTimeout(()=>{ mark(op[0],1); save(); paint(1); showToast('Шаг закрыт · ' + op[0].t); }, RM?0:140);
+ setTimeout(()=>{ mark(op[0],1); save(); paint(1); showToast('Шаг закрыт · ' + op[0].t); }, RM?0:140+hit);
 }
 
 /* ---------- плашка о выполненном ----------
