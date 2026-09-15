@@ -150,25 +150,27 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* Одна плашка на три вида, активный выделен вложенной капсулой (`.segbar`), а не своим фоном:
    три отдельные капсулы читались как три кнопки, а это один переключатель. Высота ряда
    остаётся 44 — на ней стоит свёрнутая капсула строки ввода (translateY(-75px)). */
-.dockrow{position:relative;display:flex;align-items:center;width:100%;height:44px;padding:3px;
-  border-radius:22px;background:rgba(16,16,16,.66);   /* плоская подложка: ни канта, ни размытия */
+/* Капсула видов — по центру дока, три иконки по 64: стеклянная, как кнопка выполненных и
+   таблетка логотипа (референс владельца — iOS-таблетка с тремя значками). Раньше это был
+   плоский ряд во всю ширину с текстом FLOW / PROCESS / FOCUS. */
+.dockrow{position:relative;display:flex;align-items:center;width:auto;height:44px;padding:3px;
+  border-radius:22px;background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  box-shadow:var(--glass);
   transition:opacity var(--t-tap) var(--e-out)}
 .dockrow.busy{opacity:0;pointer-events:none}   /* плашка о выполненном встаёт ровно на это место */
 /* Подложка активного вида — одна на всех и ездит между третями: переключение это перемещение
    одного элемента, а не подмена фона у двух. Позицию (0/1/2) ставит drawTabs в --seg-i. */
-/* Активный вид — стеклянная капсула, ровно как кнопка выполненных и таблетка логотипа:
-   тот же фон, то же размытие, тот же кант --glass. Неактивные плоские: у них фона нет вовсе,
-   видна плоская подложка ряда — разница между «выбрано» и «нет» держится на стекле. */
+/* Активный вид — светлая плоская подложка внутри стеклянной капсулы (второе стекло внутри
+   первого сливалось бы с ним) плюс иконка цветом --hot. */
 .segbar{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 3);border-radius:19px;
-  background:rgba(30,30,30,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  box-shadow:var(--glass);pointer-events:none;
+  background:var(--g2a);pointer-events:none;
   transform:translateX(calc(var(--seg-i, 0) * 100%));
   transition:transform var(--t-base) var(--e-move),opacity var(--t-tap) var(--e-out)}
 .dockrow.none .segbar{opacity:0}   /* открыты выполненные — активного вида нет */
-.seg{position:relative;z-index:1;flex:1 1 0;min-width:0;height:100%;padding:0 4px;border:0;border-radius:19px;
-  background:transparent;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-family:var(--font-head);font-size:16px;letter-spacing:1px;line-height:1;color:var(--muted);
+.seg{position:relative;z-index:1;flex:none;width:64px;height:100%;padding:0;border:0;border-radius:19px;
+  background:transparent;cursor:pointer;display:grid;place-items:center;color:var(--muted);
   transition:color var(--t-base) var(--e-out),transform var(--t-base) var(--e-over)}
+.seg svg{display:block}
 .seg.on{color:var(--hot)}
 @media (hover:hover){.seg:not(.on):hover{color:var(--text)}}
 /* кружок стоит по одной оси с кружками задач: у строки внутренний отступ справа 11 */

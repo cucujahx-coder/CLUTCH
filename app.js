@@ -77,6 +77,8 @@ const P = {
   plus:'M12 5v14M5 12h14',
   check:'M4 12l5 5L20 6',
   list:'M4 6h16M4 12h16M4 18h16',
+  layers:'M12 3 3 8l9 5 9-5-9-5M3 13l9 5 9-5M3 18l9 5 9-5',
+  target:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 12h.01',
   globe:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M3 12h18M12 3c-3 3.5-3 14.5 0 18M12 3c3 3.5 3 14.5 0 18',
   sort:'M4 7h13M4 12h9M4 17h5M17 13v7M17 20l3-3M17 20l-3-3',
   x:'M6 6l12 12M18 6L6 18',
@@ -764,7 +766,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v79';
+const APP_V='tasks-v80';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1787,6 +1789,10 @@ trackSafe(); trackVH();
 
 /* Три капсулы в доке: чем показан список. Выбор живёт в S — переживает перезагрузку.
    Выполненные идут поверх вида, поэтому при переключении капсулы список возвращается к ним. */
+/* Три вида — три иконки в одной капсуле по центру дока (референс владельца — iOS-таблетка
+   с тремя значками): список — FLOW, слои — PROCESS, мишень — FOCUS. Подписи остались в aria-label. */
+const TAB_ICON = {flow:'list', process:'layers', focus:'target'};
+document.querySelectorAll('.seg').forEach(b=>{ b.innerHTML = Ic(P[TAB_ICON[b.dataset.tab]] || P.list, 22); });
 function drawTabs(){
  const t = curTab(), segs = [...document.querySelectorAll('.seg')];
  segs.forEach((b,i)=>{

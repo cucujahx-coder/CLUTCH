@@ -42,14 +42,15 @@ async function common(file){
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('find').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
  const segs=[...d.querySelectorAll('.dockrow .seg')];
- assert(!$('sort')&&segs.map(b=>b.dataset.tab).join(',')==='flow,process,focus'&&segs.map(b=>b.textContent).join(',')==='FLOW,PROCESS,FOCUS','вместо сортировки — три капсулы FLOW / PROCESS / FOCUS');
+ assert(!$('sort')&&segs.map(b=>b.dataset.tab).join(',')==='flow,process,focus'&&segs.map(b=>b.getAttribute('aria-label')).join(',')==='FLOW,PROCESS,FOCUS'&&segs.every(b=>b.querySelector('svg')&&!b.textContent.trim()),'вместо сортировки — три капсулы FLOW / PROCESS / FOCUS');
  assert(segs[0].classList.contains('on')&&segs[0].getAttribute('aria-selected')==='true','по умолчанию FLOW');
  /* одна плашка на три вида: подложка активного одна и ездит между третями */
  assert(d.querySelectorAll('.dockrow .segbar').length===1&&d.querySelector('.dockrow').style.getPropertyValue('--seg-i')==='0','активный вид отмечен общей подложкой, стоящей на первой трети');
- /* активная — стеклянная, как кнопка выполненных; ряд под ней плоский */
+ /* капсула видов — стеклянная таблетка по центру с тремя иконками; активная — плоская светлая подложка внутри */
  const cssSeg=read('app.css').replace(/\/\*[\s\S]*?\*\//g,'');
- assert(/\.segbar\{[^}]*backdrop-filter:blur\(8px\);\s*box-shadow:var\(--glass\)/.test(cssSeg),'активная капсула в том же стекле, что .rnd44 и таблетка логотипа');
- assert(!/\.dockrow\{[^}]*(--glass|backdrop-filter)/.test(cssSeg),'ряд под ней плоский: ни канта, ни размытия');
+ assert(/\.dockrow\{[^}]*width:auto[^}]*backdrop-filter:blur\(8px\);\s*box-shadow:var\(--glass\)/.test(cssSeg),'капсула видов стеклянная и по ширине содержимого, как .rnd44 и таблетка логотипа');
+ assert(/\.segbar\{[^}]*background:var\(--g2a\)/.test(cssSeg)&&!/\.segbar\{[^}]*(backdrop-filter|--glass)/.test(cssSeg),'подложка активного плоская — второе стекло внутри первого сливалось бы');
+ assert(/\.seg\{[^}]*width:64px/.test(cssSeg),'три иконки по 64 — цель нажатия шире 44');
  assert(!/\.row\{[^}]*--glass/.test(cssSeg),'у плашек задач канта нет — владелец убрал обводки');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
  /* кнопка и строка ввода — одна капсула: кнопка внутри неё, свёрнутый вид — красный круг на месте кнопки в доке */
