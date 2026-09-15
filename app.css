@@ -29,7 +29,7 @@
   --on-blue:#fff;
   --danger:#E50006;
   /* четыре ступени приоритета, все плотные и разного тона */
-  --pri1:#2EC27E; --pri2:#FFD400; --pri3:#FF9500; --pri4:#E50006;
+  --ring-rgb:229,0,6;   /* кольцо кружка — красное, срочность прозрачностью (v110; четыре цвета приоритета сняты) */
   /* ── движение: одна система на все страницы ──
      Кривые выбираются по роли, а не по вкусу (смягчение — slow in / slow out):
        --e-out  появление и остановка: быстрый старт, мягкое торможение
@@ -285,10 +285,8 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 
 .ck{flex:none;width:44px;height:44px;border-radius:50%;border:0;background:var(--g2a);color:var(--text);
   display:grid;place-items:center;cursor:pointer;transition:background var(--t-tap) var(--e-out),box-shadow var(--t-tap) var(--e-out)}
-.ck.p1{box-shadow:inset 0 0 0 2px var(--pri1)}
-.ck.p2{box-shadow:inset 0 0 0 2px var(--pri2)}
-.ck.p3{box-shadow:inset 0 0 0 2px var(--pri3)}
-.ck.p4{box-shadow:inset 0 0 0 2px var(--pri4)}
+/* кольцо срочности: всегда красное, прозрачность --ring (0…1) ставит движок — в списке по позиции строки */
+.ck{box-shadow:inset 0 0 0 2px rgba(var(--ring-rgb),var(--ring,0))}
 .ck.on{background:var(--inv);color:var(--on-inv)}
 .ck svg{opacity:0}
 .ck.on svg{opacity:1}
@@ -306,7 +304,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .pri button{flex:none;width:36px;height:36px;border:0;border-radius:50%;background:var(--g2a);
   display:grid;place-items:center;cursor:pointer;color:var(--muted);font-size:15px;
   transition:transform var(--t-tap) var(--e-over),box-shadow var(--t-tap) var(--e-out)}
-.pri button .dotc{width:18px;height:18px;border-radius:50%}
+.pri button .dotc{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(var(--ring-rgb),var(--ring,0))}
 .pri button.on{box-shadow:inset 0 0 0 2px var(--inv)}
 @keyframes pri-in{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
 .pri{animation:pri-in var(--t-base) var(--e-over)}

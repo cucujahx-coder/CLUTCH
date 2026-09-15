@@ -171,7 +171,10 @@ async function common(file){
  d.querySelector('.pri button[data-v="3"]').click();
  assert(!d.querySelector('.pri'),'выбор закрывает капсулу');
  const again=()=>rows().find(r=>txt(r)===name0);
- assert(w.app.S.ts.find(x=>x.t===name0).pri===3&&again().querySelector('.ck').classList.contains('p3'),'приоритет записан и виден кольцом');
+ assert(w.app.S.ts.find(x=>x.t===name0).pri===3,'приоритет записан');
+ { const rs=rows(), rg=r=>+r.querySelector('.ck').style.getPropertyValue('--ring');
+   assert(rg(rs[0])===0&&rg(rs[rs.length-1])===1&&rg(rs[1])>rg(rs[0])&&rg(rs[rs.length-1])===rg(again()),'кольцо красное с шагом прозрачности по позиции: верхняя 0, нижняя (срочная) 1');
+   assert(rs.every(r=>!/\bp[1-4]\b/.test(r.querySelector('.ck').className)),'цветных ступеней на кольце нет'); }
  again().click();
  assert(w.app.S.cur.k==='t'&&w.app.byId(w.app.S.cur.id).t!==name0||true,'после долгого нажатия строка сама не открывается');
 
@@ -260,7 +263,7 @@ async function common(file){
  /* оформление */
  const css=read('app.css');
  assert(!/prefers-color-scheme/.test(css)&&/--bg:#101010/.test(css),'тема одна, тёмная');
- assert(/--pri1:#2EC27E/.test(css)&&/--pri4:#E50006/.test(css),'четыре плотных цвета приоритета');
+ assert(/--ring-rgb:229,0,6/.test(css)&&/\.ck\{box-shadow:inset 0 0 0 2px rgba\(var\(--ring-rgb\),var\(--ring,0\)\)\}/.test(css)&&!/--pri1/.test(css),'кольцо кружка — красное с прозрачностью --ring, цветов приоритета нет');
  /* движение — одна система: кривые по роли в CSS и в EASE движка совпадают, сырых кривых и секунд в переходах нет */
  const js=read('app.js'), tokOf=n=>(css.match(new RegExp('--'+n+':(cubic-bezier\\([^)]*\\))'))||[])[1];
  const ease=eval('('+(js.match(/const EASE = (\{[^}]*\})/)||[])[1]+')');

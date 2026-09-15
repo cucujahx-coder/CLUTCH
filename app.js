@@ -767,7 +767,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v109';
+const APP_V='tasks-v110';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1193,12 +1193,17 @@ function sub(x, gaps){
  if(x.due) bits.push(fmtDue(x.due)); else if(gaps) bits.push('без срока');
  return bits.join(' · ');
 }
-/* Кружок строки: у задачи галочка, у проекта число открытых шагов. Кольцо приоритета — цветом */
-function ckHTML(x, left){
- const cls = 'ck press' + (x.pri ? ' p'+x.pri : '') + (x.done ? ' on' : '');
+/* Кружок строки: у задачи галочка, у проекта число открытых шагов. Кольцо — всегда красное,
+   а срочность показана его прозрачностью (--ring, 0…1): в списке это доля позиции среди всех
+   показанных строк (самая срочная, внизу, — 100 %, самая дальняя — 0), у шага в чате — pri/4.
+   Четыре цвета приоритета сняты владельцем (v110). */
+function ckHTML(x, left, ring){
+ const cls = 'ck press' + (x.done ? ' on' : '');
+ const r = ring === undefined ? (x.pri ? x.pri/4 : 0) : ring;
+ const st = ' style="--ring:'+(+r).toFixed(3)+'"';
  if(left === undefined || x.done)
-  return '<button class="'+cls+'" aria-label="'+(x.done?'Снять отметку':'Выполнить')+': '+esc(x.t||x.n||'')+'">'+Ic(P.check,18)+'</button>';
- return '<button class="'+cls+'" aria-label="Закрыть следующий шаг, осталось '+left+'"><span class="num">'+left+'</span></button>';
+  return '<button class="'+cls+'"'+st+' aria-label="'+(x.done?'Снять отметку':'Выполнить')+': '+esc(x.t||x.n||'')+'">'+Ic(P.check,18)+'</button>';
+ return '<button class="'+cls+'"'+st+' aria-label="Закрыть следующий шаг, осталось '+left+'"><span class="num">'+left+'</span></button>';
 }
 /* Ассистент ждёт ответа: последняя реплика в переписке — его, и она кончается вопросом.
    Такая строка получает синюю точку вместо едва заметной. */
@@ -1207,7 +1212,7 @@ function needsReply(x){
  return !!(last && last.a !== undefined && last.u === undefined && /\?[^.!?]*$/.test(String(last.a).trim()));
 }
 /* Строка списка: задача или проект */
-function rowEl(x, isP, next, left){
+function rowEl(x, isP, next, left, ring){
  const r = document.createElement('div');
  r.className = 'row' + (x.done ? ' done' : '') + (needsReply(x) ? ' ask' : '');
  if(isP) r.dataset.pj = x.id; else r.dataset.id = x.id;
@@ -1220,7 +1225,7 @@ function rowEl(x, isP, next, left){
  const meta  = isP ? x.n : (fmtDue(x.due) || '');
  r.innerHTML = '<div class="cell"><span class="sr-only">'+KIND[r.dataset.kind]+': </span>'+
    '<div class="t1">'+esc(title)+'</div>'+(meta?'<div class="t2">'+esc(meta)+'</div>':'')+'</div>' +
-   ckHTML(isP ? {pri:x.pri, done:0, n:x.n} : x, isP ? left : undefined);
+   ckHTML(isP ? {pri:x.pri, done:0, n:x.n} : x, isP ? left : undefined, ring);
  r.querySelector('.ck').onclick = e => { e.stopPropagation(); isP ? ringTap(x, r) : toggle(x, r); };
  const go = () => { if(suppressRow){ suppressRow = false; return; }
    S.cur = {k:isP?'p':'t', id:x.id}; save(); open(); };
@@ -1234,7 +1239,7 @@ function paint(keep){
  const dn = S.ts.filter(x=>x.done && !x.del);
  list.innerHTML = '';
  if(S.showDone){
-  dn.forEach(x=>list.appendChild(rowEl(x,0)));
+  dn.forEach((x,i)=>list.appendChild(rowEl(x,0,undefined,undefined,dn.length>1?i/(dn.length-1):1)));
   if(!dn.length) list.innerHTML = '<div class="empty">Пока ничего не сделано.</div>';
  } else {
   const items = [];
@@ -1251,7 +1256,8 @@ function paint(keep){
   items.sort((a,b)=>(a.pri - b.pri) || (a.id - b.id));
   const tab = TABS[curTab()];
   const shown = items.filter(tab.all);
-  shown.forEach(i=>list.appendChild(rowEl(i.x, i.isP, i.next, i.left)));
+  /* кольцо: шаг прозрачности по числу строк — верхняя 0, нижняя (самая срочная) 100 % */
+  shown.forEach((i,k)=>list.appendChild(rowEl(i.x, i.isP, i.next, i.left, shown.length>1?k/(shown.length-1):1)));
   if(!shown.length) list.innerHTML = '<div class="empty">'+esc(tab.empty)+'</div>';
  }
  drawFind(); drawTabs(); drawSort();
@@ -1439,7 +1445,7 @@ function hideToast(){
 
 /* ---------- приоритет ----------
    Долгое нажатие по строке открывает на её месте капсулу: «нет» и четыре ступени, каждая своего цвета. */
-const PRI = [{v:0},{v:1,c:'var(--pri1)'},{v:2,c:'var(--pri2)'},{v:3,c:'var(--pri3)'},{v:4,c:'var(--pri4)'}];
+const PRI = [{v:0},{v:1},{v:2},{v:3},{v:4}];   /* ступени — красное кольцо с прозрачностью v/4 */
 function closePri(){
  if(!priPop) return;
  const p = priPop; priPop = null;
@@ -1454,7 +1460,7 @@ function openPri(x, row){
  const back = document.createElement('div'); back.className = 'pri-back';
  const el = document.createElement('div'); el.className = 'pri';
  el.innerHTML = PRI.map(p => '<button class="press'+(Number(x.pri||0)===p.v?' on':'')+'" data-v="'+p.v+'" '+
-   'aria-label="Приоритет '+(p.v||'нет')+'">'+(p.c?'<span class="dotc" style="background:'+p.c+'"></span>':'—')+'</button>').join('')+
+   'aria-label="Приоритет '+(p.v||'нет')+'">'+(p.v?'<span class="dotc" style="--ring:'+(p.v/4)+'"></span>':'—')+'</button>').join('')+
    '<button class="press edit" data-edit="1" aria-label="Переименовать">'+Ic(P.edit,18)+'</button>';
  el.style.top = Math.max(16, Math.min(rb.top - hb.top, hb.height - ROW_H - 16)) + 'px';
  host.appendChild(back); host.appendChild(el);
