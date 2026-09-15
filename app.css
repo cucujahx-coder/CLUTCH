@@ -234,10 +234,10 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    попадает в прокрутку всегда. gap:0 — свой зазор между строками у #list есть. */
 #scr-list .scroll{top:0;bottom:0;gap:0;flex-direction:column-reverse;padding-top:0;
   padding-bottom:calc(76px + 53px + 44px + 31px + var(--rowh) + var(--pend, 0px) + var(--safe-b))}   /* под доком: 53 между капсулами и кнопкой, одна строка до кольца кнопки: 26 + 5 + --rowh */
-/* строка ввода открыта: дока нет, между ней и ближайшей задачей — одна строка, 44 (v99; было 16).
+/* строка ввода открыта: дока нет, между ней и ближайшей задачей — зазор как между задачами, 4 (v107; в v99 была одна строка, до неё 16).
    В режиме под логотипом список на это время прижимается к строке ввода: margin-top:auto у #list
    в обычной колонке сажает короткий список вниз, длинному не мешает (авто-отступ схлопывается в ноль) */
-#scr-list .scroll.tight{padding-bottom:calc(68px + var(--rowh) + var(--foot) + var(--pend, 0px) + var(--safe-b))}
+#scr-list .scroll.tight{padding-bottom:calc(68px + 4px + var(--foot) + var(--pend, 0px) + var(--safe-b))}   /* v107: зазор как между задачами, 4 */
 #scr-list.top .scroll.tight #list{margin-top:auto}
 /* Порядок «сверху вниз»: список растёт от логотипа, контейнер обычный, колпак уходит первым.
    Отступ от якоря — одна строка (44), с другой стороны — обычные 16 (v96): у кнопки 44 в режиме
@@ -246,7 +246,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 #scr-list.top .cap{order:-1;height:calc(16px + 44px + var(--rowh) + var(--safe-t))}
 /* при открытой строке ввода запас снизу тот же, что и в режиме от кнопки: правило .top выше по
    порядку перебивало бы .tight (одинаковая специфичность) — поэтому повтор здесь */
-#scr-list.top .scroll.tight{padding-bottom:calc(68px + var(--rowh) + var(--foot) + var(--pend, 0px) + var(--safe-b))}
+#scr-list.top .scroll.tight{padding-bottom:calc(68px + 4px + var(--foot) + var(--pend, 0px) + var(--safe-b))}
 
 /* ── строка списка: кружок слева, текст справа ─ */
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */

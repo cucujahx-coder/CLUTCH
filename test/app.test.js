@@ -64,7 +64,7 @@ async function common(file){
    assert(rows().map(txt).join('|')===before,'под логотипом порядок тот же: приоритет растёт сверху вниз, срочное внизу');
    assert(/#scr-list\.top \.scroll\{flex-direction:column;padding-bottom:calc\(76px \+ 53px \+ 44px \+ 47px/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1;height:calc\(16px \+ 44px \+ var\(--rowh\) \+ var\(--safe-t\)\)\}/.test(read('app.css')),'под логотипом: колпак первым и в одну строку (44) от шапки, снизу обычные 16');
    assert(/#scr-list \.scroll\{[^}]*padding-bottom:calc\(76px \+ 53px \+ 44px \+ 31px \+ var\(--rowh\)/.test(read('app.css')),'от кнопки: одна строка (--rowh) до кольца кнопки');
-   assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ var\(--rowh\)/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight #list\{margin-top:auto\}/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight\{padding-bottom:calc\(68px \+ var\(--rowh\)/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи одна строка, и под логотипом список прижат к строке ввода');
+   assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ 4px/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight #list\{margin-top:auto\}/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight\{padding-bottom:calc\(68px \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи одна строка, и под логотипом список прижат к строке ввода');
    $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно'); }
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('sort').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
@@ -924,6 +924,13 @@ async function haptics(file){
  assert(css('--foot')==='8px'&&css('--safe-b')==='0px','окно равно области, область ниже базы — клавиатура и без фокуса');
  kbw.visualViewport.height=kbw.innerHeight=700; Object.defineProperty(kbw,'innerHeight',{value:700,configurable:true}); vvL.resize();
  assert(css('--foot')==='16px','область ниже базы меньше чем на 150 — полоса браузера, не клавиатура');
+ /* компенсация прокрутки: под логотипом список держит верх и не трогается, мелкие сдвиги области — тоже нет */
+ { const sc=kbw.document.getElementById('scroll'); kbw.app.S.up=1; kbw.app.paint(); sc.scrollTop=100;
+   kbw.visualViewport.height=400; vvL.resize(); assert(sc.scrollTop===100,'под логотипом высота области меняется — прокрутка списка стоит');
+   kbw.app.S.up=0; kbw.app.paint(); kbw.visualViewport.height=700; vvL.resize();
+   const th=kbw.document.getElementById('thread'); th.scrollTop=100; kbw.visualViewport.height=680; vvL.resize();
+   assert(th.scrollTop===100,'сдвиг области на 20 px — не клавиатура, лента не трогается');
+   kbw.visualViewport.height=400; vvL.resize(); assert(th.scrollTop===380,'сдвиг на клавиатуру — лента держит низ'); }
  Object.defineProperty(kbw,'innerHeight',{value:768,configurable:true});
  /* Высота клавиатуры запомнена; при следующем фокусе контейнер ужимается сразу, до resize —
     чтобы iOS не панорамировала экран. Без resize догадка живёт 700 мс и снимается */
