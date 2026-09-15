@@ -6,7 +6,7 @@ const MODE = window.MODE || 'two';
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* Кривые движения — те же, что токены --e-* в app.css, по роли: out — появление и остановка,
    in — уход, move — перемещение, over — прибытие с перелётом. Тест сверяет с CSS. */
-const EASE = {out:'cubic-bezier(.2,.8,.2,1)', in:'cubic-bezier(.4,0,.8,.4)', move:'cubic-bezier(.32,.72,0,1)', over:'cubic-bezier(.34,1.56,.64,1)'};
+const EASE = {out:'cubic-bezier(.2,.8,.2,1)', in:'cubic-bezier(.4,0,.8,.4)', move:'cubic-bezier(.32,.72,0,1)', over:'cubic-bezier(.34,1.56,.64,1)', kb:'cubic-bezier(.38,.7,.125,1)'};
 const LAG = 40;   /* мс между элементами группы — доводка, как --lag в CSS */
 /* Смена иконки на кнопке — не подмена, а движение: новая выскакивает с перелётом. Меняем
    только если иконка действительно другая (ключ в data-ic), иначе кнопка дёргалась бы на
@@ -767,7 +767,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v100';
+const APP_V='tasks-v101';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1268,6 +1268,7 @@ function paint(keep){
    внутри scale() и var() в @keyframes Safari на телефоне не отрисовал — кнопка стояла. */
 const PULL_FULL = 90, JUMP_MS = 280, OVER_FULL = 60;
 const ROW_H = 48;   /* = --rowh в CSS */
+const MINI_Y = 107; /* сдвиг свёрнутой капсулы на место кнопки: 26 + 44 + (ROW_H + 5) − 16, как translateY в .composer.mini */
 function armRubber(el){
  let y0 = null, live = false, snapT = 0, pulled = 0, touching = false, cool = false;
  const short = () => el.scrollHeight - el.clientHeight <= 1;
@@ -1283,7 +1284,7 @@ function armRubber(el){
     Таблица частей осталась на случай возврата: базовая трансформа (у центрированного
     трансформой элемента её нельзя терять), амплитуды сжатия и прыжка, задержка. */
  const parts = () => [
-  {el:composer, base:'translateY(-75px)', sq:[.06,.1], st:[.94,1.1], amp:36, lag:0},
+  {el:composer, base:'translateY(-' + MINI_Y + 'px)', sq:[.06,.1], st:[.94,1.1], amp:36, lag:0},
   {el:composer.querySelector('.shutter .sw'), base:'', sq:[.14,.2], st:[.9,1.16], amp:0, lag:0}
  ].filter(x=>x.el);
  const tf = (x, p, dy, sx, sy) => (x.base + (dy ? ' translateY(' + dy.toFixed(1) + 'px)' : '') + ' scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')').trim();
@@ -1918,7 +1919,7 @@ let ntFocused = false;
 function openComposer(voice){
  if(!mini()) return;
  ntFocused = false;
- composer.style.transform = 'translateY(' + (-75 + (voice ? 0 : (kbH || 0))) + 'px)';
+ composer.style.transform = 'translateY(' + (-MINI_Y + (voice ? 0 : (kbH || 0))) + 'px)';
  void composer.offsetHeight;
  composer.classList.remove('mini'); scroll.classList.add('tight');
  $('dock').classList.add('hide');
@@ -1936,8 +1937,14 @@ function closeComposer(){
  sweep(composer);                     /* та же вспышка, что при раскрытии: капсула гаснет и сворачивается разом */
  nt.value=''; nt.blur(); composer.classList.add('mini');
  ntPick = []; paintNtPick();          /* отменили задачу — отменили и её вложения */
+ /* Снятие .tight меняет запас снизу (и под логотипом снимает прижим к строке ввода) одним
+    кадром — список прыгал, пока клавиатура ещё ехала. FLIP: меряем, где список был, где стал,
+    и провожаем его из старого места в новое за время клавиатуры по её кривой (v101). */
+ const y0 = list.getBoundingClientRect().top;
  $('dock').classList.remove('hide'); scroll.classList.remove('tight');
  $('veil-b').style.height = '';
+ const d = y0 - list.getBoundingClientRect().top;
+ if(!RM && list.animate && Math.abs(d) > 1) list.animate([{transform:'translateY(' + d.toFixed(1) + 'px)'},{transform:'none'}],{duration:250, easing:EASE.kb});
  drawAdd(); toBottom();
 }
 /* Открываем по click, не по touchend: iOS отдаёт клавиатуру только из «настоящего» жеста,
