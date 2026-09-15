@@ -767,7 +767,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v108';
+const APP_V='tasks-v109';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1862,7 +1862,18 @@ function drawSort(){
  swapIcon(s, S.up ? 'down' : 'up', Ic(S.up ? P.down : P.up, 18));
  s.setAttribute('aria-label', S.up ? 'Список сверху вниз, под логотипом' : 'Список снизу вверх, от кнопки');
 }
-$('sort').onclick = () => { tap(8); S.up = S.up?0:1; save(); paint(); if(S.up) scroll.scrollTop = 0; };
+$('sort').onclick = () => { tap(8); S.up = S.up?0:1; save(); paint(); if(S.up) scroll.scrollTop = 0; kickScroll(); };
+/* Хвост под доком для режима под логотипом должен быть в разметке; если приехал новый движок
+   со старым HTML (установленное приложение обновляется по частям), достраиваем его сами —
+   иначе список в этом режиме не прокручивается до конца. */
+if(scroll && !scroll.querySelector('.tail')) scroll.insertAdjacentHTML('beforeend', '<div class="tail" aria-hidden="true"></div>');
+/* iOS прокручивает области асинхронно и после смены направления контейнера (column ↔
+   column-reverse) может держать старые границы прокрутки — список «отскакивает» к покою,
+   хотя ему есть куда ехать. Пинок: на кадр выключить прокрутку и включить снова. */
+function kickScroll(){
+ if(!scroll) return;
+ scroll.style.overflowY = 'hidden'; void scroll.offsetHeight; scroll.style.overflowY = '';
+}
 $('undo').onclick = () => { if(undoBuf){ mark(undoBuf.x,0); save(); paint(1); tap(8); } hideToast(); };
 
 /* большая кнопка с пауком разворачивается в строку ввода */

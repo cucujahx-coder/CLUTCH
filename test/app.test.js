@@ -66,7 +66,10 @@ async function common(file){
    assert(/#scr-list\.top \.cap\{order:-1;height:calc\(16px \+ 44px \+ var\(--rowh\) \+ var\(--safe-t\)\)\}/.test(read('app.css')),'под логотипом: колпак первым и в одну строку (44) от шапки, снизу обычные 16');
    assert(/#scr-list \.scroll\{[^}]*padding-bottom:calc\(76px \+ 53px \+ 44px \+ 31px \+ var\(--rowh\)/.test(read('app.css')),'от кнопки: одна строка (--rowh) до кольца кнопки');
    assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ 4px/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight #list\{margin-top:auto\}/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight \.tail\{height:calc\(68px \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи одна строка, и под логотипом список прижат к строке ввода');
-   $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно'); }
+   $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно');
+   assert(/kickScroll\(\);/.test(read('app.js'))&&/scroll\.style\.overflowY = 'hidden'; void scroll\.offsetHeight/.test(read('app.js')),'после смены направления область прокрутки получает пинок — iOS иначе держит старые границы');
+   /* движок достраивает хвост, если его нет в разметке (старый HTML + новый движок) */
+   assert(/if\(scroll && !scroll\.querySelector\('\.tail'\)\) scroll\.insertAdjacentHTML/.test(read('app.js')),'движок сам достраивает .tail, если разметка старая'); }
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('sort').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
  const segs=[...d.querySelectorAll('.dockrow .seg')];
