@@ -767,7 +767,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v85';
+const APP_V='tasks-v86';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1281,6 +1281,7 @@ function armRubber(el){
   {el:composer, base:'translateY(-75px)', sq:[.06,.1], st:[.94,1.1], amp:36, lag:0},
   {el:composer.querySelector('.shutter .sw'), base:'', sq:[.14,.2], st:[.9,1.16], amp:0, lag:0},
   {el:$('brand'), base:'', sq:[.05,.1], st:[.96,1.06], amp:20, lag:LAG},
+  {el:$('vname'), base:'translateX(-50%)', sq:[.05,.1], st:[.96,1.06], amp:20, lag:LAG},
   {el:$('find'), base:'', sq:[.06,.1], st:[.94,1.1], amp:20, lag:LAG},
   {el:$('sort'), base:'', sq:[.06,.1], st:[.94,1.1], amp:20, lag:LAG},
   {el:document.querySelector('#scr-list .dockrow'), base:'', sq:[.04,.1], st:[.97,1.06], amp:20, lag:LAG}
@@ -1814,9 +1815,12 @@ trackSafe(); trackVH();
 /* Три вида — три иконки в одной капсуле по центру дока (референс владельца — iOS-таблетка
    с тремя значками): список — FLOW, слои — PROCESS, мишень — FOCUS. Подписи остались в aria-label. */
 const TAB_ICON = {flow:'list', process:'layers', focus:'target'};
+const TAB_NAME = {flow:'Поток', process:'Процесс', focus:'Фокус', done:'Выполнено'};
 document.querySelectorAll('.seg').forEach(b=>{ b.innerHTML = Ic(P[TAB_ICON[b.dataset.tab]] || P.list, 22); });
 function drawTabs(){
  const t = curTab(), segs = [...document.querySelectorAll('.seg')];
+ /* Название вида по центру шапки, там, где стоял логотип; смена — тем же выскоком, что у иконок */
+ const vn = $('vname'); if(vn){ const k = S.showDone ? 'done' : t; swapIcon(vn.firstElementChild, k, '<span>'+esc(TAB_NAME[k] || '')+'</span>'); }
  segs.forEach((b,i)=>{
   const on = !S.showDone && b.dataset.tab === t;
   b.classList.toggle('on', on);

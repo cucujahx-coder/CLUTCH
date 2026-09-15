@@ -415,6 +415,10 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* заголовок задачи правится на месте — фокус подсвечивает таблетку, как строку ввода */
 .title{transition:box-shadow var(--t-fast) var(--e-out)}
 .title:focus-within{box-shadow:inset 0 0 0 2px var(--blue),var(--glass)}
+/* название вида на экране списка — та же таблетка, что название задачи в чате, только не правится */
+.vname{pointer-events:none;transform-origin:50% 100%}
+.vname .h1{display:block;font-family:var(--font);font-weight:700;font-size:17px;white-space:nowrap}
+.vname .h1 span{display:inline-block}
 /* уход: лист настроек и капсула приоритета не исчезают, а уходят вниз с ускорением */
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .sheet-back{animation:fade var(--t-base) var(--e-out)}
