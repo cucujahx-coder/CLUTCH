@@ -131,7 +131,7 @@ async function common(file){
   assert(kf&&!cj.classList.contains('pull'),'пружина вернулась — прыжок');
   scrollTo(200); assert(!cj.classList.contains('pull')&&!kf.k[0].transform.includes('NaN'),'обычная прокрутка внутри диапазона кнопку не трогает');
  }
- assert(/\.veil\.top\{[^}]*linear-gradient\(to bottom,var\(--bg\),/.test(read('app.css'))&&/\.veil\.bottom\{[^}]*linear-gradient\(to top,var\(--bg\),/.test(read('app.css')),'полосы затемнения у края уходят в сплошной фон');
+ assert(/\.veil\.top\{top:0;height:calc\(76px \+ var\(--safe-t\)\)/.test(read('app.css'))&&/\.veil\.top\{[^}]*rgba\(16,16,16,\.85\),rgba\(16,16,16,\.35\) 65%/.test(read('app.css')),'верхняя полоса затемнения исходная: 76 px, .85 → .35 — владелец вернул после проб');
  assert(/\.pull\{transition:none\}/.test(read('app.css'))&&!/calc\([^)]*var\(--pull/.test(read('app.css')),'сжатие идёт за пальцем без перехода; calc() с --pull в CSS нет — Safari его не рисует');
  tch('touchstart',300); tch('touchmove',380); tch('touchcancel');
  assert(sc.style.transform==='','обрыв касания тоже возвращает');
