@@ -764,7 +764,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v76';
+const APP_V='tasks-v77';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1258,10 +1258,16 @@ function paint(keep){
    отпустил — подпрыгивает. Степень сжатия — доля от PULL_FULL пикселей пути пальца.
    Геометрия считается в JS и ставится inline (сжатие) и через animate() (прыжок): calc()
    внутри scale() и var() в @keyframes Safari на телефоне не отрисовал — кнопка стояла. */
-const PULL_FULL = 90, JUMP_MS = 280;
+const PULL_FULL = 90, JUMP_MS = 280, OVER_FULL = 60;
 function armRubber(el){
- let y0 = null, live = false, snapT = 0, pulled = 0;
+ let y0 = null, live = false, snapT = 0, pulled = 0, touching = false, cool = false;
  const short = () => el.scrollHeight - el.clientHeight <= 1;
+ /* Длинный список пружинит нативно, и iOS во время пружины отдаёт scrollTop за пределами
+    допустимого: у перевёрнутого контейнера диапазон [-(max), 0], у обычного [0, max].
+    Перелёт за край — та же тяга: кнопка сжимается на его долю, а на отпускании прыгает. */
+ const over = () => { const max = el.scrollHeight - el.clientHeight, st = el.scrollTop;
+   const rev = getComputedStyle(el).flexDirection === 'column-reverse';
+   return Math.max((rev ? -max : 0) - st, st - (rev ? 0 : max), 0); };
  const btn = () => el.closest('#scr-list') && composer.classList.contains('mini') ? composer : null;
  const sw = () => composer.querySelector('.shutter .sw');
  const squash = p => ({b:'translateY(-75px) scale(' + (1 + .06*p).toFixed(3) + ',' + (1 - .1*p).toFixed(3) + ')',
@@ -1279,10 +1285,17 @@ function armRubber(el){
    b.animate([{transform:q.b, easing:EASE.out},{transform:'translateY(' + (-75 - 36*p).toFixed(1) + 'px) scale(.94,1.1)',offset:.3},{transform:'translateY(-75px)'}],
      {duration:JUMP_MS, easing:EASE.over});
    if(s && s.animate) s.animate([{transform:q.s, easing:EASE.out},{transform:'scale(.9,1.16)',offset:.3},{transform:'none'}],{duration:JUMP_MS, easing:EASE.over}); };
+ el.addEventListener('scroll', () => {
+  if(short()) return;
+  const o = over();
+  if(o > 0){ if(!cool) pull(Math.min(1, o / OVER_FULL)); }
+  else { cool = false; if(pulled && !touching) jump(); }   /* пружина без пальца (бросок в край) — прыжок, когда вернулась */
+ }, {passive:true});
  /* затухание как у iOS: чем дальше тянешь, тем медленнее едет, предел — чуть больше половины */
  const damp = d => { const h = el.clientHeight || 1, c = 0.55, a = Math.abs(d);
    return Math.sign(d) * h * c * (1 - 1 / (a * c / h + 1)); };
  el.addEventListener('touchstart', e => {
+  touching = true;
   if(e.touches.length !== 1 || !short()){ y0 = null; return; }
   y0 = e.touches[0].clientY; live = false;
  }, {passive:true});
@@ -1294,6 +1307,10 @@ function armRubber(el){
   pull(Math.min(1, Math.abs(dy) / PULL_FULL));   /* по пути пальца, не по затухшему сдвигу */
  }, {passive:true});
  const release = () => {
+  touching = false;
+  /* Нативная пружина: отпустили за краем — прыжок сразу, а обратный ход пружины
+     (scrollTop ещё за краем) сжимать заново нельзя, иначе прыгнет дважды */
+  if(pulled && !short()){ jump(); cool = over() > 0; }
   if(y0 === null) return;
   y0 = null;
   if(!live) return;

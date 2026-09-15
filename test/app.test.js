@@ -88,6 +88,19 @@ async function common(file){
   tj('touchstart',300); tj('touchmove',380); tj('touchend');
   assert(kf&&/translateY\(-10\d\.\dpx\) scale\(\.94,1\.1\)/.test(kf.k[1].transform)&&kf.k[1].offset<=.3&&kf.o.duration<=300&&kf.k[0].easing==='cubic-bezier(.2,.8,.2,1)'&&kf.o.easing==='cubic-bezier(.34,1.56,.64,1)','отпустили — резкий прыжок: взлёт по --e-out за треть времени, высота по тяге, посадка с перелётом');
   assert(!cj.classList.contains('pull')&&cj.style.transform==='','после прыжка inline-трансформы нет — кнопка снова управляется классами');
+  /* Длинный список: пружина нативная, iOS отдаёт scrollTop за краем — кнопка сжимается и прыгает так же */
+  Object.defineProperty(scj,'scrollHeight',{value:1000,configurable:true}); Object.defineProperty(scj,'clientHeight',{value:400,configurable:true});
+  const scrollTo=v=>{ scj.scrollTop=v; scj.dispatchEvent(new wj.Event('scroll')); };
+  kf=null; tj('touchstart',300); scrollTo(-30);
+  assert(cj.classList.contains('pull')&&/scale\(1\.0\d+,0\.9\d+\)/.test(cj.style.transform)&&!scj.classList.contains('dragging'),'длинный список: перелёт за край сжимает кнопку, свою резинку JS не включает');
+  tj('touchend');
+  assert(kf&&!cj.classList.contains('pull'),'отпустили за краем — прыжок');
+  kf=null; scrollTo(-20); assert(!cj.classList.contains('pull'),'обратный ход пружины после прыжка кнопку не сжимает — иначе прыгнуло бы дважды');
+  scrollTo(0); scrollTo(-25);
+  assert(cj.classList.contains('pull'),'бросок в край без пальца — сжатие по пружине');
+  scrollTo(0);
+  assert(kf&&!cj.classList.contains('pull'),'пружина вернулась — прыжок');
+  scrollTo(200); assert(!cj.classList.contains('pull')&&!kf.k[0].transform.includes('NaN'),'обычная прокрутка внутри диапазона кнопку не трогает');
  }
  assert(/\.composer\.mini\.pull,\.composer\.mini\.pull \.shutter \.sw\{transition:none\}/.test(read('app.css'))&&!/calc\([^)]*var\(--pull/.test(read('app.css')),'сжатие идёт за пальцем без перехода; calc() с --pull в CSS нет — Safari его не рисует');
  tch('touchstart',300); tch('touchmove',380); tch('touchcancel');
