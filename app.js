@@ -155,10 +155,22 @@ function elflash(el, ms){
    показа плашки поле уже без фокуса — помним момент, а не только состояние. */
 let kbLast = 0, kbAtTap = 0;
 addEventListener('focusout', e => { if(e.target.matches && e.target.matches('.inp')) kbLast = Date.now(); });
+/* Засветка — только на настоящее нажатие. По одному pointerdown её давать нельзя: при прокрутке
+   палец ложится на строку, и она вспыхивала, хотя никто её не нажимал. Как в списках iOS:
+   подсветка ждёт 90 мс и появляется, если палец не сдвинулся; сдвиг больше 8 px или начало
+   прокрутки (pointercancel) её отменяют, а быстрый тап вспыхивает сразу на отпускании. */
+let flashT = 0, flashEl = null, fx0 = 0, fy0 = 0;
 addEventListener('pointerdown', e => {
  kbAtTap = kbOpen() ? Date.now() : kbLast;
- elflash(e.target.closest && e.target.closest('.press,.row,.step'));
+ clearTimeout(flashT);
+ flashEl = e.target.closest && e.target.closest('.press,.row,.step'); fx0 = e.clientX; fy0 = e.clientY;
+ if(flashEl) flashT = setTimeout(()=>{ if(flashEl) elflash(flashEl); flashEl = null; }, 90);
 }, true);
+addEventListener('pointermove', e => {
+ if(flashEl && Math.hypot(e.clientX - fx0, e.clientY - fy0) > 8){ clearTimeout(flashT); flashEl = null; }
+}, true);
+addEventListener('pointerup', () => { if(flashEl){ clearTimeout(flashT); elflash(flashEl); flashEl = null; } }, true);
+addEventListener('pointercancel', () => { clearTimeout(flashT); flashEl = null; }, true);
 /* Строка ввода вспыхивает в момент активации: вся капсула белеет разом, держит четверть
    времени и гаснет — резко, как фотовспышка. Полоса, проезжавшая 460 мс, была мягкой. */
 function sweep(el){
@@ -750,7 +762,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v62';
+const APP_V='tasks-v63';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с

@@ -651,6 +651,24 @@ async function editing(){
  assert(p.n==='Проект Икс','уход фокуса сохраняет');
 }
 
+/* ---------- засветка только на нажатие ---------- */
+async function flashTest(){
+ console.log('засветка');
+ const {w,d}=load('index.html',w2=>{ w2.matchMedia=()=>({matches:false}); });
+ const row=d.querySelector('#list .row'); let flashes=0; row.animate=()=>{ flashes++; return {}; };
+ const pe=(type,x,y)=>{ const e=new w.Event(type,{bubbles:true}); e.clientX=x; e.clientY=y; row.dispatchEvent(e); };
+ pe('pointerdown',100,300); pe('pointermove',100,340); await wait(150); pe('pointerup',100,340);
+ assert(flashes===0,'палец сдвинулся — прокрутка, строка не вспыхивает');
+ pe('pointerdown',100,300); w.dispatchEvent(new w.Event('pointercancel')); await wait(150);
+ assert(flashes===0,'началась нативная прокрутка (pointercancel) — не вспыхивает');
+ pe('pointerdown',100,300); pe('pointerup',100,300);
+ assert(flashes===1,'быстрый тап вспыхивает сразу на отпускании');
+ pe('pointerdown',100,300); await wait(150);
+ assert(flashes===2,'удержание без сдвига вспыхивает через 90 мс');
+ pe('pointerup',100,300);
+ assert(flashes===2,'и на отпускании второй раз не вспыхивает');
+}
+
 /* ---------- голосовой набор ---------- */
 async function voice(){
  console.log('голосовой набор');
@@ -857,6 +875,7 @@ async function haptics(file){
  spiderTest();
  await editing();
  await voice();
+ await flashTest();
  await haptics('index.html');
  await haptics('panels.html');
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);
