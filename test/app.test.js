@@ -205,8 +205,8 @@ async function common(file){
  $('undo').click();
  assert(w.app.S.ts.find(x=>x.t===fname).done===0&&!$('toast').classList.contains('on'),'«Вернуть» откатывает');
 
- /* чат: галочка в шапке, отправка и ответ */
- rows()[0].click();
+ /* чат: галочка в шапке, отправка и ответ — открываем задачу, не проект (порядок теперь от якоря, первым может стоять проект) */
+ rows().find(r=>r.dataset.id).click();
  /* первое касание по полю — программный фокус без прокрутки, iOS не панорамирует; повторное — не перехватывается (каретка) */
  const pd=()=>{ const e=new w.Event('pointerdown',{bubbles:true,cancelable:true}); $('msg').dispatchEvent(e); return e.defaultPrevented; };
  $('msg').blur();
