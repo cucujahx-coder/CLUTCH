@@ -686,18 +686,33 @@ async function voice(){
  assert(!$('add').classList.contains('rec')&&$('add').dataset.ic==='up','распознавание кончилось — кнопка снова обычная, со стрелкой отправки');
  $('add').click();
  assert(w.app.S.ts.some(x=>x.t==='купить молоко'),'надиктованное отправляется той же кнопкой');
- /* долгое нажатие на паука — строка раскрывается без клавиатуры и сразу слушает */
+ /* удержание паука — режим голоса: круг остаётся кругом, белеет и слушает молча */
  await wait(150);
  assert($('composer').classList.contains('mini'),'после отправки строка свёрнута');
+ assert(!!$('shutter').querySelector('.micro svg'),'микрофон лежит в кнопке заранее — переход паук → микрофон один и обратимый');
  const pe=(type,x,y)=>{ const e=new w.Event(type,{bubbles:true}); e.clientX=x; e.clientY=y; $('shutter').dispatchEvent(e); };
- pe('pointerdown',100,700); await wait(650); pe('pointerup',100,700); $('shutter').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
- assert(!$('composer').classList.contains('mini')&&starts.length===2&&$('add').classList.contains('rec'),'удержание паука раскрыло строку и включило голос');
- assert(d.activeElement!==$('nt'),'без фокуса: клавиатура не нужна, ужатия под неё нет');
- live.onresult({results:[[{transcript:'позвонить маме'}]]}); live.onend();
- assert($('nt').value==='позвонить маме'&&!$('add').classList.contains('rec'),'текст в поле, кнопка снова стрелка');
+ const click=()=>$('shutter').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+ pe('pointerdown',100,700); await wait(650); pe('pointerup',100,700); click();
+ assert($('composer').classList.contains('mini')&&$('composer').classList.contains('voice')&&starts.length===2,'удержание: круг остался кругом, в режиме голоса, распознавание пошло');
+ live.onresult({results:[[{transcript:'позвонить маме'}]]});
+ assert($('nt').value===''&&$('composer').classList.contains('mini'),'пока идёт запись, текст не показывается');
+ live.onend();
+ assert(!$('composer').classList.contains('mini')&&!$('composer').classList.contains('voice')&&$('nt').value==='позвонить маме'&&d.activeElement===$('nt'),'запись кончилась сама — строка раскрылась с текстом и фокусом');
  $('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape'}));
- pe('pointerdown',100,700); await wait(200); pe('pointerup',100,700); $('shutter').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
- assert(!$('composer').classList.contains('mini')&&starts.length===2&&d.activeElement===$('nt'),'короткое нажатие — обычное раскрытие с фокусом, без голоса');
+ /* тап по белому кругу останавливает запись сам, внутри жеста */
+ pe('pointerdown',100,700); await wait(650); pe('pointerup',100,700); click();
+ assert($('composer').classList.contains('voice')&&starts.length===3,'вторая запись пошла');
+ live.onresult({results:[[{transcript:'купить хлеб'}]]});
+ pe('pointerdown',100,700); pe('pointerup',100,700); click();
+ assert(!$('composer').classList.contains('voice')&&!$('composer').classList.contains('mini')&&$('nt').value==='купить хлеб'&&d.activeElement===$('nt'),'тап по кругу — стоп, строка с текстом и фокусом сразу');
+ const stale=live; stale.onend&&stale.onend();
+ assert($('nt').value==='купить хлеб','запоздалый onend распознавателя ничего не ломает');
+ $('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape'}));
+ /* ничего не сказали — круг остаётся кругом */
+ pe('pointerdown',100,700); await wait(650); pe('pointerup',100,700); click(); live.onend();
+ assert($('composer').classList.contains('mini')&&!$('composer').classList.contains('voice'),'пустая запись — круг остался кругом');
+ pe('pointerdown',100,700); await wait(200); pe('pointerup',100,700); click();
+ assert(!$('composer').classList.contains('mini')&&starts.length===4&&d.activeElement===$('nt'),'короткое нажатие — обычное раскрытие с фокусом, без голоса');
 }
 
 /* ---------- паук в ленте ----------

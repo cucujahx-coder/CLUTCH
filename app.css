@@ -49,6 +49,8 @@
      Только для движения вместе с клавиатурой — по --e-move содержимое её обгоняло,
      и при схлопывании список оказывался там, где клавиатура ещё стояла (кадры с телефона) */
   --e-kb:cubic-bezier(.38,.7,.125,1);
+  /* дыхание свечения при записи голоса: симметричная синусоида, полный вдох-выдох за 1,2 с */
+  --e-breathe:cubic-bezier(.45,0,.55,1); --t-breathe:1.2s;
   --ease-ios:var(--e-move);   /* старые имена — псевдонимы, чтобы ничего не сломать */
   --bounce:var(--e-over);
   /* стеклянный кант: те же чёткие линии в пиксель, что и раньше, только повёрнуты по диагонали —
@@ -128,6 +130,19 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .composer:not(.mini) .shutter{opacity:0;pointer-events:none}
 /* паук на кнопке: в прыжке он вылетает за край, поэтому кнопка ничего не обрезает */
 .shutter .sw{display:block;width:55px;line-height:0;color:#14100E;transform-origin:50% 100%;pointer-events:none}
+/* Режим голоса (удержание паука): круг остаётся кругом, белеет, паук перетекает в микрофон,
+   вокруг ровное белое дыхание. Микрофон лежит в кнопке всегда и просто гаснет/проявляется —
+   так переход один и обратимый. Текст в это время не показывается: строка раскроется, когда
+   запись кончится. */
+.shutter .micro{position:absolute;inset:0;display:grid;place-items:center;color:#14100E;opacity:0;
+  transform:scale(.55);pointer-events:none;
+  transition:opacity var(--t-fast) var(--e-out),transform var(--t-base) var(--e-over)}
+.composer.voice .shutter .micro{opacity:1;transform:none}
+.composer.voice .shutter .sw{opacity:0;transform:scale(.55)}
+@keyframes breathe{
+  0%,100%{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--g3a),0 0 10px 2px rgba(255,255,255,.18)}
+  50%{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--g3a),0 0 30px 12px rgba(255,255,255,.55)}}
+.composer.mini.voice{background:var(--inv);animation:breathe var(--t-breathe) var(--e-breathe) infinite}
 .shutter .sw svg{display:block;width:100%;height:auto}
 .shutter .eye{fill:#FFE3C2}
 .shutter .eye-b{fill:#FFE3C2;opacity:0}
@@ -401,7 +416,7 @@ body.nav #scr-detail:not(.on) .scroll{transform:translateX(32px)}
 body.nav #scr-detail.on .scroll{transition-delay:var(--lag)}
 .press{transition:transform var(--t-base) var(--e-over);transform-origin:50% 100%}
 .press:active{transform:scale(1.05,.92);transition:transform var(--t-tap) var(--e-out)}
-.shutter .sw{transition:transform var(--t-base) var(--e-over)}
+.shutter .sw{transition:transform var(--t-base) var(--e-over),opacity var(--t-fast) var(--e-out)}
 .shutter:active .sw{transform:scale(1.14,.8);transition:transform var(--t-tap) var(--e-out)}
 .composer.mini{transform-origin:50% 100%}
 .composer.mini:has(.shutter:active){transform:translateY(-75px) scale(1.06,.9);transition:transform var(--t-tap) var(--e-out)}

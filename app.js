@@ -762,7 +762,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v63';
+const APP_V='tasks-v64';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1790,18 +1790,52 @@ function closeComposer(){
 }
 /* Открываем по click, не по touchend: iOS отдаёт клавиатуру только из «настоящего» жеста,
    а touchend с preventDefault она за такой не считает */
-/* Долгое нажатие на паука (500 мс, как у строк) — сразу голосовой набор: строка раскрывается
-   без клавиатуры и слушает. Сдвиг больше 10 px — не удержание. После удержания придёт обычный
-   click — его гасим, иначе он открыл бы строку второй раз с фокусом. */
+/* Режим голоса по удержанию паука. Круг остаётся кругом (.voice: белеет, паук перетекает в
+   микрофон, дышит свечением) и молча слушает — текст копится в voiceText и не показывается.
+   Запись кончилась — капсула раскрывается в строку с готовым текстом и фокусом. Кончиться
+   может двумя путями: сама, по тишине (onend — фоновое событие, iOS клавиатуру из него не
+   откроет: строка с текстом и стрелкой появится, клавиатура — по тапу в поле), или по тапу на
+   белый круг — тогда заканчиваем сами, синхронно, внутри жеста, и клавиатура выезжает сразу;
+   запоздалый onend распознавателя после этого игнорируется. Без Web Speech удержание ведёт
+   в прежнюю подсказку про микрофон на клавиатуре. */
+let voiceRec = null, voiceText = '';
+$('shutter').insertAdjacentHTML('beforeend', '<span class="micro" aria-hidden="true">' + Ic(P.mic, 32) + '</span>');
+function voiceStart(){
+ if(!mini() || voiceRec) return;
+ if(!SR){ openComposer(true); return; }
+ const r = new SR();
+ r.lang = navigator.language || 'ru-RU'; r.interimResults = true; r.continuous = false;
+ voiceText = '';
+ r.onresult = e => { let t = ''; for(const res of e.results) t += res[0].transcript; voiceText = t.trim(); };
+ r.onend = () => { if(voiceRec === r) voiceEnd(); };
+ r.onerror = r.onend;
+ voiceRec = r; composer.classList.add('voice'); $('shutter').setAttribute('aria-label', 'Остановить запись');
+ try{ r.start(); }catch(e){ voiceEnd(); }
+}
+function voiceEnd(){
+ const r = voiceRec; if(!r) return;
+ voiceRec = null; composer.classList.remove('voice'); $('shutter').setAttribute('aria-label', 'Новая задача');
+ try{ r.onend = null; r.onerror = null; r.stop(); }catch(e){}
+ const text = voiceText; voiceText = '';
+ if(!text) return;                       /* ничего не сказали — круг остаётся кругом */
+ nt.value = text; openComposer(); drawAdd();
+}
+/* Удержание 500 мс (как у строк) — режим голоса; сдвиг больше 10 px — не удержание. После
+   удержания придёт обычный click — его гасим. Тап по белому кругу во время записи — стоп. */
 (function armHold(){
  const b = $('shutter'); let t = 0, x0 = 0, y0 = 0, held = false;
  b.addEventListener('pointerdown', e => { x0 = e.clientX; y0 = e.clientY; held = false; clearTimeout(t);
-  t = setTimeout(()=>{ held = true; tap(14); openComposer(true); }, 500); });
+  if(voiceRec) return;
+  t = setTimeout(()=>{ held = true; tap(14); voiceStart(); }, 500); });
  const off = () => clearTimeout(t);
  b.addEventListener('pointermove', e => { if(Math.hypot(e.clientX - x0, e.clientY - y0) > 10) off(); });
  ['pointerup','pointercancel','pointerleave'].forEach(ev => b.addEventListener(ev, off));
  b.addEventListener('contextmenu', e => e.preventDefault());   /* iOS не должна показывать своё меню */
- b.onclick = () => { if(held){ held = false; return; } openComposer(); };
+ b.onclick = () => {
+  if(held){ held = false; return; }
+  if(voiceRec){ tap(8); voiceEnd(); return; }
+  openComposer();
+ };
 })();
 nt.oninput = drawAdd;
 /* Строку закрывает уход фокуса — но только если фокус вообще был получен: внутри
