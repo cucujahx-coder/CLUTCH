@@ -764,7 +764,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v69';
+const APP_V='tasks-v70';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1388,7 +1388,7 @@ function openPri(x, row){
  el.innerHTML = PRI.map(p => '<button class="press'+(Number(x.pri||0)===p.v?' on':'')+'" data-v="'+p.v+'" '+
    'aria-label="Приоритет '+(p.v||'нет')+'">'+(p.c?'<span class="dotc" style="background:'+p.c+'"></span>':'—')+'</button>').join('')+
    '<button class="press edit" data-edit="1" aria-label="Переименовать">'+Ic(P.edit,18)+'</button>';
- el.style.top = Math.max(16, Math.min(rb.top - hb.top, hb.height - 56 - 16)) + 'px';
+ el.style.top = Math.max(16, Math.min(rb.top - hb.top, hb.height - 44 - 16)) + 'px';
  host.appendChild(back); host.appendChild(el);
  priPop = {el, back};
  tap(14);
