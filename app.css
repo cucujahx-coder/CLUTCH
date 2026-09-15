@@ -226,12 +226,12 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */
 /* кружок справа, текст слева: обычный порядок, разметка не меняется (кружок в ней последний) */
 .row{position:relative;display:flex;flex-direction:row;align-items:center;gap:10px;height:44px;padding:4px 4px 4px 16px;flex:none;
-  background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  background:rgba(21,21,21,.8);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   border-radius:22px;cursor:pointer;transition:background var(--t-tap) var(--e-out);overflow:hidden}
 /* Строка списка — 44, минимальная цель нажатия, ниже нельзя: кружок 36, шрифт 15 */
 .row .ck{width:36px;height:36px}
 .row .t1{font-size:15px}
-@media (hover:hover){.row:hover{background:rgba(36,36,36,.78)}}
+@media (hover:hover){.row:hover{background:rgba(30,30,30,.8)}}
 .cell{min-width:0;flex:1}
 .t1{font-size:17px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* .t2 остался только у строки проекта: у задачи подписи нет вовсе */
