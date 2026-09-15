@@ -7,21 +7,31 @@ import {TOOLS} from './tools.js';
 
 const DEFAULT_MODEL='claude-sonnet-5';   /* разговор */
 const DEFAULT_SUM_MODEL='claude-haiku-4-5';  /* выжимки старой переписки — дешёвая модель */
-const MAX_TOKENS=4096;
+const MAX_TOKENS=8192;                   /* ход с кодом длиннее разговорного: скрипты тоже выход */
 const EFFORT='low';                      /* чат должен отвечать быстро; поднять при поверхностных ответах */
 const MAX_BODY=1024*1024;                /* история несёт результаты поиска — они объёмные */
 const MAX_MSGS=40;
 
 /* Сеть: поиск и загрузка страниц исполняются на стороне Anthropic и приходят в том же
-   потоке. Версии _20260209 сами фильтруют выдачу кодом, отдельный code_execution рядом
-   объявлять нельзя — модель получает две среды исполнения. Каждый поиск платный, поэтому
-   потолок вызовов на ответ; текст страницы ограничен, потому что ляжет в историю у клиента. */
+   потоке. Версии базовые (_20250305/_20250910), а не _20260209: те фильтруют выдачу
+   своим кодом, и рядом с code_execution модель получала бы две среды исполнения —
+   документация прямо предупреждает. Каждый поиск платный, поэтому потолок вызовов
+   на ответ; текст страницы ограничен, потому что ляжет в историю у клиента. */
 const WEB_USES=3;
 const FETCH_TOKENS=6000;
 const WEB_TOOLS=[
- {type:'web_search_20260209',name:'web_search',max_uses:WEB_USES},
- {type:'web_fetch_20260209',name:'web_fetch',max_uses:WEB_USES,max_content_tokens:FETCH_TOKENS}
+ {type:'web_search_20250305',name:'web_search',max_uses:WEB_USES},
+ {type:'web_fetch_20250910',name:'web_fetch',max_uses:WEB_USES,max_content_tokens:FETCH_TOKENS}
 ];
+/* Код и документы: контейнер на стороне Anthropic, в нём готовые навыки для docx/xlsx/
+   pptx/pdf. Контейнер живёт у задачи (client присылает его id), файлы из него клиент
+   забирает через {file:id} ниже. Навыки требуют бета-заголовок; Files API — нет. */
+const CODE_TOOL={type:'code_execution_20260521',name:'code_execution'};
+const SKILLS=['docx','xlsx','pptx','pdf'].map(id=>({type:'anthropic',skill_id:id,version:'latest'}));
+const BETA='code-execution-2025-08-25';
+const CID=/^container_[A-Za-z0-9_-]{2,120}$/;
+const FID=/^file_[A-Za-z0-9_-]{2,120}$/;
+const FILE_MAX=20*1024*1024;             /* больше — не проксируем, это ляжет в IndexedDB */
 const PAUSES=3;                          /* сколько раз продолжаем ход после pause_turn */
 
 const ALLOW=[
@@ -59,6 +69,18 @@ export default {
   const raw=await req.text();
   if(raw.length>MAX_BODY)return json({error:'слишком большой запрос'},413,h);
   let b; try{b=JSON.parse(raw)}catch(e){return json({error:'bad json'},400,h)}
+
+  /* Файл, собранный в контейнере: клиент скачивает его через нас — ключ только тут.
+     Отдаём поток как есть, с типом содержимого из Files API. */
+  if(typeof b.file==='string'){
+   if(!FID.test(b.file))return json({error:'кривой идентификатор файла'},400,h);
+   let r;
+   try{r=await fetch('https://api.anthropic.com/v1/files/'+b.file+'/content',{headers:{'anthropic-version':'2023-06-01','x-api-key':env.ANTHROPIC_API_KEY}});}
+   catch(e){return json({error:'сеть до Anthropic: '+cut(e&&e.message||e,200)},502,h);}
+   if(!r.ok)return json({error:'anthropic '+r.status},502,h);
+   if(+(r.headers.get('content-length')||0)>FILE_MAX)return json({error:'файл слишком большой'},413,h);
+   return new Response(r.body,{headers:{...h,'content-type':r.headers.get('content-type')||'application/octet-stream','cache-control':'no-store'}});
+  }
 
   /* Название задачи в два слова. Пользователь пишет как придётся, а в списке имя
      должно читаться с одного взгляда. Дешёвая модель, ответ — одна строка. */
@@ -125,7 +147,7 @@ export default {
    /* Серверные вызовы и их результаты — как есть: в результатах поиска лежит шифрованное
       содержимое, по которому модель собирает цитаты, его не обрезать и не пересобирать. */
    if(x.type==='server_tool_use')return {type:'server_tool_use',id:cut(x.id,80),name:cut(x.name,60),input:x.input&&typeof x.input==='object'?x.input:{}};
-   if(x.type==='web_search_tool_result'||x.type==='web_fetch_tool_result')
+   if(/^[a-z_]+_tool_result$/.test(x.type)&&x.type!=='tool_result')
     return {type:x.type,tool_use_id:cut(x.tool_use_id,80),content:x.content};
    /* Вложения пользователя: картинка и PDF идут как есть, base64 не режем */
    if((x.type==='image'||x.type==='document')&&x.source&&x.source.type==='base64')
@@ -150,41 +172,53 @@ export default {
   /* Поиск учитывает, где пользователь: «клиника рядом» без этого ищется где попало.
      Пояс приходит от клиента; кривой — не подставляем, иначе API вернёт 400. */
   const tools=[...TOOLS,...WEB_TOOLS.map(t=>t.name==='web_search'&&validTz(b.tz)
-   ?{...t,user_location:{type:'approximate',timezone:b.tz}}:t)];
+   ?{...t,user_location:{type:'approximate',timezone:b.tz}}:t),CODE_TOOL];
   const system=buildSystem({...b,today});
-  const call=messages=>fetch('https://api.anthropic.com/v1/messages',{
+  const headers={'content-type':'application/json','anthropic-version':'2023-06-01','anthropic-beta':BETA,'x-api-key':env.ANTHROPIC_API_KEY};
+  const call=(messages,cid)=>fetch('https://api.anthropic.com/v1/messages',{
    method:'POST',
-   headers:{
-    'content-type':'application/json',
-    'anthropic-version':'2023-06-01',
-    'x-api-key':env.ANTHROPIC_API_KEY
-   },
+   headers,
    body:JSON.stringify({
     model,
     max_tokens:MAX_TOKENS,
     stream:true,
     system,
     tools,
+    container:cid?{id:cid,skills:SKILLS}:{skills:SKILLS},
     output_config:{effort:EFFORT},
     messages
    })
   });
 
+  /* Контейнер задачи: в нём лежат уже собранные файлы, так что «поправь таблицу»
+     не начинается с нуля. Протухший (400) — молча начинаем с нового. */
+  let cid=CID.test(b.container||'')?b.container:null;
   let up;
-  try{up=await call(hist);}
-  catch(e){return json({error:'сеть до Anthropic: '+cut(e&&e.message||e,200)},502,h);}
+  try{
+   up=await call(hist,cid);
+   if(!up.ok&&up.status===400&&cid){cid=null; up=await call(hist,null);}
+  }catch(e){return json({error:'сеть до Anthropic: '+cut(e&&e.message||e,200)},502,h);}
 
   if(!up.ok)return json({error:'anthropic '+up.status,detail:cut(await up.text(),500)},502,h);
 
   /* Серверный цикл упёрся в свой лимит итераций (pause_turn) — продолжаем ход сами,
      в тот же поток: переотправляем историю с уже полученным ходом ассистента, без
-     добавочного сообщения. Клиент про паузу не знает. */
-  const again=async content=>{
-   try{const r=await call([...hist,{role:'assistant',content}]); return r.ok?r.body:null;}
+     добавочного сообщения, в тот же контейнер. Клиент про паузу не знает. */
+  const again=async(content,c)=>{
+   try{const r=await call([...hist,{role:'assistant',content}],c||cid); return r.ok?r.body:null;}
    catch(e){return null;}
   };
+  /* Имя и размер собранного файла — из Files API; сам файл клиент заберёт отдельно */
+  const meta=async id=>{
+   try{
+    const r=await fetch('https://api.anthropic.com/v1/files/'+id,{headers:{'anthropic-version':'2023-06-01','x-api-key':env.ANTHROPIC_API_KEY}});
+    if(!r.ok)return null;
+    const d=await r.json();
+    return {id,name:cut(d.filename||id,200),mime:cut(d.mime_type||'application/octet-stream',100),size:+d.size_bytes||0};
+   }catch(e){return null;}
+  };
 
-  return new Response(relay(up.body,again),{
+  return new Response(relay(up.body,again,meta),{
    headers:{...h,'content-type':'text/event-stream; charset=utf-8','cache-control':'no-cache','connection':'keep-alive'}
   });
  }
@@ -209,12 +243,12 @@ const acc=(a,b)=>{
    Ход с серверными вызовами (поиск, загрузка страницы) клиент должен вернуть в истории
    целиком и в том же порядке, иначе на следующем ходу модель забудет, что искала, —
    поэтому такой ход отдаётся в done блоками (content), а источники из цитат — списком (src). */
-function relay(body,again){
+function relay(body,again,meta){
  const dec=new TextDecoder(), enc=new TextEncoder();
  return new ReadableStream({async start(c){
   const send=(ev,data)=>c.enqueue(enc.encode('event: '+ev+'\ndata: '+JSON.stringify(data)+'\n\n'));
-  let usage=null, stop=null, srv=false;
-  const content=[], src=[], seen={};
+  let usage=null, stop=null, srv=false, cid=null;
+  const content=[], src=[], seen={}, fids=[];
   const cite=x=>{
    if(!x||typeof x.url!=='string'||!/^https?:/i.test(x.url)||seen[x.url])return;
    seen[x.url]=1; src.push({url:cut(x.url,500),title:cut(x.title||'',120)});
@@ -227,11 +261,18 @@ function relay(body,again){
     else if(cb.type==='tool_use'||cb.type==='server_tool_use'){
      const b={type:cb.type,id:cb.id,name:cb.name,input:{}}; blocks[i]=b; b.json=''; content.push(b);
      if(cb.type==='server_tool_use')srv=true;
-    }else if(cb.type==='web_search_tool_result'||cb.type==='web_fetch_tool_result'){
+    }else if(/_tool_result$/.test(cb.type)){
+     /* Результат серверного инструмента приходит целиком одним блоком */
      srv=true; content.push({type:cb.type,tool_use_id:cb.tool_use_id,content:cb.content});
-     const err=cb.content&&!Array.isArray(cb.content)&&cb.content.error_code;
+     const r=cb.content;
+     const err=r&&!Array.isArray(r)&&(r.error_code||(/_error$/.test(r.type||'')&&(r.error_code||r.type)));
      if(err)send('srv',{name:cb.type,error:cut(err,60)});
+     /* Файлы, собранные кодом: у результата список выходов с file_id */
+     if(r&&Array.isArray(r.content))for(const o of r.content)if(o&&typeof o.file_id==='string'&&!fids.includes(o.file_id))fids.push(o.file_id);
     }
+   }
+   else if(d.type==='message_start'){
+    const m=d.message; if(m&&m.container&&typeof m.container.id==='string')cid=m.container.id;
    }
    else if(d.type==='content_block_delta'&&d.delta){
     const dl=d.delta;
@@ -255,6 +296,10 @@ function relay(body,again){
    else if(d.type==='message_delta'){
     if(d.usage)usage=acc(usage,d.usage);
     if(d.delta&&d.delta.stop_reason)stop=d.delta.stop_reason;
+    /* Контейнер создаётся, когда код уже выполнился, поэтому в потоке его id
+       приезжает в конце — в дельте сообщения, а не в message_start */
+    const ct=(d.delta&&d.delta.container)||d.container;
+    if(ct&&typeof ct.id==='string')cid=ct.id;
    }
    else if(d.type==='error')send('error',{error:(d.error&&d.error.message)||'ошибка потока',code:(d.error&&d.error.type)||''});
   };
@@ -274,14 +319,18 @@ function relay(body,again){
     }
    }
    if(stop!=='pause_turn'||!again||pass===PAUSES)break;
-   body=await again(content.filter(b=>b.type!=='text'||b.text));
+   body=await again(content.filter(b=>b.type!=='text'||b.text),cid);
    if(!body)break;
    stop=null;
   }
   if(stop==='refusal')send('error',{error:'Модель отказалась отвечать на это.',code:'refusal'});
+  const files=[];
+  if(meta)for(const id of fids.slice(0,10)){const f=await meta(id); if(f)files.push(f);}
   send('done',{usage,stop,
    ...(srv?{content:content.filter(b=>b.type!=='text'||b.text)}:{}),
-   ...(src.length?{src}:{})});
+   ...(src.length?{src}:{}),
+   ...(cid?{container:cid}:{}),
+   ...(files.length?{files}:{})});
   c.close();
  }});
 }

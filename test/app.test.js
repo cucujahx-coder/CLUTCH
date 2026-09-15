@@ -590,6 +590,14 @@ async function web(){
  assert(links[0].textContent.includes('<b>Грузчики')&&!links[0].querySelector('b'),'заголовок источника экранирован');
  assert(links[0].getAttribute('target')==='_blank'&&links[0].getAttribute('rel')==='noopener','открывается в новой вкладке без opener');
  assert(links[0].textContent.includes('a.ru'),'рядом хост');
+ /* Среда исполнения задачи: её id уходит в запросе, подписи ходов кода */
+ assert(!(await A.chatPayload(t,false)).container,'без среды поле не шлётся');
+ t.cid='container_abc'; assert((await A.chatPayload(t,false)).container==='container_abc','id среды задачи уходит в запросе');
+ assert(A.srvLabel({name:'bash_code_execution',input:{command:'ls'}})==='Выполняю код'&&A.srvLabel({name:'web_search',input:{query:'x'}})==='Ищу в сети: x','подписи серверных ходов');
+ /* Двоичный файл текстом не читается */
+ t.files=[{name:'d.docx',mime:'application/x',size:3,body:undefined,owner:'t'+t.id}];
+ const rd=await A.runTool({id:'r1',name:'file_read',input:{name:'d.docx'}},t,false);
+ assert(/не читается|двоичн/.test(rd.out),'нечитаемый файл — понятный ответ модели, не исключение');
  /* Поиск платный поштучно */
  const before=A.spendUsd(A.S.spend);
  A.addSpend({output_tokens:0,server_tool_use:{web_search_requests:2}});

@@ -724,6 +724,7 @@ const ACT={
   const f=(c.item.files||[]).find(x=>x.name===name);
   if(!f)return {out:'файл не найден'};
   const body=await fileBody(c.item,f);
+  if(body!=null&&typeof body!=='string')return {out:'файл двоичный ('+(f.mime||'')+'), текстом не читается; он остался в среде исполнения'};
   return {out:body==null?'файл не читается':body};
  },
  /* Чтение: в лимит действий не входит и карточки не рисует */
@@ -763,7 +764,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v66';
+const APP_V='tasks-v67';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -861,7 +862,8 @@ async function chatPayload(item,isP){
  let tz='UTC'; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch(e){}
  const profile=(S.mem||[]).join('\n');
  return {task,others,messages:await chatMessages(item),today:today(),tz,
-  ...(profile?{profile}:{}),...(item.sum?{summary:item.sum}:{})};
+  ...(profile?{profile}:{}),...(item.sum?{summary:item.sum}:{}),
+  ...(item.cid?{container:item.cid}:{})};   /* среда исполнения задачи: в ней уже собранные файлы */
 }
 
 /* Один проход потока. Текст отдаётся кусками через onDelta — лента дорисовывается
@@ -870,10 +872,32 @@ async function chatPayload(item,isP){
 /* Подпись под точками, пока модель ищет: что именно ищет или какую страницу читает */
 function srvLabel(d){
  const inp=(d&&d.input)||{};
- if(d.error)return 'Поиск не удался';
+ if(d.error)return /web/.test(d.name||'')?'Поиск не удался':'Не вышло, пробую иначе';
  if(d.name==='web_search')return 'Ищу в сети'+(inp.query?': '+inp.query:'');
  if(d.name==='web_fetch'){let h=''; try{h=new URL(inp.url).host.replace(/^www\./,'')}catch(e){} return 'Читаю'+(h?' '+h:' страницу');}
+ if(d.name==='bash_code_execution')return 'Выполняю код';
+ if(d.name==='text_editor_code_execution')return 'Пишу файл';
  return '';
+}
+
+/* Файлы, собранные в среде исполнения: у клиента только их идентификаторы, тело
+   скачивается через воркер (ключ там) и ложится во вложения задачи как обычный файл —
+   в IndexedDB, Blob как есть. Одноимённый файл заменяется: модель правит свой же документ. */
+async function pullFiles(item,isP,files){
+ const owner=shortId(item,isP); item.files=item.files||[];
+ for(const f of files.slice(0,10)){
+  const name=String(f.name||'файл').replace(/[\/\\]/g,'_');
+  try{
+   const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({file:f.id})});
+   if(!r.ok)throw new Error('HTTP '+r.status);
+   const blob=await r.blob();
+   await bodyPut(owner,name,blob);
+   const i=item.files.findIndex(x=>x.name===name);
+   if(i<0&&item.files.length>=MAX_FILES)item.files.shift();
+   const e={name,mime:blob.type||f.mime||'application/octet-stream',size:blob.size||f.size||0,owner};
+   if(i>=0)item.files[i]=e; else item.files.push(e);
+  }catch(e){item.chat.push({err:1,a:'Не удалось забрать файл '+name+': '+((e&&e.message)||e)});}
+ }
 }
 
 async function streamOnce(body,onDelta,onStatus){
@@ -886,7 +910,7 @@ async function streamOnce(body,onDelta,onStatus){
  }
  if(!r.body)throw new Error('поток недоступен');
  const rd=r.body.getReader(), dec=new TextDecoder();
- let buf='', out='', got=false, raw=null, src=null; const tools=[];
+ let buf='', out='', got=false, raw=null, src=null, cid=null, files=null; const tools=[];
  for(;;){
   const {value,done}=await rd.read();
   if(done)break;
@@ -900,7 +924,8 @@ async function streamOnce(body,onDelta,onStatus){
    if(ev==='text'){out+=d; got=true; onDelta&&onDelta(out);}
    else if(ev==='tool_use'){tools.push(d); got=true;}
    else if(ev==='srv'){const l=srvLabel(d); if(l&&onStatus)onStatus(l);}
-   else if(ev==='done'){addSpend(d&&d.usage); if(d&&Array.isArray(d.content))raw=d.content; if(d&&Array.isArray(d.src))src=d.src;}
+   else if(ev==='done'){addSpend(d&&d.usage); if(d&&Array.isArray(d.content))raw=d.content; if(d&&Array.isArray(d.src))src=d.src;
+    if(d&&typeof d.container==='string')cid=d.container; if(d&&Array.isArray(d.files))files=d.files;}
    else if(ev==='error'){
     const e=new Error(d.error||'ошибка потока');
     e.retry=!got;                       /* повторяем только если ничего не успели показать */
@@ -909,7 +934,7 @@ async function streamOnce(body,onDelta,onStatus){
   }
  }
  if(!got){const e=new Error('пустой ответ'); e.retry=true; throw e;}
- return {text:out.trim(),tools,raw,src};
+ return {text:out.trim(),tools,raw,src,cid,files};
 }
 
 async function askOnce(item,isP,onDelta,onStatus){
@@ -997,6 +1022,8 @@ async function turn(item,isP){
   ph.typing=0; ph.a=res.text;
   if(res.raw)ph.raw=res.raw;
   if(res.src&&res.src.length)ph.src=res.src;
+  if(res.cid)item.cid=res.cid;
+  if(res.files&&res.files.length)await pullFiles(item,isP,res.files);
   if(!res.tools.length){
    if(!res.text)item.chat.pop();
    paint(); save(); squeeze(item); return;
@@ -2022,7 +2049,7 @@ try{ document.fonts && document.fonts.ready.then(toBottom); }catch(e){}
 window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, addTask, addStep, makeProject,
   delItem, fmtDue, flush, paint, openPri, closePri, showToast, hideToast,
   chatPayload, chatMessages, md, runTool, undoAct, byShort, shortId, fileBody, fmtSize, attach,
-  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle,
+  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles,
   get pending(){return pending}, get undos(){return undos}, get undoNote(){return undoNote}};
 
 /* Открыть страницу с ?debug — поверх интерфейса появятся живые числа: размеры окна и

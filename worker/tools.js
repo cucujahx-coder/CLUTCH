@@ -58,7 +58,7 @@ export const TOOLS=[
  {name:'memory_forget',description:'Убрать факт из памяти о пользователе.',
   input_schema:{type:'object',properties:{text:str('Что забыть — достаточно узнаваемой части')},required:['text'],additionalProperties:false}},
 
- {name:'file_read',description:'Прочитать сохранённый файл текущей записи по имени. Маленькие файлы уже вложены в снимок — их читать не нужно.',
+ {name:'file_read',description:'Прочитать сохранённый текстовый файл текущей записи по имени. Маленькие файлы уже вложены в снимок — их читать не нужно. Двоичные (docx, xlsx, pdf) так не читаются — они есть в среде исполнения.',
   input_schema:{type:'object',properties:{name:str('Имя файла')},required:['name'],additionalProperties:false}}
 ];
 

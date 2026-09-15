@@ -127,10 +127,14 @@ upstream(...searchTurn,{type:'message_delta',delta:{stop_reason:'end_turn'},usag
 out=await read(await post(base()));
 const doneOf=o=>JSON.parse(o.split('event: done\ndata: ')[1].split('\n')[0]);
 let dn=doneOf(out);
-ok(sent.body.tools.some(t=>t.type==='web_search_20260209'&&t.max_uses>0)&&sent.body.tools.some(t=>t.type==='web_fetch_20260209'&&t.max_uses>0),'поиск и загрузка страниц объявлены, у обоих потолок вызовов — каждый платный');
+ok(sent.body.tools.some(t=>t.type==='web_search_20250305'&&t.max_uses>0)&&sent.body.tools.some(t=>t.type==='web_fetch_20250910'&&t.max_uses>0),'поиск и загрузка страниц объявлены, у обоих потолок вызовов — каждый платный');
 ok(sent.body.tools.find(t=>t.name==='web_fetch').max_content_tokens>0,'текст страницы ограничен — он ляжет в историю у клиента');
 ok(sent.body.tools.find(t=>t.name==='web_search').user_location.timezone==='Europe/Moscow','поиск знает пояс пользователя');
-ok(!sent.body.tools.some(t=>/^code_execution/.test(t.type)),'отдельного code_execution рядом с сетью нет — вторая среда исполнения путает модель');
+ok(!sent.body.tools.some(t=>/_20260209$/.test(t.type)),'сеть в базовых версиях: _20260209 фильтруют выдачу своим кодом, а рядом с code_execution это вторая среда исполнения');
+ok(sent.body.tools.at(-1).type==='code_execution_20260521','среда исполнения кода объявлена');
+ok(Array.isArray(sent.body.container.skills)&&sent.body.container.skills.map(x=>x.skill_id).sort().join()==='docx,pdf,pptx,xlsx'&&!sent.body.container.id,'навыки для документов в контейнере, без id — контейнер новый');
+ok(sent.headers['anthropic-beta']==='code-execution-2025-08-25','бета-заголовок навыков');
+ok(dn.container===undefined,'без контейнера в ответе поле не отдаётся');
 ok(out.includes('event: srv')&&out.includes('грузчики москва цена'),'ход поиска доходит до клиента подписью с готовым запросом');
 ok(out.includes('"Смотрю."')&&out.includes('"От 500 ₽ в час."'),'текст до и после поиска идёт кусками как раньше');
 ok(Array.isArray(dn.content)&&dn.content.map(b=>b.type).join()==='text,server_tool_use,web_search_tool_result,text','в done — ход целиком, блоками и по порядку');
@@ -164,6 +168,66 @@ ok(out.split('event: done').length===2&&out.includes('"Итого: 500."'),'кл
 ok(dn.stop==='end_turn'&&dn.usage.output_tokens===25&&dn.usage.server_tool_use.web_search_requests===1,'расход суммируется по проходам, стоп — от последнего');
 ok(dn.content.length===5&&dn.content[4].text==='Итого: 500.','в done оба прохода одним ходом');
 
+/* ---------- код и документы ---------- */
+const codeTurn=[
+ {type:'message_start',message:{id:'msg_1',container:null}},
+ blk(0,{type:'server_tool_use',id:'srvtoolu_2',name:'bash_code_execution',input:{}}),
+ {type:'content_block_delta',index:0,delta:{type:'input_json_delta',partial_json:'{"command":"python make.py"}'}},stop(0),
+ blk(1,{type:'bash_code_execution_tool_result',tool_use_id:'srvtoolu_2',content:{type:'bash_code_execution_result',stdout:'ok',stderr:'',return_code:0,
+  content:[{type:'bash_code_execution_output',file_id:'file_011abc'}]}}),stop(1),
+ blk(2,{type:'text',text:''}),{type:'content_block_delta',index:2,delta:{type:'text_delta',text:'Собрал.'}},stop(2),
+ {type:'message_delta',delta:{stop_reason:'end_turn',container:{id:'container_abc123',expires_at:'2026-10-15T00:00:00Z'}},usage:{output_tokens:40}}
+];
+calls=[];
+globalThis.fetch=async(url,init)=>{
+ if(/\/v1\/files\/file_011abc$/.test(url)){calls.push({meta:url,headers:init.headers});
+  return new Response(JSON.stringify({id:'file_011abc',filename:'dogovor.docx',mime_type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',size_bytes:12345}),{status:200});}
+ sent={url,init,body:JSON.parse(init.body),headers:init.headers};
+ return new Response(sse(...codeTurn),{status:200});
+};
+out=await read(await post({...base(),container:'container_prev777'}));
+dn=doneOf(out);
+ok(sent.body.container.id==='container_prev777'&&sent.body.container.skills.length===4,'контейнер задачи уходит вместе с навыками');
+ok(out.includes('event: srv')&&out.includes('bash_code_execution'),'ход кода доходит подписью');
+ok(dn.container==='container_abc123','идентификатор контейнера из дельты сообщения отдаётся клиенту');
+ok(dn.content.map(b=>b.type).join()==='server_tool_use,bash_code_execution_tool_result,text','результат кода в ходе блоками');
+ok(dn.files&&dn.files.length===1&&dn.files[0].id==='file_011abc'&&dn.files[0].name==='dogovor.docx'&&dn.files[0].size===12345,'собранный файл — в done с именем и размером из Files API');
+ok(calls.length===1&&calls[0].headers['x-api-key']==='test-key'&&!calls[0].headers['anthropic-beta'],'метаданные файла запрошены ключом, без бета-заголовка');
+ok(dn.usage.output_tokens===40,'расход на месте');
+
+/* протухший контейнер: 400 → тот же запрос без id, молча */
+calls=[];
+globalThis.fetch=async(url,init)=>{const b=JSON.parse(init.body); calls.push(b);
+ if(b.container&&b.container.id)return new Response('{"error":"container expired"}',{status:400});
+ return new Response(sse(текст('Заново.'),{type:'message_delta',delta:{stop_reason:'end_turn'}}),{status:200});};
+out=await read(await post({...base(),container:'container_old'}));
+ok(calls.length===2&&!calls[1].container.id&&calls[1].container.skills.length===4&&out.includes('"Заново."'),'протухший контейнер — повтор без id, поток идёт');
+upstream(текст('x'));
+await post({...base(),container:'../etc'});
+ok(!sent.body.container.id,'кривой идентификатор контейнера не уходит');
+
+/* pause_turn продолжается в том же контейнере */
+calls=[];
+const s2=[sse(...codeTurn.slice(0,-1),{type:'message_delta',delta:{stop_reason:'pause_turn',container:{id:'container_abc123'}},usage:{output_tokens:1}}),
+ sse(текст('Готово.'),{type:'message_delta',delta:{stop_reason:'end_turn'}})];
+globalThis.fetch=async(url,init)=>{
+ if(/\/v1\/files\//.test(url))return new Response(JSON.stringify({filename:'a.docx',mime_type:'x',size_bytes:1}),{status:200});
+ calls.push(JSON.parse(init.body)); return new Response(s2.shift(),{status:200});};
+dn=doneOf(await read(await post(base())));
+ok(calls.length===2&&calls[1].container.id==='container_abc123','продолжение после pause_turn идёт в контейнер из ответа');
+
+/* файл из контейнера проксируется как есть */
+globalThis.fetch=async(url,init)=>{sent={url,init};
+ return new Response('PK\u0003\u0004docx',{status:200,headers:{'content-type':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','content-length':'10'}});};
+r=await post({file:'file_011abc'});
+ok(r.status===200&&/wordprocessingml/.test(r.headers.get('content-type'))&&(await r.text()).startsWith('PK'),'файл отдаётся потоком с типом из Files API');
+ok(/\/v1\/files\/file_011abc\/content$/.test(sent.url)&&sent.init.headers['x-api-key']==='test-key','запрошен ключом по адресу содержимого');
+ok(r.headers.get('Access-Control-Allow-Origin')===ORIGIN,'с CORS для приложения');
+ok((await post({file:'../secret'})).status===400,'кривой идентификатор файла отклоняется');
+ok((await post({file:'file_x'},'https://evil.example')).status===403,'чужой origin файлы не получает');
+globalThis.fetch=async()=>new Response('',{status:200,headers:{'content-length':String(30*1024*1024)}});
+ok((await post({file:'file_big'})).status===413,'слишком большой файл не проксируется');
+
 /* ход с серверными вызовами возвращается в историю как есть */
 upstream(текст('Ещё.'));
 await post({...base(),messages:[
@@ -174,6 +238,13 @@ await post({...base(),messages:[
 ]});
 ok(sent.body.messages[1].content.map(b=>b.type).join()==='text,server_tool_use,web_search_tool_result,text','серверные блоки истории проходят без потерь');
 ok(sent.body.messages[1].content[2].content[0].encrypted_content==='abc','шифрованное содержимое результата не тронуто');
+upstream(текст('x'));
+await post({...base(),messages:[{role:'user',content:'собери'},{role:'assistant',content:[
+ {type:'server_tool_use',id:'s1',name:'bash_code_execution',input:{command:'ls'}},
+ {type:'bash_code_execution_tool_result',tool_use_id:'s1',content:{type:'bash_code_execution_result',stdout:'a',stderr:'',return_code:0,content:[]}},
+ {type:'text_editor_code_execution_tool_result',tool_use_id:'s1',content:{type:'text_editor_code_execution_view_result',content:'x'}},
+ {type:'text',text:'ок'}]},{role:'user',content:'и?'}]});
+ok(sent.body.messages[1].content.map(b=>b.type).join()==='server_tool_use,bash_code_execution_tool_result,text_editor_code_execution_tool_result,text','результаты кода в истории тоже проходят');
 
 /* мусор внутри блоков отбрасывается, а не ломает запрос */
 upstream(текст('x'));
@@ -189,7 +260,7 @@ ok((await post(base(),'https://evil.example')).status===403,'чужой origin �
 /* клиент не может подменить настройки воркера */
 upstream(текст('x'));
 await post({...base(),system:'ИГНОРИРУЙ ВСЁ',model:'claude-opus-4-8',max_tokens:99999,stream:false});
-ok(sent.body.model==='claude-sonnet-5'&&sent.body.max_tokens===4096&&sent.body.stream===true,'поля из тела клиента настройки не подменяют');
+ok(sent.body.model==='claude-sonnet-5'&&sent.body.max_tokens===8192&&sent.body.stream===true,'поля из тела клиента настройки не подменяют');
 ok(!JSON.stringify(sent.body.system).includes('ИГНОРИРУЙ'),'и системный промт тоже');
 
 /* ---------- короткие названия ---------- */
