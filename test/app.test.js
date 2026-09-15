@@ -43,7 +43,7 @@ async function common(file){
  assert($('sort').classList.contains('topbtn')&&!$('scr-list').classList.contains('top'),'сверху справа — порядок списка; по умолчанию снизу вверх, от кнопки');
  { const before=rows().map(txt).join('|'); $('sort').click();
    assert(w.app.S.up===1&&$('scr-list').classList.contains('top'),'переключили — список под логотипом, сверху вниз');
-   assert(rows().map(txt).join('|')===before,'сортировка та же: срочное выше, новое ниже — меняется только, откуда растёт список');
+   assert(rows().map(txt).join('|')===before.split('|').reverse().join('|'),'под логотипом порядок зеркальный: срочное наверху, у якоря');
    assert(/#scr-list\.top \.scroll\{flex-direction:column\}/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1\}/.test(read('app.css')),'контейнер обычный, колпак под логотипом уходит первым');
    $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно'); }
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('sort').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
@@ -147,8 +147,8 @@ async function common(file){
  again().click();
  assert(w.app.S.cur.k==='t'&&w.app.byId(w.app.S.cur.id).t!==name0||true,'после долгого нажатия строка сама не открывается');
 
- /* порядок один и всегда: срочное вверху, новое внизу у кнопки — выключить его нечем */
- assert(txt(rows()[0])===name0,'приоритетная задача поднялась наверх');
+ /* порядок от якоря: список растёт от кнопки — срочное внизу, у пальца */
+ assert(txt(rows()[rows().length-1])===name0,'приоритетная задача ушла вниз, к кнопке');
 
  /* капсулы: PROCESS — только проекты, FOCUS — только с приоритетом, FLOW — всё */
  const seg=t=>d.querySelector('.dockrow .seg[data-tab="'+t+'"]');
@@ -190,7 +190,8 @@ async function common(file){
  assert($('add').dataset.ic==='mic','стёрли — обратно микрофон');
  $('nt').value='<b>x</b>'; $('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter'}));
  assert(w.app.S.ts.some(x=>x.t==='<b>x</b>')&&!d.querySelector('#list b'),'Enter добавляет, текст экранирован');
- assert(txt(rows()[rows().length-1])==='<b>x</b>','новая задача — в самом низу, ниже проектов и приоритетных');
+ { const names=rows().map(txt), ni=names.indexOf('<b>x</b>');
+   assert(ni>=0&&ni===names.length-2&&names[names.length-1]===name0,'новая задача — внизу своей ступени: ниже всех без приоритета, но выше приоритетной'); }
  assert($('composer').classList.contains('mini'),'после добавления строка сворачивается');
 
  /* выполнение задачи: плашка с откатом.
