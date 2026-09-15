@@ -99,12 +99,12 @@ async function common(file){
   const {w:wj,d:dj}=load('index.html',w2=>{ w2.matchMedia=()=>({matches:false}); });
   const scj=dj.getElementById('scroll'), cj=dj.getElementById('composer');
   let kf=null, kfF=null; cj.animate=(k,o)=>{ kf={k,o}; return {}; };
-  const fj=dj.getElementById('find'), bj=dj.getElementById('brand'); fj.animate=(k,o)=>{ kfF={k,o}; return {}; };
+  const fj=dj.getElementById('find'), bj=dj.getElementById('brand'); fj.animate=(k,o)=>{ kfF={k,o}; return {}; }; bj.animate=fj.animate;
   const tj=(type,y)=>{const e=new wj.Event(type,{bubbles:true}); e.touches=y==null?[]:[{clientX:100,clientY:y}]; scj.dispatchEvent(e);};
   tj('touchstart',300); tj('touchmove',380);
-  assert(fj.classList.contains('pull')&&/^scale\(1\.0\d+,0\.9\d+\)$/.test(fj.style.transform)&&/^scale\(/.test(bj.style.transform)&&dj.querySelector('#scr-list .dockrow').classList.contains('pull'),'пружинит весь экран: кнопка выполненных, таблетка логотипа (центровка сохранена) и капсула видов сжаты вместе с кнопкой');
+  assert(!fj.classList.contains('pull')&&!fj.style.transform&&!bj.style.transform&&!dj.querySelector('#scr-list .dockrow').classList.contains('pull'),'пружинит только кнопка: таблетки, кнопки шапки и капсула видов стоят');
   tj('touchend');
-  assert(kfF&&kfF.o.delay===40&&kfF.o.fill==='backwards'&&/translateY\(-1\d\.\dpx\)/.test(kfF.k[1].transform)&&fj.style.transform===''&&bj.style.transform==='','остальные прыгают на шаг --lag позже кнопки, держа сжатие до старта, и ниже её');
+  assert(kfF===null,'и не прыгают — владелец оставил прыжок одной кнопке');
   assert(kf&&/^translateY\(-75px\) translateY\(-3\d\.\dpx\) scale\(0\.940,1\.100\)$/.test(kf.k[1].transform)&&kf.k[1].offset<=.3&&kf.o.duration<=300&&kf.k[0].easing==='cubic-bezier(.2,.8,.2,1)'&&kf.o.easing==='cubic-bezier(.34,1.56,.64,1)','отпустили — резкий прыжок: взлёт по --e-out за треть времени, высота по тяге, посадка с перелётом');
   assert(!cj.classList.contains('pull')&&cj.style.transform==='','после прыжка inline-трансформы нет — кнопка снова управляется классами');
   /* Длинный список: пружина нативная, iOS отдаёт scrollTop за краем — кнопка сжимается и прыгает так же */

@@ -767,7 +767,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v87';
+const APP_V='tasks-v88';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1273,18 +1273,13 @@ function armRubber(el){
    const rev = getComputedStyle(el).flexDirection === 'column-reverse';
    return Math.max((rev ? -max : 0) - st, st - (rev ? 0 : max), 0); };
  const btn = () => el.closest('#scr-list') && composer.classList.contains('mini') ? composer : null;
- /* Пружинит весь интерфейс экрана списка, не только кнопка: паук внутри неё, таблетка
-    логотипа, кнопка выполненных и капсула видов. У каждого своя базовая трансформа (у таблетки
-    это центровка translateX(-50%) — её нельзя потерять), своя амплитуда сжатия и прыжка.
-    Кнопка прыгает первой, остальные — на шаг --lag позже (доводка), держа сжатие до старта. */
+ /* Пружинят только большая кнопка и паук в ней. В v81 пружинил весь экран (таблетки, кнопки,
+    капсула видов — с доводкой на --lag), в v88 владелец это снял: прыжок остался у кнопки.
+    Таблица частей осталась на случай возврата: базовая трансформа (у центрированного
+    трансформой элемента её нельзя терять), амплитуды сжатия и прыжка, задержка. */
  const parts = () => [
   {el:composer, base:'translateY(-75px)', sq:[.06,.1], st:[.94,1.1], amp:36, lag:0},
-  {el:composer.querySelector('.shutter .sw'), base:'', sq:[.14,.2], st:[.9,1.16], amp:0, lag:0},
-  {el:$('brand'), base:'', sq:[.05,.1], st:[.96,1.06], amp:20, lag:LAG},
-  {el:$('vname'), base:'translateX(-50%)', sq:[.05,.1], st:[.96,1.06], amp:20, lag:LAG},
-  {el:$('find'), base:'', sq:[.06,.1], st:[.94,1.1], amp:20, lag:LAG},
-  {el:$('sort'), base:'', sq:[.06,.1], st:[.94,1.1], amp:20, lag:LAG},
-  {el:document.querySelector('#scr-list .dockrow'), base:'', sq:[.04,.1], st:[.97,1.06], amp:20, lag:LAG}
+  {el:composer.querySelector('.shutter .sw'), base:'', sq:[.14,.2], st:[.9,1.16], amp:0, lag:0}
  ].filter(x=>x.el);
  const tf = (x, p, dy, sx, sy) => (x.base + (dy ? ' translateY(' + dy.toFixed(1) + 'px)' : '') + ' scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')').trim();
  const squash = (x, p) => tf(x, p, 0, 1 + x.sq[0]*p, 1 - x.sq[1]*p);
