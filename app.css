@@ -158,6 +158,9 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   box-shadow:var(--glass);
   transition:opacity var(--t-tap) var(--e-out)}
 .dockrow.busy{opacity:0;pointer-events:none}   /* плашка о выполненном встаёт ровно на это место */
+/* выполненные — на кромке справа от капсулы видов, в одном ряду с ней; плашка вырастает из этой кнопки */
+.dock #find{position:absolute;right:0;bottom:0;transition:transform var(--t-base) var(--e-over),opacity var(--t-tap) var(--e-out)}
+.dock #find.busy{opacity:0;pointer-events:none}
 /* Подложка активного вида — одна на всех и ездит между третями: переключение это перемещение
    одного элемента, а не подмена фона у двух. Позицию (0/1/2) ставит drawTabs в --seg-i. */
 /* Активный вид — светлая плоская подложка внутри стеклянной капсулы (второе стекло внутри
@@ -224,6 +227,9 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   padding-bottom:calc(76px + 21px + 44px + 47px + var(--pend, 0px) + var(--safe-b))}   /* под доком, 16 px до кольца кнопки */
 /* строка ввода открыта: дока нет, между ней и последней задачей тот же зазор 8, что между задачами */
 #scr-list .scroll.tight{padding-bottom:calc(68px + 16px + var(--foot) + var(--pend, 0px) + var(--safe-b))}
+/* Порядок «сверху вниз»: список растёт от логотипа, контейнер обычный, колпак уходит первым */
+#scr-list.top .scroll{flex-direction:column}
+#scr-list.top .cap{order:-1}
 
 /* ── строка списка: кружок слева, текст справа ─ */
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */

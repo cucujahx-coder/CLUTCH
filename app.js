@@ -72,6 +72,7 @@ const SPIDER =
 const P = {
   clip:'M21 12.5 12.5 21a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10.5 19',
   up:'M12 19V5M5 12l7-7 7 7',
+  down:'M12 5v14M5 12l7 7 7-7',
   mic:'M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3M5 10v1a7 7 0 0 0 14 0v-1M12 19v3',
   back:'M15 5l-7 7 7 7',
   plus:'M12 5v14M5 12h14',
@@ -267,7 +268,7 @@ const overdue=s=>!!s&&days(s)<0;
 /* ---------- хранилище ---------- */
 const KEY='tasks:v1';
 const OLD_KEYS=['clutch:v5','clutch-plan:v1','everyday:v4']; /* приложения-предшественники */
-let S={seq:1,ts:[],pr:[],showDone:0,cur:null,mem:[],spend:null};
+let S={seq:1,ts:[],pr:[],showDone:0,up:0,cur:null,mem:[],spend:null};
 let saveT;
 function save(){clearTimeout(saveT);saveT=setTimeout(flush,120)}
 function flush(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -309,7 +310,7 @@ function importOld(){
  return null;
 }
 function seed(){
- const st={seq:1,ts:[],pr:[],showDone:0,cur:null,mem:[],spend:null};
+ const st={seq:1,ts:[],pr:[],showDone:0,up:0,cur:null,mem:[],spend:null};
  const mk=(n,due,why)=>{const id=st.seq++;st.pr.push({id,n,due,why,chat:[]});return id};
  const p1=mk('Запуск лендинга',plus(4),'Три шага из пяти готовы. Всё упирается в оффер — без него вычитка и выкладка не двинутся.');
  const p2=mk('Переезд офиса',plus(30),'Список неполный: нет пункта про интернет и вывоз старой мебели.');
@@ -766,7 +767,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v81';
+const APP_V='tasks-v82';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1247,7 +1248,7 @@ function paint(keep){
   shown.forEach(i=>list.appendChild(rowEl(i.x, i.isP, i.next, i.left)));
   if(!shown.length) list.innerHTML = '<div class="empty">'+esc(tab.empty)+'</div>';
  }
- drawFind(); drawTabs();
+ drawFind(); drawTabs(); drawSort();
  if(MODE==='two' || view==='detail') paintDetail();   /* закрытый экран чата не перерисовываем */
  if(!keep) toBottom();
 }
@@ -1280,6 +1281,7 @@ function armRubber(el){
   {el:composer.querySelector('.shutter .sw'), base:'', sq:[.14,.2], st:[.9,1.16], amp:0, lag:0},
   {el:$('brand'), base:'translateX(-50%)', sq:[.05,.1], st:[.96,1.06], amp:20, lag:LAG},
   {el:$('find'), base:'', sq:[.06,.1], st:[.94,1.1], amp:20, lag:LAG},
+  {el:$('sort'), base:'', sq:[.06,.1], st:[.94,1.1], amp:20, lag:LAG},
   {el:document.querySelector('#scr-list .dockrow'), base:'', sq:[.04,.1], st:[.97,1.06], amp:20, lag:LAG}
  ].filter(x=>x.el);
  const tf = (x, p, dy, sx, sy) => (x.base + (dy ? ' translateY(' + dy.toFixed(1) + 'px)' : '') + ' scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')').trim();
@@ -1349,6 +1351,9 @@ function armRubber(el){
    заставляет браузер применить новые размеры до правки прокрутки. */
 function toBottom(){
  if(!scroll) return;
+ /* Список под логотипом (S.up) покоится наверху — у обычного контейнера это ноль прокрутки,
+    и доводить его до низа нельзя: список уезжал бы под кнопку при каждой перерисовке. */
+ if(S.up) return;
  const go = () => { void scroll.offsetHeight; scroll.scrollTop = scroll.scrollHeight; };
  go();
  /* Второй проход в следующем кадре: на первом размеры ещё не окончательные — при старте
@@ -1417,6 +1422,7 @@ function showToast(text){
  if(Date.now() - Math.max(kbAtTap, kbLast) < 1200) return;
  $('toast-t').textContent = text;
  document.querySelector('.dockrow').classList.add('busy');   /* плашка встаёт ровно на место капсул */
+ $('find').classList.add('busy');                             /* и вырастает из кнопки выполненных */
  $('toast').classList.add('on');
  clearTimeout(toastTimer);
  toastTimer = setTimeout(hideToast, 4000);
@@ -1424,7 +1430,7 @@ function showToast(text){
 function hideToast(){
  clearTimeout(toastTimer);
  $('toast').classList.remove('on');
- setTimeout(()=>document.querySelector('.dockrow').classList.remove('busy'), 220);
+ setTimeout(()=>{ document.querySelector('.dockrow').classList.remove('busy'); $('find').classList.remove('busy'); }, 220);
 }
 
 /* ---------- приоритет ----------
@@ -1835,6 +1841,16 @@ function drawFind(){
  f.setAttribute('aria-label', S.showDone ? 'Входящие' : 'Выполненные');
 }
 $('find').onclick = () => { tap(8); S.showDone = S.showDone?0:1; save(); paint(); };
+/* Порядок списка: снизу вверх от кнопки (по умолчанию) или сверху вниз под логотипом.
+   Сортировка одна и та же — срочное выше, новое ниже; меняется, откуда список растёт:
+   класс .top у экрана переворачивает контейнер (column вместо column-reverse). */
+function drawSort(){
+ const s = $('sort'); if(!s) return;
+ $('scr-list').classList.toggle('top', !!S.up);
+ swapIcon(s, S.up ? 'down' : 'up', Ic(S.up ? P.down : P.up, 18));
+ s.setAttribute('aria-label', S.up ? 'Список сверху вниз, под логотипом' : 'Список снизу вверх, от кнопки');
+}
+$('sort').onclick = () => { tap(8); S.up = S.up?0:1; save(); paint(); if(S.up) scroll.scrollTop = 0; };
 $('undo').onclick = () => { if(undoBuf){ mark(undoBuf.x,0); save(); paint(1); tap(8); } hideToast(); };
 
 /* большая кнопка с пауком разворачивается в строку ввода */

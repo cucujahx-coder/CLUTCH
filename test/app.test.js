@@ -39,10 +39,17 @@ async function common(file){
  /* строки — стеклянные капсулы, ни шапки со списком, ни фильтров, ни меню действий */
  assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet'),'ни шапки «Входящие», ни фильтров, ни меню действий');
  assert(/\.topbtn\{[^}]*right:16px[^}]*\}/.test(read('app.css'))&&!/\.topbtn[^{]*\{[^}]*translateX/.test(read('app.css')),'угловые кнопки на кромке 16 px, как строки и док — без сдвига внутрь');
- assert(!!d.querySelector('.brand img')&&!!$('find')&&$('find').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
+ assert($('find').closest('.dock')&&/\.dock #find\{position:absolute;right:0;bottom:0/.test(read('app.css')),'выполненные внизу — на кромке справа от капсулы видов');
+ assert($('sort').classList.contains('topbtn')&&!$('scr-list').classList.contains('top'),'сверху справа — порядок списка; по умолчанию снизу вверх, от кнопки');
+ { const before=rows().map(txt).join('|'); $('sort').click();
+   assert(w.app.S.up===1&&$('scr-list').classList.contains('top'),'переключили — список под логотипом, сверху вниз');
+   assert(rows().map(txt).join('|')===before,'сортировка та же: срочное выше, новое ниже — меняется только, откуда растёт список');
+   assert(/#scr-list\.top \.scroll\{flex-direction:column\}/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1\}/.test(read('app.css')),'контейнер обычный, колпак под логотипом уходит первым');
+   $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно'); }
+ assert(!!d.querySelector('.brand img')&&!!$('find')&&$('sort').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
  const segs=[...d.querySelectorAll('.dockrow .seg')];
- assert(!$('sort')&&segs.map(b=>b.dataset.tab).join(',')==='flow,process,focus'&&segs.map(b=>b.getAttribute('aria-label')).join(',')==='FLOW,PROCESS,FOCUS'&&segs.every(b=>b.querySelector('svg')&&!b.textContent.trim()),'вместо сортировки — три капсулы FLOW / PROCESS / FOCUS');
+ assert(segs.map(b=>b.dataset.tab).join(',')==='flow,process,focus'&&segs.map(b=>b.getAttribute('aria-label')).join(',')==='FLOW,PROCESS,FOCUS'&&segs.every(b=>b.querySelector('svg')&&!b.textContent.trim()),'вместо сортировки — три капсулы FLOW / PROCESS / FOCUS');
  assert(segs[0].classList.contains('on')&&segs[0].getAttribute('aria-selected')==='true','по умолчанию FLOW');
  /* одна плашка на три вида: подложка активного одна и ездит между третями */
  assert(d.querySelectorAll('.dockrow .segbar').length===1&&d.querySelector('.dockrow').style.getPropertyValue('--seg-i')==='0','активный вид отмечен общей подложкой, стоящей на первой трети');
