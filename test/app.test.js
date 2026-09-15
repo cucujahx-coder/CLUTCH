@@ -29,7 +29,7 @@ async function common(file){
  const pj=n=>rows().find(r=>r.dataset.pj&&r.title===n);
  assert(rows().every(r=>!r.querySelector('.t2')),'строки в одну линию: подзаголовка нет ни у задач, ни у проектов');
  assert(rows().some(r=>r.dataset.pj&&r.querySelector('.sr-only+.t1+.sr-only')),'имя проекта остаётся диктору');
- assert(/\.row\{[^}]*height:44px;padding:4px 16px 4px 4px[^}]*border-radius:22px/.test(read('app.css'))&&/\.pri\{[^}]*height:44px/.test(read('app.css')),'строка 44 — минимальная цель нажатия, 36 + 4×2, радиус 22, капсула приоритета той же высоты');
+ assert(/\.row\{[^}]*height:44px;padding:4px 4px 4px 16px[^}]*border-radius:22px/.test(read('app.css'))&&/\.pri\{[^}]*height:44px/.test(read('app.css')),'строка 44 — минимальная цель нажатия, 36 + 4×2, радиус 22, капсула приоритета той же высоты');
  assert(/\.row \.ck\{width:36px;height:36px\}/.test(read('app.css'))&&/\.row \.t1\{font-size:15px\}/.test(read('app.css'))&&/#list\{[^}]*gap:4px/.test(read('app.css')),'кружок 36, шрифт 15, зазор 4');
  assert(pj('Запуск лендинга')&&txt(pj('Запуск лендинга'))==='Написать текст оффера','у проекта заголовок — ближайший открытый шаг, снизу — имя проекта');
  assert(/\.t2\{font-size:14px;color:var\(--text-2\)/.test(read('app.css'))&&/--text-2:#B4B4B4/.test(read('app.css')),'имя проекта читается: своя ступень цвета, а не приглушённый --muted');
@@ -207,7 +207,7 @@ async function common(file){
  assert(/\.sheet\.out \.sheet-body\{animation:sheet-out var\(--t-fast\) var\(--e-in\) forwards\}/.test(css)&&/\.pri\.out\{animation:pri-out var\(--t-tap\) var\(--e-in\) forwards\}/.test(css)&&/\.sheet-back\{animation:fade/.test(css),'лист настроек и капсула приоритета появляются и уходят движением');
  assert(/body\.nav #scr-detail:not\(\.on\) \.scroll\{transform:translateX\(32px\)\}/.test(css)&&/body\.nav #scr-detail\.on \.scroll\{transition-delay:var\(--lag\)\}/.test(css),'лента догоняет экран чата на шаг позже, только в nav');
  assert(/function swapIcon/.test(js)&&(js.match(/swapIcon\(/g)||[]).length>=5,'смена иконок на кнопках идёт через swapIcon');
- assert(/\.row\{[^}]*flex-direction:row-reverse[^}]*padding:4px 16px 4px 4px/.test(css)&&/\.step\{[^}]*flex-direction:row-reverse/.test(css),'кружки слева: строки и шаги перевёрнуты, отступ текста справа');
+ assert(/\.row\{[^}]*flex-direction:row;[^}]*padding:4px 4px 4px 16px/.test(css)&&/\.step\{[^}]*flex-direction:row;/.test(css),'кружки справа: обычный порядок у строк и шагов, отступ текста слева');
  assert(/@font-face\{font-family:"Play"/.test(css)&&/play-cyrillic-400-normal\.woff2/.test(css),'Play подключён файлами рядом с HTML');
  assert(/\.scroll\{[^}]*overflow-y:scroll/.test(css.replace(/\/\*[\s\S]*?\*\//g,'')),'прокрутка живая всегда: при auto короткий список стоит намертво');
  assert(/'\.\/play-cyrillic-400-normal\.woff2'/.test(read('sw.js')),'шрифт Play попал в оффлайн-кэш');
