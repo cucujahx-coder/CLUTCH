@@ -767,7 +767,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v101';
+const APP_V='tasks-v102';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1213,10 +1213,11 @@ function rowEl(x, isP, next, left){
  if(isP) r.dataset.pj = x.id; else r.dataset.id = x.id;
  r.dataset.kind = kindOf(x, isP);
  r.tabIndex = 0;
- /* Две строки (v100): заголовок — название; подпись — у задачи срок, у проекта следующий
-    шаг и его срок (или срок проекта). Пустая подпись не рисуется, заголовок центрируется. */
- const title = isP ? x.n : x.t;
- const meta  = isP ? [next && next.t, fmtDue((next && next.due) || x.due)].filter(Boolean).join(' · ') : (fmtDue(x.due) || '');
+ /* Две строки (v100, v102): у задачи заголовок — название, подпись — срок; у проекта заголовок —
+    ближайший открытый шаг (что делать), подпись — название проекта (откуда). Пустая подпись
+    не рисуется, заголовок центрируется. */
+ const title = isP ? ((next && next.t) || x.n) : x.t;
+ const meta  = isP ? x.n : (fmtDue(x.due) || '');
  r.innerHTML = '<div class="cell"><span class="sr-only">'+KIND[r.dataset.kind]+': </span>'+
    '<div class="t1">'+esc(title)+'</div>'+(meta?'<div class="t2">'+esc(meta)+'</div>':'')+'</div>' +
    ckHTML(isP ? {pri:x.pri, done:0, n:x.n} : x, isP ? left : undefined);

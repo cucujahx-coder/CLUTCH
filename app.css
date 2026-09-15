@@ -252,14 +252,14 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    подпись 12/14 (у задачи срок, у проекта следующий шаг и срок); кружок 36, радиус 24 */
 .row .ck{width:36px;height:36px}
 .row .t1{font-size:15px;line-height:18px}
-.row .t2{font-size:12px;line-height:14px;margin-top:0;padding-left:18px}   /* под текстом заголовка, не под точкой */
-/* точка слева от названия, как в списке недавних у Claude (референс владельца, v93): 6 px,
-   едва заметная (v95); когда ассистент ждёт ответа (.row.ask) — фирменная синяя.
-   В поле правки её нет — это псевдоэлемент текста */
-.row .t1::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba(224,224,224,.16);
-  margin-right:12px;vertical-align:middle;position:relative;top:-1px;transition:background var(--t-fast) var(--e-out)}
-.row.ask .t1::before{background:var(--blue)}
-.row .t1.edit::before{content:none}
+.row .t2{font-size:12px;line-height:14px;margin-top:0;color:var(--muted)}   /* подпись приглушённее заголовка (v102) */
+.row .cell{padding-left:18px}   /* место под точку: 6 + 12 */
+/* точка слева, как в списке недавних у Claude (референс владельца, v93): 6 px, едва заметная
+   (v95), по вертикальному центру строки, а не у заголовка (v102 — строка стала двухстрочной);
+   когда ассистент ждёт ответа (.row.ask) — фирменная синяя. Псевдоэлемент строки, разметка та же */
+.row::before{content:'';position:absolute;left:16px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;
+  background:rgba(224,224,224,.16);transition:background var(--t-fast) var(--e-out)}
+.row.ask::before{background:var(--blue)}
 @media (hover:hover){.row:hover{background:rgba(30,30,30,.8)}}
 .cell{min-width:0;flex:1}
 .t1{font-size:17px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
