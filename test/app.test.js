@@ -141,7 +141,7 @@ async function common(file){
   assert(kf&&!cj.classList.contains('pull'),'пружина вернулась — прыжок');
   scrollTo(200); assert(!cj.classList.contains('pull')&&!kf.k[0].transform.includes('NaN'),'обычная прокрутка внутри диапазона кнопку не трогает');
  }
- assert(/\.veil\.top\{top:0;height:calc\(76px \+ var\(--safe-t\)\)/.test(read('app.css'))&&/\.veil\.top\{[^}]*rgba\(16,16,16,\.85\),rgba\(16,16,16,\.35\) 65%/.test(read('app.css')),'верхняя полоса затемнения исходная: 76 px, .85 → .35 — владелец вернул после проб');
+ assert(/\.veil\.top\{top:0;height:calc\(76px \+ var\(--safe-t\)\)/.test(read('app.css'))&&/\.veil\.top\{[^}]*rgba\(var\(--veil-rgb\),\.85\),rgba\(var\(--veil-rgb\),\.35\) 65%/.test(read('app.css'))&&/--veil-rgb:16,16,16/.test(read('app.css')),'верхняя полоса затемнения исходная: 76 px, .85 → .35 — владелец вернул после проб');
  assert(/\.dock\{pointer-events:none\}/.test(read('app.css'))&&/\.dock > \*\{pointer-events:auto\}/.test(read('app.css'))&&/\.dock\.hide > \*\{pointer-events:none\}/.test(read('app.css')),'пустое место дока касания не ловит — свайп над кнопкой прокручивает список');
  assert(/\.pull\{transition:none\}/.test(read('app.css'))&&!/calc\([^)]*var\(--pull/.test(read('app.css')),'сжатие идёт за пальцем без перехода; calc() с --pull в CSS нет — Safari его не рисует');
  tch('touchstart',300); tch('touchmove',380); tch('touchcancel');
@@ -263,6 +263,10 @@ async function common(file){
  /* оформление */
  const css=read('app.css');
  assert(!/prefers-color-scheme/.test(css)&&/--bg:#101010/.test(css),'тема одна, тёмная');
+ /* FOCUS — красный фон: вся гамма одним блоком токенов, поверхности темнее фона, кольцо белое */
+ assert(/#scr-list\.focus\{[^}]*--bg:var\(--hot\)[^}]*--ring-rgb:255,255,255/.test(css)&&/#scr-list\.focus \.composer\.mini\{background:#101010\}/.test(css),'во вкладке FOCUS фон фирменный красный, гамма под него: кольцо белое, кнопка тёмная');
+ { const body=css.replace(/:root\{[\s\S]*?\n\}/,'');
+   assert(!/rgba\(26,26,26,\.72\)|rgba\(21,21,21,\.8\)|rgba\(16,16,16,\./.test(body),'цвета поверхностей — только токенами в :root, иначе FOCUS их не перекрасит'); }
  assert(/--ring-rgb:229,0,6/.test(css)&&/\.ck\{box-shadow:inset 0 0 0 2px rgba\(var\(--ring-rgb\),var\(--ring,0\)\)\}/.test(css)&&!/--pri1/.test(css),'кольцо кружка — красное с прозрачностью --ring, цветов приоритета нет');
  /* движение — одна система: кривые по роли в CSS и в EASE движка совпадают, сырых кривых и секунд в переходах нет */
  const js=read('app.js'), tokOf=n=>(css.match(new RegExp('--'+n+':(cubic-bezier\\([^)]*\\))'))||[])[1];

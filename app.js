@@ -224,7 +224,8 @@ function burst(row, keepRow){
  rf.animate([{opacity:.5,transform:'scale(.6)'},{opacity:0,transform:'scale(2.6)'}],{duration:390,easing:EASE.out});
  setTimeout(()=>rf.remove(),400);
 
- const cols=['#E50006','#FF4A44','#E0E0E0','#FF8A86'];
+ /* на красном фоне (FOCUS) красные искры не видны — там разлетаются белые и тёмные */
+ const cols = host.classList.contains('focus') ? ['#fff','#101010','#FFD9D9','#3A0002'] : ['#E50006','#FF4A44','#E0E0E0','#FF8A86'];
  for(let i=0;i<10;i++){
   const a=(i/10)*Math.PI*2+Math.random(), d=34+Math.random()*40, s=document.createElement('span');
   s.className='spark'; s.style.cssText += 'left:'+cx+'px;top:'+cy+'px;background:'+cols[i%4];
@@ -767,7 +768,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v110';
+const APP_V='tasks-v111';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1834,6 +1835,12 @@ function drawTabs(){
  const t = curTab(), segs = [...document.querySelectorAll('.seg')];
  /* Название вида по центру шапки, там, где стоял логотип; смена — тем же выскоком, что у иконок */
  const vn = $('vname'); if(vn){ const k = S.showDone ? 'done' : t; swapIcon(vn.firstElementChild, k, '<span>'+esc(TAB_NAME[k] || '')+'</span>'); }
+ /* FOCUS — красный фон: класс переключает всю гамму (токены в app.css), а мета theme-color
+    красит полосу состояния и края на телефоне, иначе над красным экраном висит чёрная рамка */
+ const foc = !S.showDone && t === 'focus';
+ $('scr-list').classList.toggle('focus', foc);
+ const meta = document.querySelector('meta[name="theme-color"]');
+ if(meta) meta.setAttribute('content', foc ? '#E50006' : '#101010');
  segs.forEach((b,i)=>{
   const on = !S.showDone && b.dataset.tab === t;
   b.classList.toggle('on', on);
