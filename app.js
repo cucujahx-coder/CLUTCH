@@ -766,7 +766,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v80';
+const APP_V='tasks-v81';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1271,22 +1271,37 @@ function armRubber(el){
    const rev = getComputedStyle(el).flexDirection === 'column-reverse';
    return Math.max((rev ? -max : 0) - st, st - (rev ? 0 : max), 0); };
  const btn = () => el.closest('#scr-list') && composer.classList.contains('mini') ? composer : null;
- const sw = () => composer.querySelector('.shutter .sw');
- const squash = p => ({b:'translateY(-75px) scale(' + (1 + .06*p).toFixed(3) + ',' + (1 - .1*p).toFixed(3) + ')',
-                       s:'scale(' + (1 + .14*p).toFixed(3) + ',' + (1 - .2*p).toFixed(3) + ')'});
- const pull = p => { const b = btn(); if(!b) return;
-   pulled = p; const q = squash(p);
-   b.classList.add('pull'); b.style.transform = q.b; const s = sw(); if(s) s.style.transform = q.s; };
- const jump = () => { const b = composer; if(!b.classList.contains('pull')) return;
-   const p = pulled, q = squash(p), s = sw(); pulled = 0;
-   b.classList.remove('pull'); b.style.transform = ''; if(s) s.style.transform = '';
-   if(RM || !b.classList.contains('mini') || !b.animate) return;
+ /* Пружинит весь интерфейс экрана списка, не только кнопка: паук внутри неё, таблетка
+    логотипа, кнопка выполненных и капсула видов. У каждого своя базовая трансформа (у таблетки
+    это центровка translateX(-50%) — её нельзя потерять), своя амплитуда сжатия и прыжка.
+    Кнопка прыгает первой, остальные — на шаг --lag позже (доводка), держа сжатие до старта. */
+ const parts = () => [
+  {el:composer, base:'translateY(-75px)', sq:[.06,.1], st:[.94,1.1], amp:36, lag:0},
+  {el:composer.querySelector('.shutter .sw'), base:'', sq:[.14,.2], st:[.9,1.16], amp:0, lag:0},
+  {el:$('brand'), base:'translateX(-50%)', sq:[.05,.1], st:[.96,1.06], amp:20, lag:LAG},
+  {el:$('find'), base:'', sq:[.06,.1], st:[.94,1.1], amp:20, lag:LAG},
+  {el:document.querySelector('#scr-list .dockrow'), base:'', sq:[.04,.1], st:[.97,1.06], amp:20, lag:LAG}
+ ].filter(x=>x.el);
+ const tf = (x, p, dy, sx, sy) => (x.base + (dy ? ' translateY(' + dy.toFixed(1) + 'px)' : '') + ' scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')').trim();
+ const squash = (x, p) => tf(x, p, 0, 1 + x.sq[0]*p, 1 - x.sq[1]*p);
+ const pull = p => { if(!btn()) return;
+   pulled = p;
+   for(const x of parts()){ x.el.classList.add('pull'); x.el.style.transform = squash(x, p); } };
+ const jump = () => { if(!composer.classList.contains('pull')) return;
+   const p = pulled; pulled = 0;
+   const ps = parts();
+   for(const x of ps){ x.el.classList.remove('pull'); x.el.style.transform = ''; }
+   if(RM || !composer.classList.contains('mini')) return;
    /* прыжок резкий: взлёт за треть времени по --e-out (быстрый старт), высота по тяге,
       растяжение в верхней точке, посадка с перелётом по --e-over. Владелец просил резче:
       было 420 мс с пиком посередине. */
-   b.animate([{transform:q.b, easing:EASE.out},{transform:'translateY(' + (-75 - 36*p).toFixed(1) + 'px) scale(.94,1.1)',offset:.3},{transform:'translateY(-75px)'}],
-     {duration:JUMP_MS, easing:EASE.over});
-   if(s && s.animate) s.animate([{transform:q.s, easing:EASE.out},{transform:'scale(.9,1.16)',offset:.3},{transform:'none'}],{duration:JUMP_MS, easing:EASE.over}); };
+   for(const x of ps){
+    if(!x.el.animate) continue;
+    x.el.animate([{transform:squash(x, p), easing:EASE.out},
+                  {transform:tf(x, p, -x.amp*p, x.st[0], x.st[1]), offset:.3},
+                  {transform:x.base || 'none'}],
+      {duration:JUMP_MS, delay:x.lag, easing:EASE.over, fill:'backwards'});
+   } };
  el.addEventListener('scroll', () => {
   if(short()) return;
   const o = over();

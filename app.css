@@ -430,7 +430,9 @@ body.nav #scr-detail.on .scroll{transition-delay:var(--lag)}
 /* Резинка списка: пока тянешь, кнопка и паук сжаты на долю тяги — трансформу ставит JS
    inline, здесь только выключен переход, чтобы шло за пальцем; прыжок на отпускании —
    animate() в JS. calc() в scale() и var() в @keyframes Safari не отрисовал. */
-.composer.mini.pull,.composer.mini.pull .shutter .sw{transition:none}
+.pull{transition:none}
+/* остальные части экрана списка пружинят той же геометрией — сжимаются от низа, как кнопки */
+.brand,.dockrow{transform-origin:50% 100%}
 /* своя реплика: без отскока и без скачка — просто мягко всплывает */
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes land{from{transform:translateY(12px)}to{transform:none}}
