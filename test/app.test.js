@@ -41,7 +41,7 @@ async function common(file){
  assert(/\.topbtn\{[^}]*right:16px[^}]*\}/.test(read('app.css'))&&!/\.topbtn[^{]*\{[^}]*translateX/.test(read('app.css')),'угловые кнопки на кромке 16 px, как строки и док — без сдвига внутрь');
  assert($('find').closest('.dock')&&/\.dock #find\{position:absolute;right:0;bottom:0/.test(read('app.css')),'выполненные внизу — на кромке справа от капсулы видов');
  assert(/\.brand\{[^}]*left:16px/.test(read('app.css'))&&!/\.brand\{[^}]*translateX\(-50%\)/.test(read('app.css')),'логотип у левой кромки 16, не по центру');
- assert($('vname').classList.contains('title')&&$('vname').textContent==='Поток','по центру шапки — название вида, Play Bold, как название задачи в чате');
+ assert($('vname').classList.contains('title')&&$('vname').textContent==='Поток'&&/\.vname\{[^}]*background:none[^}]*box-shadow:none/.test(read('app.css')),'по центру шапки — название вида, Play Bold, текстом без капсулы');
  d.querySelector('.dockrow .seg[data-tab="process"]').click(); assert($('vname').textContent==='Процесс','переключили вид — сменилось название');
  d.querySelector('.dockrow .seg[data-tab="flow"]').click(); $('find').click(); assert($('vname').textContent==='Выполнено','выполненные — своё название'); $('find').click();
  assert($('sort').classList.contains('topbtn')&&!$('scr-list').classList.contains('top'),'сверху справа — порядок списка; по умолчанию снизу вверх, от кнопки');
