@@ -204,7 +204,7 @@ async function common(file){
 
  /* оформление */
  const css=read('app.css');
- assert(!/prefers-color-scheme/.test(css)&&/--bg:#101010/.test(css),'тема одна, тёмная');
+ assert(!/prefers-color-scheme/.test(css)&&/--bg:#000;/.test(css),'тема одна, тёмная, фон чистый чёрный');
  assert(/--pri1:#2EC27E/.test(css)&&/--pri4:#E50006/.test(css),'четыре плотных цвета приоритета');
  /* движение — одна система: кривые по роли в CSS и в EASE движка совпадают, сырых кривых и секунд в переходах нет */
  const js=read('app.js'), tokOf=n=>(css.match(new RegExp('--'+n+':(cubic-bezier\\([^)]*\\))'))||[])[1];
