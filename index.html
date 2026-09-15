@@ -33,6 +33,9 @@
     <div class="scroll" id="scroll">
       <div id="list"></div>
       <div class="cap"></div>
+      <!-- хвост под доком для режима под логотипом: настоящий блок, а не padding — Safari не считает
+           нижний отступ flex-контейнера прокручиваемым, и список «стоял» -->
+      <div class="tail" aria-hidden="true"></div>
     </div>
     <div class="dock" id="dock">
       <!-- три капсулы: чем показан список. Ряд ровно 44 высотой — на этой геометрии стоит

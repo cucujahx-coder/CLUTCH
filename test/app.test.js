@@ -62,9 +62,10 @@ async function common(file){
  { const before=rows().map(txt).join('|'); $('sort').click();
    assert(w.app.S.up===1&&$('scr-list').classList.contains('top'),'переключили — список под логотипом, сверху вниз');
    assert(rows().map(txt).join('|')===before,'под логотипом порядок тот же: приоритет растёт сверху вниз, срочное внизу');
-   assert(/#scr-list\.top \.scroll\{flex-direction:column;padding-bottom:calc\(76px \+ 53px \+ 44px \+ 47px/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1;height:calc\(16px \+ 44px \+ var\(--rowh\) \+ var\(--safe-t\)\)\}/.test(read('app.css')),'под логотипом: колпак первым и в одну строку (44) от шапки, снизу обычные 16');
+   assert(/#scr-list\.top \.scroll\{flex-direction:column;padding-bottom:0\}/.test(read('app.css'))&&/#scr-list\.top \.tail\{display:block;flex:none;height:calc\(76px \+ 53px \+ 44px \+ 47px/.test(read('app.css'))&&/\.tail\{display:none\}/.test(read('app.css'))&&d.querySelector('#scroll > .cap + .tail'),'под логотипом запас снизу — настоящий блок .tail, не padding: Safari его не считает прокручиваемым; от кнопки хвост скрыт');
+   assert(/#scr-list\.top \.cap\{order:-1;height:calc\(16px \+ 44px \+ var\(--rowh\) \+ var\(--safe-t\)\)\}/.test(read('app.css')),'под логотипом: колпак первым и в одну строку (44) от шапки, снизу обычные 16');
    assert(/#scr-list \.scroll\{[^}]*padding-bottom:calc\(76px \+ 53px \+ 44px \+ 31px \+ var\(--rowh\)/.test(read('app.css')),'от кнопки: одна строка (--rowh) до кольца кнопки');
-   assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ 4px/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight #list\{margin-top:auto\}/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight\{padding-bottom:calc\(68px \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи одна строка, и под логотипом список прижат к строке ввода');
+   assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ 4px/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight #list\{margin-top:auto\}/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight \.tail\{height:calc\(68px \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи одна строка, и под логотипом список прижат к строке ввода');
    $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно'); }
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('sort').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
@@ -92,7 +93,7 @@ async function common(file){
  /* Список перевёрнут: первый в разметке — у низа, колпак под шапку — над ним. Ноль прокрутки = низ,
     поэтому положение у кнопки не зависит от программной прокрутки, которую iOS при старте глотала */
  const kids=[...$('scroll').children].map(e=>e.id||e.className);
- assert(kids.join(',')==='list,cap','в разметке список первым, колпак вторым');
+ assert(kids.join(',')==='list,cap,tail','в разметке список первым, колпак вторым, хвост (для режима под логотипом) третьим');
  assert(/#scr-list \.scroll\{[^}]*flex-direction:column-reverse;padding-top:0;/.test(read('app.css').replace(/\/\*[\s\S]*?\*\//g,'')),'список рисуется снизу вверх, без padding-top');
  /* Первая задача упирается ровно в 16 px под таблеткой логотипа: 16 сверху + 44 таблетка + 16 зазор */
  assert(/\.cap\{flex:none;height:calc\(16px \+ 44px \+ 16px \+ var\(--safe-t\)\)\}/.test(read('app.css')),'над первой задачей ровно 16 px: колпак = 16 + таблетка 44 + 16');
