@@ -208,7 +208,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    Пока палец ведёт, область сдвигается трансформой без перехода; отпустили — возвращается. */
 .scroll.rubber{transition:transform var(--t-slow) var(--e-move)}
 .scroll.dragging{transition:none}
-#list{display:flex;flex-direction:column;gap:8px;flex:none}
+#list{display:flex;flex-direction:column;gap:6px;flex:none}
 
 /* Список рисуется снизу вверх: column-reverse, первый элемент разметки — у низа. Ноль прокрутки
    здесь и есть низ, поэтому положение покоя у кнопки не зависит ни от программной прокрутки, ни
@@ -225,7 +225,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* ── строка списка: кружок слева, текст справа ─ */
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */
 /* кружок слева, текст справа: row-reverse, разметка не меняется (кружок в ней последний) */
-.row{position:relative;display:flex;flex-direction:row-reverse;align-items:center;gap:12px;height:68px;padding:11px 20px 11px 11px;flex:none;
+.row{position:relative;display:flex;flex-direction:row-reverse;align-items:center;gap:12px;height:56px;padding:6px 20px 6px 6px;flex:none;
   background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   border-radius:28px;cursor:pointer;transition:background var(--t-tap) var(--e-out);overflow:hidden}
 @media (hover:hover){.row:hover{background:rgba(36,36,36,.78)}}
@@ -253,7 +253,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 
 /* ── приоритет: выбор долгим нажатием по задаче ───────────────── */
 .pri-back{position:absolute;inset:0;z-index:30}
-.pri{position:absolute;left:16px;right:16px;z-index:31;height:68px;padding:11px;border-radius:28px;
+.pri{position:absolute;left:16px;right:16px;z-index:31;height:56px;padding:6px;border-radius:28px;
   display:flex;align-items:center;justify-content:space-between;gap:6px;
   background:rgba(26,26,26,.86);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
   box-shadow:var(--glass)}

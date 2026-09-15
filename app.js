@@ -764,7 +764,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v68';
+const APP_V='tasks-v69';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1207,9 +1207,11 @@ function rowEl(x, isP, next, left){
  /* У задачи только название, подзаголовка нет. У проекта заголовок — ближайший открытый шаг,
     мелким снизу — название самого проекта: в списке видно, что делать, а не как называется папка. */
  const title = isP ? ((next && next.t) || x.n) : x.t;
- const meta  = isP ? x.n : '';
+ /* Строка в одну линию: подзаголовка нет ни у задач, ни у проектов (владелец снял).
+    Имя проекта остаётся в title и для диктора — глазами его видно в шапке чата. */
+ if(isP) r.title = x.n;
  r.innerHTML = '<div class="cell"><span class="sr-only">'+KIND[r.dataset.kind]+': </span>'+
-   '<div class="t1">'+esc(title)+'</div>'+(meta?'<div class="t2">'+esc(meta)+'</div>':'')+'</div>' +
+   '<div class="t1">'+esc(title)+'</div>'+(isP?'<span class="sr-only"> — '+esc(x.n)+'</span>':'')+'</div>' +
    ckHTML(isP ? {pri:x.pri, done:0, n:x.n} : x, isP ? left : undefined);
  r.querySelector('.ck').onclick = e => { e.stopPropagation(); isP ? ringTap(x, r) : toggle(x, r); };
  const go = () => { if(suppressRow){ suppressRow = false; return; }
@@ -1386,7 +1388,7 @@ function openPri(x, row){
  el.innerHTML = PRI.map(p => '<button class="press'+(Number(x.pri||0)===p.v?' on':'')+'" data-v="'+p.v+'" '+
    'aria-label="Приоритет '+(p.v||'нет')+'">'+(p.c?'<span class="dotc" style="background:'+p.c+'"></span>':'—')+'</button>').join('')+
    '<button class="press edit" data-edit="1" aria-label="Переименовать">'+Ic(P.edit,18)+'</button>';
- el.style.top = Math.max(16, Math.min(rb.top - hb.top, hb.height - 68 - 16)) + 'px';
+ el.style.top = Math.max(16, Math.min(rb.top - hb.top, hb.height - 56 - 16)) + 'px';
  host.appendChild(back); host.appendChild(el);
  priPop = {el, back};
  tap(14);
