@@ -126,6 +126,12 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   display:flex;flex-direction:column;align-items:center;gap:53px;   /* одна строка (48) до кольца кнопки + 5 на само кольцо (v101; было 16 + 5) */
   transition:opacity var(--t-fast) var(--e-move),transform var(--t-slow) var(--e-over)}
 .dock.hide{opacity:0;transform:translateY(12px) scale(.96);pointer-events:none}
+/* Док — прозрачная коробка 173 px над списком (кнопка + зазор + ряд), и пустое место в ней
+   перехватывало касания: свайп, начатый в зазоре над кнопкой, не прокручивал список (v104,
+   вылезло, когда зазор вырос до 53). Касания ловят только сами капсулы и кнопки. */
+.dock{pointer-events:none}
+.dock > *{pointer-events:auto}
+.dock.hide > *{pointer-events:none}
 /* кнопка-паук: в свёрнутой капсуле занимает весь круг, в раскрытой гаснет */
 .shutter{position:absolute;inset:0;border:0;border-radius:inherit;background:transparent;color:#fff;
   display:grid;place-items:center;cursor:pointer;transition:opacity var(--t-tap) var(--e-move)}

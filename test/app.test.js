@@ -149,6 +149,7 @@ async function common(file){
   scrollTo(200); assert(!cj.classList.contains('pull')&&!kf.k[0].transform.includes('NaN'),'обычная прокрутка внутри диапазона кнопку не трогает');
  }
  assert(/\.veil\.top\{top:0;height:calc\(76px \+ var\(--safe-t\)\)/.test(read('app.css'))&&/\.veil\.top\{[^}]*rgba\(16,16,16,\.85\),rgba\(16,16,16,\.35\) 65%/.test(read('app.css')),'верхняя полоса затемнения исходная: 76 px, .85 → .35 — владелец вернул после проб');
+ assert(/\.dock\{pointer-events:none\}/.test(read('app.css'))&&/\.dock > \*\{pointer-events:auto\}/.test(read('app.css'))&&/\.dock\.hide > \*\{pointer-events:none\}/.test(read('app.css')),'пустое место дока касания не ловит — свайп над кнопкой прокручивает список');
  assert(/\.pull\{transition:none\}/.test(read('app.css'))&&!/calc\([^)]*var\(--pull/.test(read('app.css')),'сжатие идёт за пальцем без перехода; calc() с --pull в CSS нет — Safari его не рисует');
  tch('touchstart',300); tch('touchmove',380); tch('touchcancel');
  assert(sc.style.transform==='','обрыв касания тоже возвращает');
