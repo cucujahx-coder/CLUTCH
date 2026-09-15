@@ -46,6 +46,7 @@ async function common(file){
  const cssSeg=read('app.css').replace(/\/\*[\s\S]*?\*\//g,'');
  assert(/\.segbar\{[^}]*backdrop-filter:blur\(8px\);\s*box-shadow:var\(--glass\)/.test(cssSeg),'активная капсула в том же стекле, что .rnd44 и таблетка логотипа');
  assert(!/\.dockrow\{[^}]*(--glass|backdrop-filter)/.test(cssSeg),'ряд под ней плоский: ни канта, ни размытия');
+ assert(!/\.row\{[^}]*--glass/.test(cssSeg),'у плашек задач канта нет — владелец убрал обводки');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
  /* кнопка и строка ввода — одна капсула: кнопка внутри неё, свёрнутый вид — красный круг на месте кнопки в доке */
  assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');

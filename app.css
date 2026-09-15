@@ -226,7 +226,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */
 /* кружок слева, текст справа: row-reverse, разметка не меняется (кружок в ней последний) */
 .row{position:relative;display:flex;flex-direction:row-reverse;align-items:center;gap:12px;height:68px;padding:11px 20px 11px 11px;flex:none;
-  background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:var(--glass);
+  background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   border-radius:28px;cursor:pointer;transition:background var(--t-tap) var(--e-out);overflow:hidden}
 @media (hover:hover){.row:hover{background:rgba(36,36,36,.78)}}
 .cell{min-width:0;flex:1}
@@ -274,7 +274,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* правка названия в строке: поле на месте заголовка, без своей рамки — рамка у строки */
 .row .t1.edit{width:100%;min-width:0;border:0;outline:0;padding:0;margin:0;background:transparent;color:var(--text);
   font:inherit;font-size:17px;line-height:1.2}
-.row:has(.t1.edit){box-shadow:inset 0 0 0 2px var(--blue),var(--glass)}
+.row:has(.t1.edit){box-shadow:inset 0 0 0 2px var(--blue)}
 
 /* ── композер: одна капсула — и кнопка, и строка ввода ─────────
    Раскрытие — переход геометрии одного элемента: круг 76 на месте большой кнопки растёт до
