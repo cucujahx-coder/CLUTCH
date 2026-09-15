@@ -183,9 +183,10 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   display:grid;place-items:center;cursor:pointer;transition:background var(--t-tap) var(--e-out),color var(--t-tap) var(--e-out)}
 .rnd44.on{background:var(--blue);color:var(--on-blue)}
 .rnd44 .num{font-family:var(--font-head);font-size:13px;line-height:1;font-weight:700}
-/* логотип в таблетке по центру сверху: закреплён, содержимое проезжает под ним.
-   Буквы в картинке вырезаны, поэтому подложка таблетки видна сквозь них */
-.brand{position:absolute;top:calc(16px + var(--safe-t));left:50%;transform:translateX(-50%);z-index:6;
+/* логотип в таблетке слева сверху, на общей кромке 16 (v85 — владелец сдвинул с центра):
+   закреплён, содержимое проезжает под ним. Буквы в картинке вырезаны, поэтому подложка
+   таблетки видна сквозь них */
+.brand{position:absolute;top:calc(16px + var(--safe-t));left:16px;z-index:6;
   height:44px;padding:0 18px;border-radius:22px;display:flex;align-items:center;cursor:pointer;border:0;
   background:rgba(26,26,26,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   box-shadow:var(--glass)}

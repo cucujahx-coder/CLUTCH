@@ -40,6 +40,7 @@ async function common(file){
  assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet'),'ни шапки «Входящие», ни фильтров, ни меню действий');
  assert(/\.topbtn\{[^}]*right:16px[^}]*\}/.test(read('app.css'))&&!/\.topbtn[^{]*\{[^}]*translateX/.test(read('app.css')),'угловые кнопки на кромке 16 px, как строки и док — без сдвига внутрь');
  assert($('find').closest('.dock')&&/\.dock #find\{position:absolute;right:0;bottom:0/.test(read('app.css')),'выполненные внизу — на кромке справа от капсулы видов');
+ assert(/\.brand\{[^}]*left:16px/.test(read('app.css'))&&!/\.brand\{[^}]*translateX\(-50%\)/.test(read('app.css')),'логотип у левой кромки 16, не по центру');
  assert($('sort').classList.contains('topbtn')&&!$('scr-list').classList.contains('top'),'сверху справа — порядок списка; по умолчанию снизу вверх, от кнопки');
  { const before=rows().map(txt).join('|'); $('sort').click();
    assert(w.app.S.up===1&&$('scr-list').classList.contains('top'),'переключили — список под логотипом, сверху вниз');
@@ -98,7 +99,7 @@ async function common(file){
   const fj=dj.getElementById('find'), bj=dj.getElementById('brand'); fj.animate=(k,o)=>{ kfF={k,o}; return {}; };
   const tj=(type,y)=>{const e=new wj.Event(type,{bubbles:true}); e.touches=y==null?[]:[{clientX:100,clientY:y}]; scj.dispatchEvent(e);};
   tj('touchstart',300); tj('touchmove',380);
-  assert(fj.classList.contains('pull')&&/^scale\(1\.0\d+,0\.9\d+\)$/.test(fj.style.transform)&&/^translateX\(-50%\) scale\(/.test(bj.style.transform)&&dj.querySelector('#scr-list .dockrow').classList.contains('pull'),'пружинит весь экран: кнопка выполненных, таблетка логотипа (центровка сохранена) и капсула видов сжаты вместе с кнопкой');
+  assert(fj.classList.contains('pull')&&/^scale\(1\.0\d+,0\.9\d+\)$/.test(fj.style.transform)&&/^scale\(/.test(bj.style.transform)&&dj.querySelector('#scr-list .dockrow').classList.contains('pull'),'пружинит весь экран: кнопка выполненных, таблетка логотипа (центровка сохранена) и капсула видов сжаты вместе с кнопкой');
   tj('touchend');
   assert(kfF&&kfF.o.delay===40&&kfF.o.fill==='backwards'&&/translateY\(-1\d\.\dpx\)/.test(kfF.k[1].transform)&&fj.style.transform===''&&bj.style.transform==='','остальные прыгают на шаг --lag позже кнопки, держа сжатие до старта, и ниже её');
   assert(kf&&/^translateY\(-75px\) translateY\(-3\d\.\dpx\) scale\(0\.940,1\.100\)$/.test(kf.k[1].transform)&&kf.k[1].offset<=.3&&kf.o.duration<=300&&kf.k[0].easing==='cubic-bezier(.2,.8,.2,1)'&&kf.o.easing==='cubic-bezier(.34,1.56,.64,1)','отпустили — резкий прыжок: взлёт по --e-out за треть времени, высота по тяге, посадка с перелётом');
