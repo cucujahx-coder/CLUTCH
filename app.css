@@ -110,10 +110,10 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    Маска гасит и заливку, и сам блюр к краю — резкой границы не остаётся */
 .veil{position:absolute;left:0;right:0;z-index:2;pointer-events:none;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .veil.top{top:0;height:calc(128px + var(--safe-t));   /* было 76 → 100 (v87) → 128 (v94): владелец просил ниже */
-  background:linear-gradient(to bottom,rgba(16,16,16,.85),rgba(16,16,16,.35) 65%,transparent);
+  background:linear-gradient(to bottom,var(--bg),rgba(16,16,16,.55) 55%,transparent);   /* у края — сплошной фон, 100 % (v97) */
   -webkit-mask-image:linear-gradient(to bottom,#000 55%,transparent);mask-image:linear-gradient(to bottom,#000 55%,transparent)}
 .veil.bottom{bottom:0;height:calc(76px + 16px + 44px + 50px + var(--safe-b));
-  background:linear-gradient(to top,rgba(16,16,16,.9),rgba(16,16,16,.45) 60%,transparent);
+  background:linear-gradient(to top,var(--bg),rgba(16,16,16,.6) 55%,transparent);   /* у края — сплошной фон, 100 % (v97) */
   -webkit-mask-image:linear-gradient(to top,#000 60%,transparent);mask-image:linear-gradient(to top,#000 60%,transparent);
   transition:height var(--t-kb) var(--e-move)}
 
