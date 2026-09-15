@@ -57,7 +57,8 @@ async function common(file){
  { const before=rows().map(txt).join('|'); $('sort').click();
    assert(w.app.S.up===1&&$('scr-list').classList.contains('top'),'переключили — список под логотипом, сверху вниз');
    assert(rows().map(txt).join('|')===before.split('|').reverse().join('|'),'под логотипом порядок зеркальный: срочное наверху, у якоря');
-   assert(/#scr-list\.top \.scroll\{flex-direction:column\}/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1\}/.test(read('app.css')),'контейнер обычный, колпак под логотипом уходит первым');
+   assert(/#scr-list\.top \.scroll\{flex-direction:column;padding-bottom:calc\(76px \+ 21px \+ 44px \+ 47px/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1;height:calc\(16px \+ 44px \+ 44px \+ var\(--safe-t\)\)\}/.test(read('app.css')),'под логотипом: колпак первым и в одну строку (44) от шапки, снизу обычные 16');
+   assert(/#scr-list \.scroll\{[^}]*padding-bottom:calc\(76px \+ 21px \+ 44px \+ 75px/.test(read('app.css')),'от кнопки: 44 (одна строка) до кольца кнопки');
    $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно'); }
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('sort').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
