@@ -25,12 +25,17 @@ async function common(file){
  const kinds=rows().map(r=>r.dataset.kind).join(',');
  /* порядок хронологический, задачи и проекты одним рядом: в демо-наборе проекты созданы первыми */
  assert(kinds==='project,project,payment,call,meeting,task,purchase','тип каждой строки угадан: '+kinds);
- /* у задачи только название; у проекта заголовок — ближайший шаг, мелким снизу — название проекта */
- const pj=n=>rows().find(r=>r.dataset.pj&&r.title===n);
- assert(rows().every(r=>!r.querySelector('.t2')),'строки в одну линию: подзаголовка нет ни у задач, ни у проектов');
- assert(rows().some(r=>r.dataset.pj&&r.querySelector('.sr-only+.t1+.sr-only')),'имя проекта остаётся диктору');
- assert(/\.row\{[^}]*height:44px;padding:4px 4px 4px 16px[^}]*border-radius:22px/.test(read('app.css'))&&/\.pri\{[^}]*height:44px/.test(read('app.css')),'строка 44 — минимальная цель нажатия, 36 + 4×2, радиус 22, капсула приоритета той же высоты');
- assert(/\.row \.ck\{width:36px;height:36px\}/.test(read('app.css'))&&/\.row \.t1\{font-size:15px\}/.test(read('app.css'))&&/#list\{[^}]*gap:4px/.test(read('app.css')),'кружок 36, шрифт 15, зазор 4');
+ /* две строки: заголовок — название; подпись — у задачи срок, у проекта следующий шаг и срок */
+ const pj=n=>rows().find(r=>r.dataset.pj&&r.querySelector('.t1').textContent===n);
+ { const p0=rows().find(r=>r.dataset.pj), t2=p0.querySelector('.t2');
+   assert(t2&&t2.textContent.includes(' · ')||t2,'у проекта подпись: следующий шаг и срок');
+   const dued=w.app.S.ts.find(x=>x.pj===null&&x.due&&!x.done);
+   const rd=rows().find(r=>+r.dataset.id===dued.id);
+   assert(rd.querySelector('.t2')&&rd.querySelector('.t2').textContent===w.app.fmtDue(dued.due),'у задачи со сроком подпись — срок');
+   const nod=w.app.S.ts.find(x=>x.pj===null&&!x.due&&!x.done);
+   assert(!rows().find(r=>+r.dataset.id===nod.id).querySelector('.t2'),'без срока подписи нет — заголовок один'); }
+ assert(/--rowh:48px/.test(read('app.css'))&&/\.row\{[^}]*height:var\(--rowh\);padding:6px 6px 6px 16px[^}]*border-radius:24px/.test(read('app.css'))&&/\.pri\{[^}]*height:var\(--rowh\)/.test(read('app.css')),'строка 48 — минимум под две строки текста: 36 + 6×2, радиус 24, капсула приоритета той же высоты');
+ assert(/\.row \.ck\{width:36px;height:36px\}/.test(read('app.css'))&&/\.row \.t1\{font-size:15px;line-height:18px\}/.test(read('app.css'))&&/\.row \.t2\{font-size:12px;line-height:14px/.test(read('app.css'))&&/#list\{[^}]*gap:4px/.test(read('app.css')),'кружок 36, заголовок 15/18, подпись 12/14, зазор 4');
  assert(/\.row \.t1::before\{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba\(224,224,224,\.16\)/.test(read('app.css'))&&/\.row\.ask \.t1::before\{background:var\(--blue\)\}/.test(read('app.css')),'слева от названия — едва заметная точка 6 px; когда ассистент ждёт ответа — синяя');
  { const t0=w.app.S.ts.find(x=>x.pj===null&&!x.done);
    t0.chat=[{u:'что делать?'},{a:'Перенести на пятницу или оставить?'}]; w.app.paint();
@@ -40,7 +45,7 @@ async function common(file){
    t0.chat.push({a:'Хорошо, оставил.'}); w.app.paint();
    assert(!rows().find(r=>+r.dataset.id===t0.id).classList.contains('ask'),'реплика без вопроса не ждёт ответа');
    t0.chat=[]; w.app.paint(); }
- assert(pj('Запуск лендинга')&&txt(pj('Запуск лендинга'))==='Написать текст оффера','у проекта заголовок — ближайший открытый шаг, снизу — имя проекта');
+ assert(pj('Запуск лендинга')&&pj('Запуск лендинга').querySelector('.t2').textContent.startsWith('Написать текст оффера'),'у проекта заголовок — имя, в подписи — ближайший открытый шаг');
  assert(/\.t2\{font-size:14px;color:var\(--text-2\)/.test(read('app.css'))&&/--text-2:#B4B4B4/.test(read('app.css')),'имя проекта читается: своя ступень цвета, а не приглушённый --muted');
  assert(w.app.kindOf({t:'Каждый день звонить маме',pj:null})==='routine'&&w.app.kindOf({t:'Напомнить про паспорт',pj:null})==='reminder','рутина и напоминание по словам');
  assert(w.app.kindOf({t:'Купить молоко',pj:null,kind:'idea'})==='idea'&&w.app.kindOf({t:'Вычитка',pj:3})==='step','явный kind важнее догадки, шаг — по проекту');
@@ -57,9 +62,9 @@ async function common(file){
  { const before=rows().map(txt).join('|'); $('sort').click();
    assert(w.app.S.up===1&&$('scr-list').classList.contains('top'),'переключили — список под логотипом, сверху вниз');
    assert(rows().map(txt).join('|')===before.split('|').reverse().join('|'),'под логотипом порядок зеркальный: срочное наверху, у якоря');
-   assert(/#scr-list\.top \.scroll\{flex-direction:column;padding-bottom:calc\(76px \+ 21px \+ 44px \+ 47px/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1;height:calc\(16px \+ 44px \+ 44px \+ var\(--safe-t\)\)\}/.test(read('app.css')),'под логотипом: колпак первым и в одну строку (44) от шапки, снизу обычные 16');
-   assert(/#scr-list \.scroll\{[^}]*padding-bottom:calc\(76px \+ 21px \+ 44px \+ 75px/.test(read('app.css')),'от кнопки: 44 (одна строка) до кольца кнопки');
-   assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ 44px/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight #list\{margin-top:auto\}/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight\{padding-bottom:calc\(68px \+ 44px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи одна строка, и под логотипом список прижат к строке ввода');
+   assert(/#scr-list\.top \.scroll\{flex-direction:column;padding-bottom:calc\(76px \+ 21px \+ 44px \+ 47px/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1;height:calc\(16px \+ 44px \+ var\(--rowh\) \+ var\(--safe-t\)\)\}/.test(read('app.css')),'под логотипом: колпак первым и в одну строку (44) от шапки, снизу обычные 16');
+   assert(/#scr-list \.scroll\{[^}]*padding-bottom:calc\(76px \+ 21px \+ 44px \+ 31px \+ var\(--rowh\)/.test(read('app.css')),'от кнопки: одна строка (--rowh) до кольца кнопки');
+   assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ var\(--rowh\)/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight #list\{margin-top:auto\}/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight\{padding-bottom:calc\(68px \+ var\(--rowh\)/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи одна строка, и под логотипом список прижат к строке ввода');
    $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно'); }
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('sort').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
@@ -142,7 +147,7 @@ async function common(file){
  assert(pr.querySelector('.ck .num').textContent==='3','в кружке проекта число открытых шагов');
  pr.querySelector('.ck').click();
  await wait(220);
- assert(txt(pj('Запуск лендинга'))==='Вычитка','следующий шаг сдвинулся — теперь он в заголовке');
+ assert(pj('Запуск лендинга').querySelector('.t2').textContent.startsWith('Вычитка'),'следующий шаг сдвинулся — теперь он в подписи');
 
  /* открытие карточки и шаги в чате */
  pj('Запуск лендинга').click();
@@ -215,7 +220,7 @@ async function common(file){
  /* выполнение задачи: плашка с откатом.
     Ждём: секунду после ухода клавиатуры плашка молчит намеренно */
  await wait(1300);
- const first=rows()[0], fname=txt(first);
+ const first=rows().find(r=>r.dataset.id), fname=txt(first);   /* задача, не проект: первым может стоять проект */
  first.querySelector('.ck').click();
  await wait(220);
  assert(w.app.S.ts.find(x=>x.t===fname).done===1,'задача выполнена');
@@ -268,7 +273,7 @@ async function common(file){
  assert(/\.sheet\.out \.sheet-body\{animation:sheet-out var\(--t-fast\) var\(--e-in\) forwards\}/.test(css)&&/\.pri\.out\{animation:pri-out var\(--t-tap\) var\(--e-in\) forwards\}/.test(css)&&/\.sheet-back\{animation:fade/.test(css),'лист настроек и капсула приоритета появляются и уходят движением');
  assert(/body\.nav #scr-detail:not\(\.on\) \.scroll\{transform:translateX\(32px\)\}/.test(css)&&/body\.nav #scr-detail\.on \.scroll\{transition-delay:var\(--lag\)\}/.test(css),'лента догоняет экран чата на шаг позже, только в nav');
  assert(/function swapIcon/.test(js)&&(js.match(/swapIcon\(/g)||[]).length>=5,'смена иконок на кнопках идёт через swapIcon');
- assert(/\.row\{[^}]*flex-direction:row;[^}]*padding:4px 4px 4px 16px/.test(css)&&/\.step\{[^}]*flex-direction:row;/.test(css),'кружки справа: обычный порядок у строк и шагов, отступ текста слева');
+ assert(/\.row\{[^}]*flex-direction:row;[^}]*padding:6px 6px 6px 16px/.test(css)&&/\.step\{[^}]*flex-direction:row;/.test(css),'кружки справа: обычный порядок у строк и шагов, отступ текста слева');
  assert(/@font-face\{font-family:"Play"/.test(css)&&/play-cyrillic-400-normal\.woff2/.test(css),'Play подключён файлами рядом с HTML');
  assert(/\.scroll\{[^}]*overflow-y:scroll/.test(css.replace(/\/\*[\s\S]*?\*\//g,'')),'прокрутка живая всегда: при auto короткий список стоит намертво');
  assert(/'\.\/play-cyrillic-400-normal\.woff2'/.test(read('sw.js')),'шрифт Play попал в оффлайн-кэш');

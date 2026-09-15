@@ -60,6 +60,7 @@
          inset -1px 1px 0 rgba(0,0,0,.4),
          inset 0 0 0 .5px rgba(255,255,255,.06);
   --glass:var(--edge),0 6px 18px rgba(0,0,0,.45);   /* кант и тень под всем стеклянным — элемент отрывается от фона */
+  --rowh:48px;   /* высота строки списка: две строки текста (15/18 + 12/14) с кружком 36; от неё считаются все зазоры «в одну строку» */
   --font:"Play",Inter,-apple-system,system-ui,sans-serif;
   --font-head:"Pixelizer",var(--font);
   --ground:none;   /* фон плоский: ровный #1A1A1A, без градиента */
@@ -226,30 +227,32 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    перевёрнутого контейнера конечный отступ браузеры считают по-разному, а настоящий блок
    попадает в прокрутку всегда. gap:0 — свой зазор между строками у #list есть. */
 #scr-list .scroll{top:0;bottom:0;gap:0;flex-direction:column-reverse;padding-top:0;
-  padding-bottom:calc(76px + 21px + 44px + 75px + var(--pend, 0px) + var(--safe-b))}   /* под доком, 44 px (одна строка) до кольца кнопки: 26 + 5 + 44 */
+  padding-bottom:calc(76px + 21px + 44px + 31px + var(--rowh) + var(--pend, 0px) + var(--safe-b))}   /* под доком, одна строка до кольца кнопки: 26 + 5 + --rowh */
 /* строка ввода открыта: дока нет, между ней и ближайшей задачей — одна строка, 44 (v99; было 16).
    В режиме под логотипом список на это время прижимается к строке ввода: margin-top:auto у #list
    в обычной колонке сажает короткий список вниз, длинному не мешает (авто-отступ схлопывается в ноль) */
-#scr-list .scroll.tight{padding-bottom:calc(68px + 44px + var(--foot) + var(--pend, 0px) + var(--safe-b))}
+#scr-list .scroll.tight{padding-bottom:calc(68px + var(--rowh) + var(--foot) + var(--pend, 0px) + var(--safe-b))}
 #scr-list.top .scroll.tight #list{margin-top:auto}
 /* Порядок «сверху вниз»: список растёт от логотипа, контейнер обычный, колпак уходит первым.
    Отступ от якоря — одна строка (44), с другой стороны — обычные 16 (v96): у кнопки 44 в режиме
    от кнопки, под шапкой 44 в режиме под логотипом */
 #scr-list.top .scroll{flex-direction:column;padding-bottom:calc(76px + 21px + 44px + 47px + var(--pend, 0px) + var(--safe-b))}
-#scr-list.top .cap{order:-1;height:calc(16px + 44px + 44px + var(--safe-t))}
+#scr-list.top .cap{order:-1;height:calc(16px + 44px + var(--rowh) + var(--safe-t))}
 /* при открытой строке ввода запас снизу тот же, что и в режиме от кнопки: правило .top выше по
    порядку перебивало бы .tight (одинаковая специфичность) — поэтому повтор здесь */
-#scr-list.top .scroll.tight{padding-bottom:calc(68px + 44px + var(--foot) + var(--pend, 0px) + var(--safe-b))}
+#scr-list.top .scroll.tight{padding-bottom:calc(68px + var(--rowh) + var(--foot) + var(--pend, 0px) + var(--safe-b))}
 
 /* ── строка списка: кружок слева, текст справа ─ */
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */
 /* кружок справа, текст слева: обычный порядок, разметка не меняется (кружок в ней последний) */
-.row{position:relative;display:flex;flex-direction:row;align-items:center;gap:10px;height:44px;padding:4px 4px 4px 16px;flex:none;
+.row{position:relative;display:flex;flex-direction:row;align-items:center;gap:10px;height:var(--rowh);padding:6px 6px 6px 16px;flex:none;
   background:rgba(21,21,21,.8);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  border-radius:22px;cursor:pointer;transition:background var(--t-tap) var(--e-out);overflow:hidden}
-/* Строка списка — 44, минимальная цель нажатия, ниже нельзя: кружок 36, шрифт 15 */
+  border-radius:24px;cursor:pointer;transition:background var(--t-tap) var(--e-out);overflow:hidden}
+/* Строка списка — 48 (v100): минимум, куда влезают две строки текста — заголовок 15/18 и
+   подпись 12/14 (у задачи срок, у проекта следующий шаг и срок); кружок 36, радиус 24 */
 .row .ck{width:36px;height:36px}
-.row .t1{font-size:15px}
+.row .t1{font-size:15px;line-height:18px}
+.row .t2{font-size:12px;line-height:14px;margin-top:0;padding-left:18px}   /* под текстом заголовка, не под точкой */
 /* точка слева от названия, как в списке недавних у Claude (референс владельца, v93): 6 px,
    едва заметная (v95); когда ассистент ждёт ответа (.row.ask) — фирменная синяя.
    В поле правки её нет — это псевдоэлемент текста */
@@ -282,7 +285,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 
 /* ── приоритет: выбор долгим нажатием по задаче ───────────────── */
 .pri-back{position:absolute;inset:0;z-index:30}
-.pri{position:absolute;left:16px;right:16px;z-index:31;height:44px;padding:4px;border-radius:22px;
+.pri{position:absolute;left:16px;right:16px;z-index:31;height:var(--rowh);padding:6px;border-radius:24px;
   display:flex;align-items:center;justify-content:space-between;gap:6px;
   background:rgba(26,26,26,.86);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
   box-shadow:var(--glass)}
