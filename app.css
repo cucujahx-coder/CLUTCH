@@ -153,14 +153,8 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* активная кнопка — фирменный синий, как включённые кнопки; свечение в его же тон */
 .composer.mini.voice{background:var(--blue);animation:breathe var(--t-breathe) var(--e-breathe) infinite}
 .shutter .sw svg{display:block;width:100%;height:auto}
-.shutter .eye{fill:#FFE3C2;transition:fill var(--t-tap) var(--e-out)}
-.shutter .eye-b{fill:#FFE3C2;opacity:0;transition:opacity var(--t-tap) var(--e-out),fill var(--t-tap) var(--e-out)}
-/* прицел: на время лазера глаза паука вспыхивают красным и раскрываются (eye-b — большие глаза) */
-.shutter.zap .eye,.shutter.zap .eye-b{fill:var(--hot)}
-.shutter.zap .eye-b{opacity:1}
-/* луч лазера: от глаза к кружку строки, вытягивается scaleX от начала, свечение цветом кнопки */
-.laser{position:absolute;z-index:16;height:2px;margin-top:-1px;transform-origin:0 50%;pointer-events:none;border-radius:1px;
-  background:var(--hot);box-shadow:0 0 6px 2px rgba(229,0,6,.65),0 0 14px 4px rgba(229,0,6,.3)}
+.shutter .eye{fill:#FFE3C2}
+.shutter .eye-b{fill:#FFE3C2;opacity:0}
 /* Одна плашка на три вида, активный выделен вложенной капсулой (`.segbar`), а не своим фоном:
    три отдельные капсулы читались как три кнопки, а это один переключатель. Высота ряда
    остаётся 44 — на ней стоит свёрнутая капсула строки ввода (translateY(-107px)). */

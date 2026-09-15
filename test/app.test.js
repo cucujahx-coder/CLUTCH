@@ -123,17 +123,6 @@ async function common(file){
   assert(kfF===null,'и не прыгают — владелец оставил прыжок одной кнопке');
   assert(kf&&/^translateY\(-107px\) translateY\(-3\d\.\dpx\) scale\(0\.940,1\.100\)$/.test(kf.k[1].transform)&&kf.k[1].offset<=.3&&kf.o.duration<=300&&kf.k[0].easing==='cubic-bezier(.2,.8,.2,1)'&&kf.o.easing==='cubic-bezier(.34,1.56,.64,1)','отпустили — резкий прыжок: взлёт по --e-out за треть времени, высота по тяге, посадка с перелётом');
   assert(!cj.classList.contains('pull')&&cj.style.transform==='','после прыжка inline-трансформы нет — кнопка снова управляется классами');
-  /* Лазер: паук стреляет из глаз в кружок задачи, взрыв — на попадании, отметка — после него */
-  { wj.Element.prototype.animate = wj.Element.prototype.animate || (()=>({}));
-    const row=[...dj.querySelectorAll('#list .row')].find(r=>r.dataset.id), id=+row.dataset.id;
-    row.querySelector('.ck').click();
-    const beams=dj.querySelectorAll('#scr-list .laser');
-    assert(beams.length===2&&dj.getElementById('shutter').classList.contains('zap'),'два луча из глаз паука, глаза вспыхнули');
-    assert([...beams].every(b=>/rotate\(-?[\d.]+deg\) scaleX\(0\)/.test(b.style.transform)&&b.style.width!==''),'луч повёрнут к цели и вытягивается от нуля');
-    assert(!wj.app.byId(id).done&&!row.querySelector('.ck').classList.contains('on'),'до попадания задача не отмечена');
-    await wait(420);
-    assert(wj.app.byId(id).done===1&&!dj.querySelector('#scr-list .laser')&&!dj.getElementById('shutter').classList.contains('zap'),'после попадания — выполнена, лучи и прицел сняты');
-    wj.app.undoAct; }
   /* Длинный список: пружина нативная, iOS отдаёт scrollTop за краем — кнопка сжимается и прыгает так же */
   Object.defineProperty(scj,'scrollHeight',{value:1000,configurable:true}); Object.defineProperty(scj,'clientHeight',{value:400,configurable:true});
   const scrollTo=v=>{ scj.scrollTop=v; scj.dispatchEvent(new wj.Event('scroll')); };
