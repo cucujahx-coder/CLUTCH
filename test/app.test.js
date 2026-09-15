@@ -86,7 +86,7 @@ async function common(file){
   let kf=null; cj.animate=(k,o)=>{ kf={k,o}; return {}; };
   const tj=(type,y)=>{const e=new wj.Event(type,{bubbles:true}); e.touches=y==null?[]:[{clientX:100,clientY:y}]; scj.dispatchEvent(e);};
   tj('touchstart',300); tj('touchmove',380); tj('touchend');
-  assert(kf&&/translateY\(-9\d\.\dpx\) scale\(\.96,1\.06\)/.test(kf.k[1].transform)&&kf.o.easing==='cubic-bezier(.34,1.56,.64,1)','отпустили — кнопка прыгает вверх на высоту по тяге, с перелётом (EASE.over)');
+  assert(kf&&/translateY\(-10\d\.\dpx\) scale\(\.94,1\.1\)/.test(kf.k[1].transform)&&kf.k[1].offset<=.3&&kf.o.duration<=300&&kf.k[0].easing==='cubic-bezier(.2,.8,.2,1)'&&kf.o.easing==='cubic-bezier(.34,1.56,.64,1)','отпустили — резкий прыжок: взлёт по --e-out за треть времени, высота по тяге, посадка с перелётом');
   assert(!cj.classList.contains('pull')&&cj.style.transform==='','после прыжка inline-трансформы нет — кнопка снова управляется классами');
  }
  assert(/\.composer\.mini\.pull,\.composer\.mini\.pull \.shutter \.sw\{transition:none\}/.test(read('app.css'))&&!/calc\([^)]*var\(--pull/.test(read('app.css')),'сжатие идёт за пальцем без перехода; calc() с --pull в CSS нет — Safari его не рисует');

@@ -764,7 +764,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v74';
+const APP_V='tasks-v75';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1258,7 +1258,7 @@ function paint(keep){
    отпустил — подпрыгивает. Степень сжатия — доля от PULL_FULL пикселей пути пальца.
    Геометрия считается в JS и ставится inline (сжатие) и через animate() (прыжок): calc()
    внутри scale() и var() в @keyframes Safari на телефоне не отрисовал — кнопка стояла. */
-const PULL_FULL = 90;
+const PULL_FULL = 90, JUMP_MS = 280;
 function armRubber(el){
  let y0 = null, live = false, snapT = 0, pulled = 0;
  const short = () => el.scrollHeight - el.clientHeight <= 1;
@@ -1273,10 +1273,12 @@ function armRubber(el){
    const p = pulled, q = squash(p), s = sw(); pulled = 0;
    b.classList.remove('pull'); b.style.transform = ''; if(s) s.style.transform = '';
    if(RM || !b.classList.contains('mini') || !b.animate) return;
-   /* прыжок: из сжатого — вверх с растяжением, высота по тяге — и сесть с перелётом */
-   b.animate([{transform:q.b},{transform:'translateY(' + (-75 - 28*p).toFixed(1) + 'px) scale(.96,1.06)',offset:.45},{transform:'translateY(-75px)'}],
-     {duration:420, easing:EASE.over});
-   if(s && s.animate) s.animate([{transform:q.s},{transform:'scale(.94,1.1)',offset:.45},{transform:'none'}],{duration:420, easing:EASE.over}); };
+   /* прыжок резкий: взлёт за треть времени по --e-out (быстрый старт), высота по тяге,
+      растяжение в верхней точке, посадка с перелётом по --e-over. Владелец просил резче:
+      было 420 мс с пиком посередине. */
+   b.animate([{transform:q.b, easing:EASE.out},{transform:'translateY(' + (-75 - 36*p).toFixed(1) + 'px) scale(.94,1.1)',offset:.3},{transform:'translateY(-75px)'}],
+     {duration:JUMP_MS, easing:EASE.over});
+   if(s && s.animate) s.animate([{transform:q.s, easing:EASE.out},{transform:'scale(.9,1.16)',offset:.3},{transform:'none'}],{duration:JUMP_MS, easing:EASE.over}); };
  /* затухание как у iOS: чем дальше тянешь, тем медленнее едет, предел — чуть больше половины */
  const damp = d => { const h = el.clientHeight || 1, c = 0.55, a = Math.abs(d);
    return Math.sign(d) * h * c * (1 - 1 / (a * c / h + 1)); };
