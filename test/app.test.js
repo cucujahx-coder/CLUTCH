@@ -132,7 +132,7 @@ async function common(file){
  $('shutter').click();
  assert(!$('composer').classList.contains('mini')&&d.getElementById('scroll').classList.contains('tight'),'паук разворачивает строку ввода');
  assert($('composer').style.transform==='','после разворота инлайновый сдвиг снят — переход идёт к раскрытой капсуле');
- assert(/composer\.style\.transform = 'translateY\(' \+ \(-75 \+ \(kbH \|\| 0\)\)/.test(read('app.js')),'точка старта морфа — место кнопки с поправкой на высоту клавиатуры');
+ assert(/composer\.style\.transform = 'translateY\(' \+ \(-75 \+ \(voice \? 0 : \(kbH \|\| 0\)\)\)/.test(read('app.js')),'точка старта морфа — место кнопки с поправкой на высоту клавиатуры (без неё в голосовом раскрытии)');
  $('add').click();
  assert(w.app.S.ts.every(x=>x.t!==''),'пустой ввод ничего не добавляет');
  assert(/Микрофон/.test($('nt').placeholder),'без Web Speech кнопка-микрофон подсказывает микрофон на клавиатуре');
@@ -652,7 +652,7 @@ async function editing(){
 }
 
 /* ---------- голосовой набор ---------- */
-function voice(){
+async function voice(){
  console.log('голосовой набор');
  const starts=[]; let live=null;
  const {w,d}=load('index.html',w2=>{
@@ -668,6 +668,18 @@ function voice(){
  assert(!$('add').classList.contains('rec')&&$('add').dataset.ic==='up','распознавание кончилось — кнопка снова обычная, со стрелкой отправки');
  $('add').click();
  assert(w.app.S.ts.some(x=>x.t==='купить молоко'),'надиктованное отправляется той же кнопкой');
+ /* долгое нажатие на паука — строка раскрывается без клавиатуры и сразу слушает */
+ await wait(150);
+ assert($('composer').classList.contains('mini'),'после отправки строка свёрнута');
+ const pe=(type,x,y)=>{ const e=new w.Event(type,{bubbles:true}); e.clientX=x; e.clientY=y; $('shutter').dispatchEvent(e); };
+ pe('pointerdown',100,700); await wait(650); pe('pointerup',100,700); $('shutter').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+ assert(!$('composer').classList.contains('mini')&&starts.length===2&&$('add').classList.contains('rec'),'удержание паука раскрыло строку и включило голос');
+ assert(d.activeElement!==$('nt'),'без фокуса: клавиатура не нужна, ужатия под неё нет');
+ live.onresult({results:[[{transcript:'позвонить маме'}]]}); live.onend();
+ assert($('nt').value==='позвонить маме'&&!$('add').classList.contains('rec'),'текст в поле, кнопка снова стрелка');
+ $('nt').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape'}));
+ pe('pointerdown',100,700); await wait(200); pe('pointerup',100,700); $('shutter').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+ assert(!$('composer').classList.contains('mini')&&starts.length===2&&d.activeElement===$('nt'),'короткое нажатие — обычное раскрытие с фокусом, без голоса');
 }
 
 /* ---------- паук в ленте ----------
@@ -844,7 +856,7 @@ async function haptics(file){
  await clips('panels.html');
  spiderTest();
  await editing();
- voice();
+ await voice();
  await haptics('index.html');
  await haptics('panels.html');
  console.log(fails?`\n${fails} ошибок`:'\nвсе тесты прошли'); process.exit(fails?1:0);

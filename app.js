@@ -750,7 +750,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v61';
+const APP_V='tasks-v62';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1747,10 +1747,14 @@ let ntFocused = false;
    reflow-ом как точку старта: после ужатия это ровно то место, где стояла кнопка. Снятие
    сдвига в конце запускает переход из этой точки в строку над клавиатурой. Фокус ставится
    синхронно, прямо в обработчике нажатия: iOS открывает клавиатуру только внутри жеста. */
-function openComposer(){
+/* voice — раскрыть под голосовой набор: без фокуса и без клавиатуры. Фокус из таймера
+   долгого нажатия iOS клавиатурой всё равно не ответит, а догадка ужатия под неё сработала бы
+   и через 1,5 с откатилась — прыжок. Без фокуса контейнер не ужимается, значит и поправку
+   на высоту клавиатуры в точку старта морфа не кладём. */
+function openComposer(voice){
  if(!mini()) return;
  ntFocused = false;
- composer.style.transform = 'translateY(' + (-75 + (kbH || 0)) + 'px)';
+ composer.style.transform = 'translateY(' + (-75 + (voice ? 0 : (kbH || 0))) + 'px)';
  void composer.offsetHeight;
  composer.classList.remove('mini'); scroll.classList.add('tight');
  $('dock').classList.add('hide');
@@ -1758,6 +1762,7 @@ function openComposer(){
  drawAdd(); toBottom();          /* .tight меняет запас снизу — доводим список до строки ввода */
  /* Отклик — до фокуса: последним действием жеста должен остаться именно focus(),
     иначе iOS не считает поле активным и клавиатуру не открывает. */
+ if(voice){ composer.style.transform = ''; dictate(nt, addBtn, drawAdd); return; }
  tap(8);
  try{ nt.focus({preventScroll:true}); }catch(e){ nt.focus(); }
  composer.style.transform = '';
@@ -1773,7 +1778,19 @@ function closeComposer(){
 }
 /* Открываем по click, не по touchend: iOS отдаёт клавиатуру только из «настоящего» жеста,
    а touchend с preventDefault она за такой не считает */
-$('shutter').onclick = () => openComposer();
+/* Долгое нажатие на паука (500 мс, как у строк) — сразу голосовой набор: строка раскрывается
+   без клавиатуры и слушает. Сдвиг больше 10 px — не удержание. После удержания придёт обычный
+   click — его гасим, иначе он открыл бы строку второй раз с фокусом. */
+(function armHold(){
+ const b = $('shutter'); let t = 0, x0 = 0, y0 = 0, held = false;
+ b.addEventListener('pointerdown', e => { x0 = e.clientX; y0 = e.clientY; held = false; clearTimeout(t);
+  t = setTimeout(()=>{ held = true; tap(14); openComposer(true); }, 500); });
+ const off = () => clearTimeout(t);
+ b.addEventListener('pointermove', e => { if(Math.hypot(e.clientX - x0, e.clientY - y0) > 10) off(); });
+ ['pointerup','pointercancel','pointerleave'].forEach(ev => b.addEventListener(ev, off));
+ b.addEventListener('contextmenu', e => e.preventDefault());   /* iOS не должна показывать своё меню */
+ b.onclick = () => { if(held){ held = false; return; } openComposer(); };
+})();
 nt.oninput = drawAdd;
 /* Строку закрывает уход фокуса — но только если фокус вообще был получен: внутри
    превью-iframe и на части устройств focus() не проходит, и строка схлопывалась сразу,
