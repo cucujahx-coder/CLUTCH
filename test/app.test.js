@@ -64,7 +64,7 @@ async function common(file){
  assert(/\.seg\{[^}]*width:64px/.test(cssSeg),'три иконки по 64 — цель нажатия шире 44');
  assert(!/\.row\{[^}]*--glass/.test(cssSeg),'у плашек задач канта нет — владелец убрал обводки');
  assert(/--glass:[^;]*0 6px 18px rgba\(0,0,0,\.45\)/.test(read('app.css')),'у всего с кантом есть и тень — она в самом токене');
- assert(/\.composer\.mini\{[^}]*box-shadow:var\(--glass-hot\)\}/.test(cssSeg)&&!/\.composer\.mini\{[^}]*0 0 0 5px/.test(cssSeg)&&/--glass-hot:inset 1px 1px 0 rgba\(255,255,255,\.55\)/.test(read('app.css')),'у большой кнопки тот же кант, что у интерфейса, но ярче — на красном обычный не виден; без внешнего кольца');
+ assert(/\.composer\.mini\{[^}]*box-shadow:var\(--glass\)\}/.test(cssSeg)&&!/\.composer\.mini\{[^}]*0 0 0 5px/.test(cssSeg),'у большой кнопки тот же кант, что у интерфейса, без внешнего кольца');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
  /* кнопка и строка ввода — одна капсула: кнопка внутри неё, свёрнутый вид — красный круг на месте кнопки в доке */
  assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');
