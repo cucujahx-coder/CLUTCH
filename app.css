@@ -185,10 +185,11 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   box-shadow:var(--glass)}
 .brand img{display:block;height:18px;width:auto}
 
-/* кнопка сортировки — та же, что выполненные, только в правом верхнем углу и по той же оси */
-.topbtn{position:absolute;top:calc(16px + var(--safe-t));right:16px;z-index:6;transform:translateX(-11px)}
-/* та же кнопка в левом верхнем углу — зеркально, по той же оси */
-.topbtn.left{left:16px;right:auto;transform:translateX(11px)}
+/* Угловые кнопки стоят ровно на кромке содержимого: 16 px от края, как строки, док,
+   лента и строка ввода. Раньше их сдвигали внутрь на 11 px «по оси кружка» — кружок с тех
+   пор уехал, а кнопки висели не по краю; к тому же .press:active сбрасывал этот сдвиг. */
+.topbtn{position:absolute;top:calc(16px + var(--safe-t));right:16px;z-index:6}
+.topbtn.left{left:16px;right:auto}
 
 /* низ отсчитывается от клавиатуры: композер 68 + его отступ + зазор 16 */
 .scroll{position:absolute;left:16px;right:16px;top:calc(72px + var(--safe-t));

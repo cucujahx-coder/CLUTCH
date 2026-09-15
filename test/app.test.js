@@ -38,6 +38,7 @@ async function common(file){
 
  /* строки — стеклянные капсулы, ни шапки со списком, ни фильтров, ни меню действий */
  assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet'),'ни шапки «Входящие», ни фильтров, ни меню действий');
+ assert(/\.topbtn\{[^}]*right:16px[^}]*\}/.test(read('app.css'))&&!/\.topbtn[^{]*\{[^}]*translateX/.test(read('app.css')),'угловые кнопки на кромке 16 px, как строки и док — без сдвига внутрь');
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('find').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
  const segs=[...d.querySelectorAll('.dockrow .seg')];
