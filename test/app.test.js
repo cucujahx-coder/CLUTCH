@@ -184,10 +184,22 @@ async function common(file){
  /* порядок от якоря: список растёт от кнопки — срочное внизу, у пальца */
  assert(txt(rows()[rows().length-1])===name0,'приоритетная задача ушла вниз, к кнопке');
 
- /* капсулы: PROCESS — только проекты, FOCUS — только с приоритетом, FLOW — всё */
+ /* капсулы: PROCESS — расписание по дням, FOCUS — только с приоритетом, FLOW — всё */
  const seg=t=>d.querySelector('.dockrow .seg[data-tab="'+t+'"]');
  seg('process').click();
- assert(w.app.S.tab==='process'&&rows().length&&rows().every(r=>r.dataset.pj),'PROCESS показывает только проекты');
+ { const byId=i=>w.app.byId(+i)||w.app.prById(+i);
+   const dated=r=>{ const x=r.dataset.pj?w.app.prById(+r.dataset.pj):w.app.byId(+r.dataset.id);
+     return r.dataset.pj ? (x.due || w.app.openIn(x.id).some(s=>s.due)) : !!x.due; };
+   assert(w.app.S.tab==='process'&&rows().length&&rows().every(dated),'PROCESS показывает только то, у чего есть срок — без срока спрятано');
+   const heads=[...d.querySelectorAll('#list .lbl.day')];
+   assert(heads.length&&heads.every(h=>h.textContent.trim()),'дни разделены заголовками');
+   assert(d.querySelector('#list > .lbl.day') === d.querySelector('#list').firstElementChild,'первый заголовок стоит перед первой строкой');
+   /* хронология от якоря: от кнопки ближайшее внизу, под логотипом — сверху */
+   const first=()=>heads[0].textContent;
+   assert(/Просрочено|Сегодня|Завтра|\d|[А-Я]/.test(first()),'заголовок дня подписан словами');
+   const order=()=>[...d.querySelectorAll('#list .lbl.day')].map(h=>h.textContent);
+   const a1=order(); $('sort').click(); const a2=order(); $('sort').click();
+   assert(a1.join('|')===a2.slice().reverse().join('|'),'смена якоря переворачивает расписание: ближайшее всегда у якоря'); }
  assert(seg('process').classList.contains('on')&&!seg('flow').classList.contains('on'),'активна капсула PROCESS');
  assert(d.querySelector('.dockrow').style.getPropertyValue('--seg-i')==='1','подложка переехала на вторую треть');
  seg('focus').click();

@@ -768,7 +768,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v120';
+const APP_V='tasks-v121';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1179,9 +1179,15 @@ function settings(){
    проекты, FOCUS — только то, чему проставлен приоритет. Порядок внутри любого вида один и тот же. */
 const TABS = {
  flow:    {all:()=>true,          empty:'Входящие пусты. Нажми большую кнопку.'},
- process: {all:i=>i.isP,          empty:'Проектов нет. Задачу разбивают на шаги из чата.'},
+ /* PROCESS — расписание: только то, у чего есть срок, с заголовками по дням (v121).
+    Без срока в этом виде не показывается вовсе — так решил владелец. */
+ process: {all:i=>!!i.due,        empty:'Ничего со сроком. Дату ставят из чата.', cal:1},
  focus:   {all:i=>(i.pri||0)>0,   empty:'Ничего срочного. Приоритет — долгим нажатием по задаче.'}
 };
+/* Заголовок группы дня: всё прошедшее — одной группой «Просрочено», дальше как в подписи строки */
+const dayLabel = d => days(d) < 0 ? 'Просрочено' : fmtDue(d);
+/* Ключ группы: у просроченного один на всех, иначе сама дата */
+const dayKey = d => days(d) < 0 ? '!' : d;
 const curTab = () => TABS[S.tab] ? S.tab : 'flow';
 let undoBuf = null, toastTimer = null, suppressRow = false, priPop = null;
 let list, scroll, thread;
@@ -1244,11 +1250,14 @@ function paint(keep){
   if(!dn.length) list.innerHTML = '<div class="empty">Пока ничего не сделано.</div>';
  } else {
   const items = [];
-  S.ts.filter(x=>!x.done && !x.del && x.pj===null).forEach(x=>items.push({x,isP:0,pri:x.pri||0,id:x.id}));
+  S.ts.filter(x=>!x.done && !x.del && x.pj===null).forEach(x=>items.push({x,isP:0,pri:x.pri||0,id:x.id,due:x.due||null}));
   S.pr.filter(p=>!p.del).forEach(p=>{
    const all = inPj(p.id), op = openIn(p.id);
    if(!op.length) return;
-   items.push({x:p, isP:1, next:op[0], left:op.length, pri:p.pri||0, id:p.id});
+   /* Срок проекта: свой, а если его нет — ближайший срок открытого шага. Шаги отдельными
+      строками в списке не живут, поэтому их даты поднимаются в строку проекта. */
+   const sd = op.map(s=>s.due).filter(Boolean).sort()[0];
+   items.push({x:p, isP:1, next:op[0], left:op.length, pri:p.pri||0, id:p.id, due:p.due || sd || null});
   });
   /* Порядок один в обоих режимах (v106): приоритет растёт сверху вниз — срочное внизу,
      внутри ступени новое ниже. От кнопки это «срочное у пальца», под логотипом владелец
@@ -1257,8 +1266,21 @@ function paint(keep){
   items.sort((a,b)=>(a.pri - b.pri) || (a.id - b.id));
   const tab = TABS[curTab()];
   const shown = items.filter(tab.all);
+  /* В расписании порядок хронологический, а не по приоритету, и ближайшее — у якоря:
+     от кнопки сегодня внизу, у пальца; под логотипом сегодня сверху, как в календаре. */
+  if(tab.cal) shown.sort((a,b)=> S.up ? a.due.localeCompare(b.due) : b.due.localeCompare(a.due));
   /* кольцо: шаг прозрачности по числу строк — верхняя 0, нижняя (самая срочная) 100 % */
-  shown.forEach((i,k)=>list.appendChild(rowEl(i.x, i.isP, i.next, i.left, shown.length>1?k/(shown.length-1):1)));
+  let day = null;
+  shown.forEach((i,k)=>{
+   if(tab.cal && dayKey(i.due) !== day){
+    day = dayKey(i.due);
+    const h = document.createElement('div');
+    h.className = 'lbl day' + (days(i.due) < 0 ? ' late' : '');
+    h.textContent = dayLabel(i.due);
+    list.appendChild(h);
+   }
+   list.appendChild(rowEl(i.x, i.isP, i.next, i.left, shown.length>1?k/(shown.length-1):1));
+  });
   if(!shown.length) list.innerHTML = '<div class="empty">'+esc(tab.empty)+'</div>';
  }
  drawFind(); drawTabs(); drawSort(); fitList();

@@ -392,6 +392,10 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   padding:11px 11px 11px 20px;flex:none}   /* кружок справа, как в списке */
 .step .t1{font-size:17px;white-space:normal}
 .lbl{font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:4px}
+/* заголовок дня в расписании (вид PROCESS): та же подпись, что «ШАГИ» в чате, с воздухом вокруг */
+.lbl.day{padding:10px 4px 2px 18px}
+#list > .lbl.day:first-child{padding-top:0}
+.lbl.day.late{color:var(--hot)}
 /* шапка чата — как на странице задач: таблетка по центру, кнопка в углу.
    Вместо лого название задачи, Play Bold */
 .title{position:absolute;top:calc(16px + var(--safe-t));left:50%;transform:translateX(-50%);z-index:6;
