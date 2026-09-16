@@ -33,6 +33,10 @@
     <div class="scroll" id="scroll">
       <div id="list"></div>
       <div class="cap"></div>
+      <!-- Распорка под доком для режима «под логотипом». Настоящий блок, а не padding-bottom:
+           Safari на iPhone не включает конечный отступ flex-контейнера в прокручиваемую область
+           (снято с устройства: 14 строк, scrollHeight = clientHeight, «ехать 0»). -->
+      <div class="tail" aria-hidden="true"></div>
     </div>
     <div class="dock" id="dock">
       <!-- три капсулы: чем показан список. Ряд ровно 44 высотой — на этой геометрии стоит

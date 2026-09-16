@@ -768,7 +768,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v118';
+const APP_V='tasks-v119';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1375,6 +1375,10 @@ function fitList(){
  const pad = Math.max(0, Math.round(box.bottom - top + (mini() ? GAP_BTN : GAP_INP)));
  scroll.style.setProperty('--listpad', pad + 'px');
 }
+/* Распорка должна быть в разметке; если приехал новый движок со старым HTML (установленное
+   приложение обновляется по частям), достраиваем её сами — иначе список под логотипом не
+   прокручивается до конца. */
+if(scroll && !scroll.querySelector('.tail')) scroll.insertAdjacentHTML('beforeend', '<div class="tail" aria-hidden="true"></div>');
 function toBottom(){
  if(!scroll) return;
  /* Список под логотипом (S.up) покоится наверху — у обычного контейнера это ноль прокрутки,

@@ -62,8 +62,10 @@ async function common(file){
  { const before=rows().map(txt).join('|'); $('sort').click();
    assert(w.app.S.up===1&&$('scr-list').classList.contains('top'),'переключили — список под логотипом, сверху вниз');
    assert(rows().map(txt).join('|')===before,'под логотипом порядок тот же: приоритет растёт сверху вниз, срочное внизу');
-   assert(/#scr-list\.top \.scroll\{flex-direction:column\}/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1\}/.test(read('app.css')),'под логотипом: контейнер обычный, колпак уходит первым; запас снизу и колпак — те же, что от кнопки');
-   assert(!/\.tail\{|\.top \.tail|class="tail"|margin-top:auto|kickScroll/.test(read('app.css')+read('app.js')+read('index.html')),'отступы «в одну строку», хвост, прижим к строке ввода и пинок прокрутки откачены (v114)');
+   assert(/#scr-list\.top \.cap\{order:-1\}/.test(read('app.css')),'под логотипом: контейнер обычный, колпак уходит первым');
+   assert(!/margin-top:auto|kickScroll/.test(read('app.css')+read('app.js')),'прижим к строке ввода и пинок прокрутки откачены (v114)');
+   assert(/#scr-list\.top \.scroll\{flex-direction:column;padding-bottom:0\}/.test(read('app.css'))&&/#scr-list\.top \.tail\{display:block;flex:none;height:var\(--listpad/.test(read('app.css'))&&/\.tail\{display:none\}/.test(read('app.css'))&&d.querySelector('#scroll > .cap + .tail'),'под логотипом запас снизу — настоящая распорка: конечный отступ flex-контейнера Safari в прокрутку не считает (v119, снято с телефона)');
+   assert(/if\(scroll && !scroll\.querySelector\('\.tail'\)\) scroll\.insertAdjacentHTML/.test(read('app.js')),'движок достраивает распорку, если разметка старая');
    assert(/#scr-list \.scroll\{[^}]*padding-bottom:var\(--listpad, calc\(76px \+ 21px \+ 44px \+ 47px/.test(read('app.css'))&&/\.dock\{[^}]*gap:21px/.test(read('app.css')),'от кнопки: 16 до кольца кнопки, док 21; запас — из --listpad, формула запасная');
    assert(/const RING = 5, GAP_BTN = 16, GAP_INP = 4;/.test(read('app.js'))&&/if\(!box\.height \|\| !cap\.height\) return;/.test(read('app.js')),'запас снизу движок меряет по реальному верху кнопки; без раскладки не трогает — работает формула');
    assert(/#scr-list \.scroll\.tight\{padding-bottom:var\(--listpad, calc\(68px \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи зазор как между задачами');
@@ -94,7 +96,7 @@ async function common(file){
  /* Список перевёрнут: первый в разметке — у низа, колпак под шапку — над ним. Ноль прокрутки = низ,
     поэтому положение у кнопки не зависит от программной прокрутки, которую iOS при старте глотала */
  const kids=[...$('scroll').children].map(e=>e.id||e.className);
- assert(kids.join(',')==='list,cap','в разметке список первым, колпак вторым');
+ assert(kids.join(',')==='list,cap,tail','в разметке список первым, колпак вторым, распорка третьей');
  assert(/#scr-list \.scroll\{[^}]*flex-direction:column-reverse;padding-top:0;/.test(read('app.css').replace(/\/\*[\s\S]*?\*\//g,'')),'список рисуется снизу вверх, без padding-top');
  /* Первая задача упирается ровно в 16 px под таблеткой логотипа: 16 сверху + 44 таблетка + 16 зазор */
  assert(/\.cap\{flex:none;height:calc\(16px \+ 44px \+ 16px \+ var\(--safe-t\)\)\}/.test(read('app.css')),'над первой задачей ровно 16 px: колпак = 16 + таблетка 44 + 16');
