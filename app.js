@@ -768,7 +768,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v117';
+const APP_V='tasks-v118';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -2198,10 +2198,32 @@ if(DEBUG){
    'композер '+rect(document.querySelector('#scr-detail.on .composer') || $('composer'))+'\n'+
    'фокус    '+((document.activeElement && document.activeElement.id) || 'нет')+'   клавиатура '+(kbUp()?'да':'нет')+'  база '+n(kbBaseH)+'  высота '+n(kbH)+'\n'+
    'низ      --safe-b '+(cs.getPropertyValue('--safe-b').trim()||'—')+'  --foot '+(cs.getPropertyValue('--foot').trim()||'—')+'\n'+
+   /* Прокрутка списка: по этой строке видно, есть ли вообще куда ехать и не наша ли
+      резинка даёт «отскок». Версия рядом — чтобы сразу отличить старую сборку в кэше. */
+   scrollLine()+
    'трасса   '+vvTrace.join(' ');
   requestAnimationFrame(tick);
  };
  tick();
+}
+
+/* Строка отладки про прокрутку списка: сколько строк, высота содержимого и области, сколько
+   осталось ехать, посчитанный запас снизу, работает ли JS-резинка (она и даёт «отскок», когда
+   ехать некуда) и фактический зазор между последней задачей и кольцом кнопки. */
+function scrollLine(){
+ if(!scroll) return '';
+ const rows = document.querySelectorAll('#list .row');
+ const last = rows[rows.length - 1], lb = last && last.getBoundingClientRect();
+ const cb = composer && composer.getBoundingClientRect();
+ const over = scroll.scrollHeight - scroll.clientHeight;
+ const n = v => Math.round(v);
+ return 'список   '+(S.showDone?'ВЫПОЛНЕНО':curTab().toUpperCase())+' '+(S.up?'↓ под лого':'↑ от кнопки')+
+        '  строк '+rows.length+'  '+APP_V.replace('tasks-','')+'\n'+
+        'прокрут. h '+n(scroll.scrollHeight)+'/'+n(scroll.clientHeight)+'  ехать '+n(over)+
+        '  top '+n(scroll.scrollTop)+'  запас '+(scroll.style.getPropertyValue('--listpad')||'—')+
+        '  резинка '+(over<=1?'ДА':'нет')+'\n'+
+        'зазор    посл. задача '+(lb?n(lb.bottom):'—')+'  кольцо '+(cb?n(cb.top-(mini()?5:0)):'—')+
+        '  = '+(lb&&cb?n(cb.top-(mini()?5:0)-lb.bottom):'—')+'\n';
 }
 
 /* Обновление установленного приложения: новый service worker забирает управление сам,
