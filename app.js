@@ -265,6 +265,13 @@ function fmtDue(s){
  return d.getDate()+' '+MON[d.getMonth()];
 }
 const overdue=s=>!!s&&days(s)<0;
+/* Время у задачи необязательное: есть — момент, нет — «на день» (v128). Хранится рядом с
+   датой строкой «ЧЧ:ММ» в местном времени, без пояса: для одного человека этого достаточно,
+   а пояс пришлось бы тащить через всю модель и промт. */
+const TIME=/^([01]\d|2[0-3]):([0-5]\d)$/;
+const fmtAt=s=>TIME.test(String(s||''))?String(s):'';
+/* Момент задачи числом — для сортировки внутри дня: «на день» идёт раньше времени */
+const atMin=x=>{ const m=TIME.exec(String((x&&x.at)||'')); return m?+m[1]*60+ +m[2]:-1; };
 
 /* ---------- хранилище ---------- */
 const KEY='tasks:v1';
@@ -601,8 +608,14 @@ const ACT={
  task_set_due(a,c){
   const d=a.date==null?null:String(a.date);
   if(d!==null&&!/^\d{4}-\d{2}-\d{2}$/.test(d))return {out:'дата должна быть YYYY-MM-DD',err:1};
-  const o=c.item, was=o.due;
-  return act('Срок → '+(d?fmtDue(d):'снят'),()=>{o.due=d},()=>{o.due=was});
+  /* Время необязательное: не прислали — оставляем как было, прислали null — снимаем */
+  const t=a.time===undefined?undefined:(a.time==null?null:String(a.time));
+  if(t&&!TIME.test(t))return {out:'время должно быть ЧЧ:ММ',err:1};
+  const o=c.item, was=o.due, wasAt=o.at;
+  const shown=t!==undefined?t:fmtAt(o.at);
+  return act('Срок → '+(d?fmtDue(d)+(shown?', '+shown:''):'снят'),
+   ()=>{ o.due=d; if(t!==undefined) o.at=t; if(!d) o.at=null; },
+   ()=>{ o.due=was; o.at=wasAt; });
  },
  task_complete(a,c){
   if(c.isP)return {out:'у проекта нет своей отметки, закрывай шаги',err:1};
@@ -768,7 +781,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v127';
+const APP_V='tasks-v128';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -844,7 +857,7 @@ async function chatPayload(item,isP){
   id:shortId(item,isP),
   title:isP?item.n:item.t,
   kind:(KIND[kindOf(item,isP)]||'Задача').toLowerCase(),
-  due:item.due||null, dueWord:fmtDue(item.due)||'',
+  due:item.due||null, dueWord:fmtDue(item.due)||'', at:fmtAt(item.at)||null,
   done:isP?false:!!item.done, isProject:!!isP,
   steps:isP?inPj(item.id).map(x=>({id:'s'+x.id,t:x.t,done:!!x.done})):[],
   /* Содержимое в промт не уходит: только имена и размеры. Исключение — маленькие
@@ -1197,7 +1210,7 @@ function sub(x, gaps){
  const noTalk = gaps && !x.tail && !x.n && !(x.chat && x.chat.length);
  const bits = [];
  if(x.tail) bits.push(x.tail.x); else if(noTalk) bits.push('без диалога');
- if(x.due) bits.push(fmtDue(x.due)); else if(gaps) bits.push('без срока');
+ if(x.due) bits.push(fmtDue(x.due)+(fmtAt(x.at)?', '+fmtAt(x.at):'')); else if(gaps) bits.push('без срока');
  return bits.join(' · ');
 }
 /* Кружок строки: у задачи галочка, у проекта число открытых шагов. Кольцо — всегда красное,
@@ -1219,7 +1232,7 @@ function needsReply(x){
  return !!(last && last.a !== undefined && last.u === undefined && /\?[^.!?]*$/.test(String(last.a).trim()));
 }
 /* Строка списка: задача или проект */
-function rowEl(x, isP, next, left, ring){
+function rowEl(x, isP, next, left, ring, atTime){
  const r = document.createElement('div');
  r.className = 'row' + (x.done ? ' done' : '') + (needsReply(x) ? ' ask' : '');
  if(isP) r.dataset.pj = x.id; else r.dataset.id = x.id;
@@ -1231,8 +1244,11 @@ function rowEl(x, isP, next, left, ring){
  const head = isP
    ? '<span class="pj">'+esc(x.n)+' → </span>'+esc((next && next.t) || '')
    : esc(x.t);
+ /* Время — справа от названия, перед кружком: оно короткое и не спорит с заголовком */
+ const at = fmtAt(isP ? (atTime || '') : x.at);
  r.innerHTML = '<div class="cell"><span class="sr-only">'+KIND[r.dataset.kind]+': </span>'+
    '<div class="t1">'+head+'</div></div>' +
+   (at ? '<span class="at">'+esc(at)+'</span>' : '') +
    ckHTML(isP ? {pri:x.pri, done:0, n:x.n} : x, isP ? left : undefined, ring);
  r.querySelector('.ck').onclick = e => { e.stopPropagation(); isP ? ringTap(x, r) : toggle(x, r); };
  const go = () => { if(suppressRow){ suppressRow = false; return; }
@@ -1260,14 +1276,16 @@ function paint(keep){
   if(!dn.length) list.innerHTML = '<div class="empty">Пока ничего не сделано.</div>';
  } else {
   const items = [];
-  S.ts.filter(x=>!x.done && !x.del && x.pj===null).forEach(x=>items.push({x,isP:0,pri:x.pri||0,id:x.id,due:x.due||null}));
+  S.ts.filter(x=>!x.done && !x.del && x.pj===null).forEach(x=>items.push({x,isP:0,pri:x.pri||0,id:x.id,due:x.due||null,at:fmtAt(x.at)||null}));
   S.pr.filter(p=>!p.del).forEach(p=>{
    const all = inPj(p.id), op = openIn(p.id);
    if(!op.length) return;
    /* Срок проекта: свой, а если его нет — ближайший срок открытого шага. Шаги отдельными
       строками в списке не живут, поэтому их даты поднимаются в строку проекта. */
    const sd = op.map(s=>s.due).filter(Boolean).sort()[0];
-   items.push({x:p, isP:1, next:op[0], left:op.length, pri:p.pri||0, id:p.id, due:p.due || sd || null});
+   /* время проекта — то, что стоит у самой ближней датированной части */
+   const near = p.due ? p : (op.filter(s=>s.due).sort((a,b)=>a.due.localeCompare(b.due))[0] || p);
+   items.push({x:p, isP:1, next:op[0], left:op.length, pri:p.pri||0, id:p.id, due:p.due || sd || null, at:fmtAt(near.at)||null});
   });
   /* Порядок один в обоих режимах (v106): приоритет растёт сверху вниз — срочное внизу,
      внутри ступени новое ниже. От кнопки это «срочное у пальца», под логотипом владелец
@@ -1278,7 +1296,12 @@ function paint(keep){
   const shown = items.filter(tab.all);
   /* В расписании порядок хронологический, а не по приоритету, и ближайшее — у якоря:
      от кнопки сегодня внизу, у пальца; под логотипом сегодня сверху, как в календаре. */
-  if(tab.cal) shown.sort((a,b)=> S.up ? a.due.localeCompare(b.due) : b.due.localeCompare(a.due));
+  /* В расписании день к дню по хронологии, а внутри дня — по времени: «на день» выше всех,
+     дальше по часам. Направление задаёт якорь, поэтому внутри дня порядок тоже переворачивается. */
+  if(tab.cal) shown.sort((a,b)=>{
+   const d = a.due.localeCompare(b.due) || (atMin(a) - atMin(b));
+   return S.up ? d : -d;
+  });
   /* кольцо: шаг прозрачности по числу строк — верхняя 0, нижняя (самая срочная) 100 % */
   let day = null, g = (!tab.cal && shown.length) ? group() : null;
   shown.forEach((i,k)=>{
@@ -1291,7 +1314,7 @@ function paint(keep){
     list.appendChild(h);
     g = group();
    }
-   g.appendChild(rowEl(i.x, i.isP, i.next, i.left, shown.length>1?k/(shown.length-1):1));
+   g.appendChild(rowEl(i.x, i.isP, i.next, i.left, shown.length>1?k/(shown.length-1):1, i.at));
   });
   if(!shown.length) list.innerHTML = '<div class="empty">'+esc(tab.empty)+'</div>';
  }
@@ -1646,7 +1669,7 @@ function paintDetail(){
  $('crumb').textContent = isP ? 'Проект' : (par ? par.n : 'Без проекта');
  const all = isP?inPj(S.cur.id):null, op = isP?openIn(S.cur.id):null;
  $('cm').textContent = isP ? ((all.length-op.length)+' из '+all.length)
-   : (x.done ? 'выполнена' : (fmtDue(x.due) || 'без срока'));
+   : (x.done ? 'выполнена' : ((fmtDue(x.due)?fmtDue(x.due)+(fmtAt(x.at)?', '+fmtAt(x.at):''):'') || 'без срока'));
  /* правая круглая кнопка шапки: у задачи галочка, у проекта число открытых шагов */
  const h = $('hctl');
  h.className = 'rnd44 topbtn press' + (!isP && x.done ? ' on' : '');
@@ -2229,7 +2252,7 @@ try{ document.fonts && document.fonts.ready.then(refit); }catch(e){}
 window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, addTask, addStep, makeProject,
   delItem, fmtDue, flush, paint, openPri, closePri, showToast, hideToast,
   chatPayload, chatMessages, md, runTool, undoAct, byShort, shortId, fileBody, fmtSize, attach, fitList, grow,
-  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles, needsReply,
+  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles, needsReply, fmtAt,
   get pending(){return pending}, get undos(){return undos}, get undoNote(){return undoNote}};
 
 /* Открыть страницу с ?debug — поверх интерфейса появятся живые числа: размеры окна и

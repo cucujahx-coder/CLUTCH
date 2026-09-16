@@ -47,6 +47,7 @@ ok(buildSystem(base())[1].text.includes('<task'),'без профиля блок
 /* ---------- файлы в снимке ---------- */
 const tf=taskBlock({id:'t12',title:'Оплатить хостинг',kind:'оплата',isProject:false,
  files:[{name:'schet.pdf',size:48213},{name:'zametka.md',size:29,body:'Марина обещала счёт до среды.'}]});
+ok(taskBlock({id:'t1',title:'x',isProject:false,due:'2026-09-20',at:'15:00',dueWord:'воскресенье'}).includes('срок: 2026-09-20 15:00'),'время стоит в снимке рядом с датой');
 ok(tf.includes('schet.pdf — 47 КБ'),'в снимке имя и размер файла');
 ok(tf.includes('zametka.md — 29 Б, содержимое ниже'),'маленький файл помечен как вложенный');
 ok(!tf.includes('Марина обещала'),'содержимое в сам снимок не попадает');
@@ -97,6 +98,7 @@ ok(tu.id==='tu_1','идентификатор вызова сохранён — 
 ok(out.includes('"stop":"tool_use"'),'в done видно, что ход закончился вызовом');
 ok(Array.isArray(sent.body.tools)&&sent.body.tools.length>=12,'описания инструментов уходят модели');
 ok(sent.body.tools.every(t=>t.name&&(t.input_schema||t.type)),'у каждого инструмента имя и схема — либо серверный тип');
+ok(sent.body.tools.find(t=>t.name==='task_set_due').input_schema.properties.time,'у срока есть необязательное время');
 
 /* ход с вызовом и ответ с результатом — блочные сообщения, пробрасываются как есть */
 upstream(текст('Готово.'));

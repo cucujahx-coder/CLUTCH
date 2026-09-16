@@ -45,6 +45,15 @@ async function common(file){
    assert(!rows().find(r=>+r.dataset.id===t0.id).classList.contains('ask'),'реплика без вопроса не ждёт ответа');
    t0.chat=[]; w.app.paint(); }
  assert(pj('Запуск лендинга')&&txt(pj('Запуск лендинга'))==='Запуск лендинга → Написать текст оффера','у проекта: имя, стрелка, ближайший открытый шаг');
+ /* время — необязательное, справа от названия; в расписании внутри дня «на день» выше времени */
+ { const t=w.app.S.ts.find(x=>x.pj===null&&!x.done);
+   const r0=()=>rows().find(r=>+r.dataset.id===t.id);
+   assert(!r0().querySelector('.at'),'без времени в строке ничего не приписано');
+   t.due=w.app.S.ts.find(y=>y.due&&y.pj===null).due; t.at='09:30'; w.app.paint();
+   assert(r0().querySelector('.at')&&r0().querySelector('.at').textContent==='09:30','время стоит справа от названия');
+   t.at='25:00'; w.app.paint(); assert(!r0().querySelector('.at'),'кривое время не показывается');
+   t.at=''; w.app.paint(); }
+ assert(w.app.fmtAt('7:5')===''&&w.app.fmtAt('07:05')==='07:05','время только ЧЧ:ММ');
  assert(/\.t2\{font-size:14px;color:var\(--text-2\)/.test(read('app.css'))&&/--text-2:#B4B4B4/.test(read('app.css')),'имя проекта читается: своя ступень цвета, а не приглушённый --muted');
  assert(w.app.kindOf({t:'Каждый день звонить маме',pj:null})==='routine'&&w.app.kindOf({t:'Напомнить про паспорт',pj:null})==='reminder','рутина и напоминание по словам');
  assert(w.app.kindOf({t:'Купить молоко',pj:null,kind:'idea'})==='idea'&&w.app.kindOf({t:'Вычитка',pj:3})==='step','явный kind важнее догадки, шаг — по проекту');

@@ -11,8 +11,11 @@ export const TOOLS=[
  {name:'task_rename',description:'Переименовать текущую запись.',
   input_schema:{type:'object',properties:{title:str('Новое название')},required:['title'],additionalProperties:false}},
 
- {name:'task_set_due',description:'Поставить или снять срок текущей записи. Дату бери только из календаря в промте.',
-  input_schema:{type:'object',properties:{date:{type:['string','null'],description:'YYYY-MM-DD или null, чтобы снять срок'}},required:['date'],additionalProperties:false}},
+ {name:'task_set_due',description:'Поставить или снять срок текущей записи. Дату бери только из календаря в промте. Время ставь, только если его назвали.',
+  input_schema:{type:'object',properties:{
+   date:{type:['string','null'],description:'YYYY-MM-DD или null, чтобы снять срок'},
+   time:{type:['string','null'],description:'ЧЧ:ММ по местному времени, если время названо; null — снять время, оставив дату'}
+  },required:['date'],additionalProperties:false}},
 
  {name:'task_complete',description:'Закрыть текущую задачу или вернуть её в работу.',
   input_schema:{type:'object',properties:{done:{type:'boolean',description:'true — закрыть, false — вернуть'}},required:['done'],additionalProperties:false}},
