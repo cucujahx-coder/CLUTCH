@@ -295,6 +295,25 @@ const sysP=buildSystem({...base(),profile:'Сергей, Москва.',summary:
 ok(sysP.some(b=>b.text.includes('<profile>'))&&sysP.some(b=>b.text.includes('<summary>')),'профиль и выжимка — отдельные блоки');
 ok(sysP.findIndex(b=>b.text.includes('<profile>'))<sysP.findIndex(b=>b.text.includes('<summary>')),'профиль раньше выжимки: кэш-барьер стоит после него');
 
+/* ---------- напоминания ---------- */
+const kv=(()=>{ const m=new Map(); return {
+ get:async(k,t)=>{const v=m.get(k); return v===undefined?null:(t==='json'?JSON.parse(v):v)},
+ put:async(k,v)=>{m.set(k,v)}, delete:async k=>{m.delete(k)},
+ list:async()=>({keys:[...m.keys()].map(name=>({name})), list_complete:true}), _m:m};
+})();
+const SUB={endpoint:'https://push.example/abc',keys:{p256dh:'BPk1'.padEnd(88,'A'),auth:'AAAAAAAAAAAAAAAAAAAAAA'}};
+const envP={...env, PUSH:kv};
+const postP=(body)=>worker.fetch(new Request('https://w.dev/',{method:'POST',headers:{'content-type':'application/json',Origin:ORIGIN},body:JSON.stringify(body)}),envP);
+r=await post({push:'sub',sub:SUB});
+ok(r.status===501,'без KV напоминания честно отвечают, что не настроены');
+r=await postP({push:'plan',sub:SUB,tz:'Europe/Moscow',plan:[{id:'t1',t:'Позвонить',at:'2026-09-20T15:00'},{id:'t2',t:'мусор',at:'вчера'}]});
+ok(r.status===200&&(await r.json()).planned===1,'план принят, мусорные записи отброшены');
+ok([...kv._m.keys()][0].startsWith('p:'),'подписка лежит под своим ключом');
+ok(!JSON.stringify([...kv._m.values()]).includes('мусор'),'кривой момент до хранилища не доходит');
+ok((await postP({push:'plan',sub:{endpoint:'http://x'},plan:[]})).status===400,'подписка без ключей отклоняется');
+r=await postP({push:'off',sub:SUB});
+ok(r.status===200&&kv._m.size===0,'выключение стирает подписку');
+
 /* ---------- прочее ---------- */
 const get=await worker.fetch(new Request('https://w.dev/',{headers:{Origin:ORIGIN}}),env);
 ok(get.status===200&&(await get.text()).includes('работает'),'GET отдаёт страницу проверки');

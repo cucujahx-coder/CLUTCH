@@ -4,6 +4,7 @@
 
 import {buildSystem} from './prompt.js';
 import {TOOLS} from './tools.js';
+import {sendPush} from './push.js';
 
 const DEFAULT_MODEL='claude-sonnet-5';   /* разговор */
 const DEFAULT_SUM_MODEL='claude-haiku-4-5';  /* выжимки старой переписки — дешёвая модель */
@@ -41,6 +42,19 @@ const ALLOW=[
 ];
 
 const cut=(s,n)=>String(s==null?'':s).slice(0,n);
+const PLAN_MAX=60;   /* ближайшие напоминания; дальше плана клиент не шлёт */
+const sha=async s=>{
+ const b=new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
+ return [...b.slice(0,16)].map(x=>x.toString(16).padStart(2,'0')).join('');
+};
+/* Момент «ЧЧ:ММ местного времени» в минуты от эпохи по поясу подписки: у сервера UTC,
+   у человека — свой пояс, и без пересчёта напоминание придёт не тогда. */
+const localNow=tz=>{
+ try{
+  const p=new Intl.DateTimeFormat('sv-SE',{timeZone:tz||'UTC',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
+  return p.replace(' ','T').slice(0,16);
+ }catch(e){ return new Date().toISOString().slice(0,16); }
+};
 const json=(o,s,h)=>new Response(JSON.stringify(o),{status:s,headers:{...h,'content-type':'application/json'}});
 const cors=o=>({
  'Access-Control-Allow-Origin':ALLOW.includes(o)?o:ALLOW[0],
@@ -51,6 +65,31 @@ const cors=o=>({
 const ISO=/^\d{4}-\d{2}-\d{2}$/;
 
 export default {
+ /* Cron: раз в минуту проходим по подпискам и шлём то, чему пришло время.
+    Отправленное вычёркиваем из плана, мёртвые подписки (404/410) удаляем. */
+ async scheduled(ev, env, ctx){
+  if(!env.PUSH) return;
+  let cursor;
+  do{
+   const page = await env.PUSH.list({prefix:'p:', cursor});
+   cursor = page.list_complete ? null : page.cursor;
+   for(const k of page.keys){
+    const rec = await env.PUSH.get(k.name, 'json');
+    if(!rec || !rec.sub) continue;
+    const now = localNow(rec.tz);
+    const due = (rec.plan||[]).filter(x => x.at <= now);
+    if(!due.length) continue;
+    let dead = false;
+    for(const x of due.slice(0,5)){
+     const code = await sendPush(rec.sub, JSON.stringify({title:x.t, id:x.id, at:x.at}), env).catch(()=>0);
+     if(code === 404 || code === 410) dead = true;
+    }
+    if(dead){ await env.PUSH.delete(k.name); continue; }
+    const rest = (rec.plan||[]).filter(x => x.at > now);
+    await env.PUSH.put(k.name, JSON.stringify({...rec, plan:rest}), {expirationTtl: 60*60*24*120});
+   }
+  }while(cursor);
+ },
  async fetch(req,env){
   const o=req.headers.get('Origin')||'';
   const h=cors(o);
@@ -69,6 +108,27 @@ export default {
   const raw=await req.text();
   if(raw.length>MAX_BODY)return json({error:'слишком большой запрос'},413,h);
   let b; try{b=JSON.parse(raw)}catch(e){return json({error:'bad json'},400,h)}
+
+  /* ---------- напоминания ----------
+     Задачи живут в браузере, сервер их не знает. Поэтому клиент сам присылает короткий
+     план: «в такое-то время сказать вот это». Храним план рядом с подпиской в KV под
+     ключом подписки; Cron раз в минуту забирает наступившее и шлёт пуш.
+     Ничего, кроме названия задачи и времени, на сервер не уходит. */
+  if(b.push === 'sub' || b.push === 'plan' || b.push === 'off'){
+   if(!env.PUSH) return json({error:'напоминания не настроены: нет KV PUSH'}, 501, h);
+   const sub = b.sub;
+   if(!sub || typeof sub.endpoint !== 'string' || !/^https:\/\//.test(sub.endpoint) || !sub.keys || !sub.keys.p256dh || !sub.keys.auth)
+    return json({error:'нужна подписка'}, 400, h);
+   const key = 'p:' + await sha(sub.endpoint);
+   if(b.push === 'off'){ await env.PUSH.delete(key); return json({ok:true}, 200, h); }
+   /* План: до PLAN_MAX ближайших напоминаний, каждое — момент и строка */
+   const plan = (Array.isArray(b.plan) ? b.plan : []).slice(0, PLAN_MAX)
+    .map(x => ({at:cut(x && x.at, 20), t:cut(x && x.t, 80), id:cut(x && x.id, 16)}))
+    .filter(x => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(x.at) && x.t);
+   await env.PUSH.put(key, JSON.stringify({sub, plan, tz:cut(b.tz, 60), at:Date.now()}),
+    {expirationTtl: 60 * 60 * 24 * 120});   /* полгода тишины — подписка и так протухнет */
+   return json({ok:true, planned:plan.length}, 200, h);
+  }
 
   /* Файл, собранный в контейнере: клиент скачивает его через нас — ключ только тут.
      Отдаём поток как есть, с типом содержимого из Files API. */

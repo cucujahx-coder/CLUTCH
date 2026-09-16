@@ -1,3 +1,12 @@
 name = "clutch-chat"
 main = "worker.js"
 compatibility_date = "2026-09-11"
+
+# Напоминания: план и подписки лежат в KV, Cron раз в минуту забирает наступившее.
+# id namespace подставить своим: wrangler kv namespace create PUSH
+[[kv_namespaces]]
+binding = "PUSH"
+id = "ПОДСТАВИТЬ_ID"
+
+[triggers]
+crons = ["* * * * *"]

@@ -302,7 +302,8 @@ const KEY='tasks:v1';
 const OLD_KEYS=['clutch:v5','clutch-plan:v1','everyday:v4']; /* приложения-предшественники */
 let S={seq:1,ts:[],pr:[],showDone:0,up:0,cur:null,mem:[],spend:null};
 let saveT;
-function save(){clearTimeout(saveT);saveT=setTimeout(flush,120)}
+function save(){
+ planSync();clearTimeout(saveT);saveT=setTimeout(flush,120)}
 function flush(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 /* Корзина чистится при загрузке: удалённое старше TRASH_DAYS стирается физически */
 function purge(st){
@@ -813,7 +814,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v131';
+const APP_V='tasks-v132';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1180,6 +1181,11 @@ function settings(){
    '<span class="as">'+((sp.in+sp.cr+sp.cw)/1000).toFixed(1)+'k вход · '+(sp.out/1000).toFixed(1)+'k выход</span></div>'
   :'<div class="se">Запросов ещё не было.</div>';
 
+ h+='<div class="sh">Напоминания</div>';
+ h+='<div class="si"><span id="push-s">Проверяю…</span>'+
+    '<button class="au" type="button" data-push="1">…</button></div>';
+ h+='<div class="se">Приходят пушем к сроку задачи, у которой указано время. На iPhone работают только у приложения с домашнего экрана. На сервер уходит название задачи и время — больше ничего.</div>';
+
  h+='<div class="sh">Корзина</div>';
  h+=trash.length?trash.map((x,i)=>'<div class="si"><span>'+esc(x.n)+'</span>'+
    '<button class="au" type="button" data-restore="'+i+'">Вернуть</button></div>').join('')
@@ -1196,6 +1202,23 @@ function settings(){
 
  body.querySelectorAll('[data-forget]').forEach(b=>b.onclick=()=>{S.mem.splice(+b.dataset.forget,1); save(); settings();});
  body.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>{delete trash[+b.dataset.restore].o.del; save(); paint(); settings();});
+ /* Напоминания: состояние узнаём у браузера, кнопка включает и выключает подписку */
+ (async()=>{
+  const st = body.querySelector('#push-s'), btn = body.querySelector('[data-push]');
+  if(!st || !btn) return;
+  const draw = s => {
+   const t = {'вкл':['Включены','Выключить'], 'выкл':['Выключены','Включить'],
+              'запрещено':['Запрещены в настройках телефона',''], 'нет':['Не поддерживаются этим браузером','']}[s];
+   st.textContent = t[0]; btn.textContent = t[1]; btn.hidden = !t[1]; btn.disabled = false;
+  };
+  draw(await pushState());
+  btn.onclick = async () => {
+   btn.disabled = true; tap(8);
+   const on = await pushState() === 'вкл';
+   if(on) await pushOff(); else if(!await pushOn()) { draw(await pushState()); return; }
+   draw(await pushState());
+  };
+ })();
  /* Пять нажатий на версию включают отладочный слой в установленном приложении, где
     ?debug в адрес не дописать; ещё пять — выключают. */
  body.querySelectorAll('[data-ver]').forEach(v=>{
@@ -1498,6 +1521,62 @@ function toBottom(){
  /* Второй проход в следующем кадре: на первом размеры ещё не окончательные — при старте
     и после смены запаса список недоезжал, и последняя задача пряталась под кнопкой. */
  if(typeof requestAnimationFrame === 'function') requestAnimationFrame(go);
+}
+
+/* ---------- напоминания ----------
+   Задачи живут в браузере, сервер их не знает — поэтому мы сами присылаем ему короткий план:
+   «в такое-то время сказать вот это». Уходит только название и момент, ничего больше.
+   На iPhone пуши работают лишь у приложения, добавленного на домашний экран (iOS 16.4+).
+   Ключ VAPID публичный, он и должен лежать в бандле. */
+const VAPID = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
+const PLAN_DAYS = 14;   /* дальше плана не шлём: список короткий, а перезаливается он часто */
+const b64bin = s => { const t = s.replace(/-/g,'+').replace(/_/g,'/'); const b = atob(t + '='.repeat((4 - t.length % 4) % 4));
+ return Uint8Array.from(b, c => c.charCodeAt(0)); };
+let pushSub = null, planTimer = 0;
+
+/* Что напомнить: задачи со сроком и временем, не закрытые, на ближайшие PLAN_DAYS */
+function planItems(){
+ const out = [], lim = plus(PLAN_DAYS);
+ for(const x of S.ts){
+  if(x.done || x.del || !x.due || !fmtAt(x.at)) continue;
+  if(x.due > lim) continue;
+  out.push({id:'t'+x.id, t:x.t, at:x.due + 'T' + fmtAt(x.at)});
+ }
+ return out.sort((a,b)=>a.at.localeCompare(b.at)).slice(0, 60);
+}
+async function pushSend(kind){
+ if(!API || !pushSub) return null;
+ let tz = 'UTC'; try{ tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }catch(e){}
+ const r = await fetch(API, {method:'POST', headers:{'content-type':'application/json'},
+  body:JSON.stringify({push:kind, sub:pushSub.toJSON ? pushSub.toJSON() : pushSub, tz, plan:kind==='plan'?planItems():undefined})});
+ return r.ok ? r.json().catch(()=>({})) : null;
+}
+/* План перезаливается не на каждое нажатие, а пачкой: правок подряд бывает много */
+function planSync(){ if(!pushSub) return; clearTimeout(planTimer); planTimer = setTimeout(()=>pushSend('plan'), 800); }
+async function pushState(){
+ if(!('serviceWorker' in navigator) || !('PushManager' in window)) return 'нет';
+ try{
+  const reg = await navigator.serviceWorker.ready;
+  pushSub = await reg.pushManager.getSubscription();
+  return pushSub ? 'вкл' : (Notification.permission === 'denied' ? 'запрещено' : 'выкл');
+ }catch(e){ return 'нет'; }
+}
+async function pushOn(){
+ const reg = await navigator.serviceWorker.ready;
+ if(Notification.permission !== 'granted'){
+  const p = await Notification.requestPermission();
+  if(p !== 'granted') return false;
+ }
+ pushSub = await reg.pushManager.getSubscription()
+  || await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64bin(VAPID)});
+ const ok = await pushSend('plan');
+ return !!ok;
+}
+async function pushOff(){
+ if(!pushSub) return;
+ await pushSend('off').catch(()=>{});
+ try{ await pushSub.unsubscribe(); }catch(e){}
+ pushSub = null;
 }
 
 /* ---------- выполнение ---------- */
