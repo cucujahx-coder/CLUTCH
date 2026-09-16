@@ -768,7 +768,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v115';
+const APP_V='tasks-v116';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1275,7 +1275,7 @@ function paint(keep){
    Геометрия считается в JS и ставится inline (сжатие) и через animate() (прыжок): calc()
    внутри scale() и var() в @keyframes Safari на телефоне не отрисовал — кнопка стояла. */
 const PULL_FULL = 90, JUMP_MS = 280, OVER_FULL = 60;
-const ROW_H = 56;   /* = --rowh в CSS */
+const ROW_H = 48;   /* = --rowh в CSS */
 const MINI_Y = 75;  /* сдвиг свёрнутой капсулы на место кнопки: 26 + 44 + 21 − 16, как translateY в .composer.mini */
 function armRubber(el){
  let y0 = null, live = false, snapT = 0, pulled = 0, touching = false, cool = false;

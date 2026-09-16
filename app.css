@@ -70,7 +70,7 @@
          inset -1px 1px 0 rgba(0,0,0,.4),
          inset 0 0 0 .5px rgba(255,255,255,.06);
   --glass:var(--edge),0 6px 18px rgba(0,0,0,.45);   /* кант и тень под всем стеклянным — элемент отрывается от фона */
-  --rowh:56px;   /* высота строки списка: кружок 44, как у круглых кнопок (.rnd44), плюс 6×2 */
+  --rowh:48px;   /* высота строки списка: две строки текста (15/18 + 12/14) с кружком 36; от неё считаются все зазоры «в одну строку» */
   --font:"Play",Inter,-apple-system,system-ui,sans-serif;
   --font-head:"Pixelizer",var(--font);
   --ground:none;   /* фон плоский: ровный #1A1A1A, без градиента */
@@ -269,11 +269,10 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* кружок справа, текст слева: обычный порядок, разметка не меняется (кружок в ней последний) */
 .row{position:relative;display:flex;flex-direction:row;align-items:center;gap:10px;height:var(--rowh);padding:6px 6px 6px 16px;flex:none;
   background:var(--surf-row);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  border-radius:28px;cursor:pointer;transition:background var(--t-tap) var(--e-out);overflow:hidden}
-/* Строка списка — 56 (v115): кружок такой же, как круглые кнопки интерфейса (44), плюс 6×2;
-   радиус 28, как у остальных капсул. Внутри две строки текста — заголовок 15/18 и подпись
-   12/14 (у задачи срок, у проекта имя проекта). Своего размера у кружка строки больше нет:
-   он общий, .ck 44 — не переопределять. */
+  border-radius:24px;cursor:pointer;transition:background var(--t-tap) var(--e-out);overflow:hidden}
+/* Строка списка — 48 (v100): минимум, куда влезают две строки текста — заголовок 15/18 и
+   подпись 12/14 (у задачи срок, у проекта следующий шаг и срок); кружок 36, радиус 24 */
+.row .ck{width:36px;height:36px}
 .row .t1{font-size:15px;line-height:18px}
 .row .t2{font-size:12px;line-height:14px;margin-top:0;color:var(--muted)}   /* подпись приглушённее заголовка (v102) */
 .row .cell{padding-left:18px}   /* место под точку: 6 + 12 */
@@ -306,11 +305,11 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 
 /* ── приоритет: выбор долгим нажатием по задаче ───────────────── */
 .pri-back{position:absolute;inset:0;z-index:30}
-.pri{position:absolute;left:16px;right:16px;z-index:31;height:var(--rowh);padding:6px;border-radius:28px;
+.pri{position:absolute;left:16px;right:16px;z-index:31;height:var(--rowh);padding:6px;border-radius:24px;
   display:flex;align-items:center;justify-content:space-between;gap:6px;
   background:var(--surf-pri);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
   box-shadow:var(--glass)}
-.pri button{flex:none;width:44px;height:44px;border:0;border-radius:50%;background:var(--g2a);
+.pri button{flex:none;width:36px;height:36px;border:0;border-radius:50%;background:var(--g2a);
   display:grid;place-items:center;cursor:pointer;color:var(--muted);font-size:15px;
   transition:transform var(--t-tap) var(--e-over),box-shadow var(--t-tap) var(--e-out)}
 .pri button .dotc{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(var(--ring-rgb),var(--ring,0))}
