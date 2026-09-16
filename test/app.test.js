@@ -64,8 +64,9 @@ async function common(file){
    assert(rows().map(txt).join('|')===before,'под логотипом порядок тот же: приоритет растёт сверху вниз, срочное внизу');
    assert(/#scr-list\.top \.scroll\{flex-direction:column\}/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1\}/.test(read('app.css')),'под логотипом: контейнер обычный, колпак уходит первым; запас снизу и колпак — те же, что от кнопки');
    assert(!/\.tail\{|\.top \.tail|class="tail"|margin-top:auto|kickScroll/.test(read('app.css')+read('app.js')+read('index.html')),'отступы «в одну строку», хвост, прижим к строке ввода и пинок прокрутки откачены (v114)');
-   assert(/#scr-list \.scroll\{[^}]*padding-bottom:calc\(76px \+ 21px \+ 44px \+ 47px/.test(read('app.css'))&&/\.dock\{[^}]*gap:21px/.test(read('app.css')),'от кнопки: 16 до кольца кнопки, док 21');
-   assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи зазор как между задачами');
+   assert(/#scr-list \.scroll\{[^}]*padding-bottom:var\(--listpad, calc\(76px \+ 21px \+ 44px \+ 47px/.test(read('app.css'))&&/\.dock\{[^}]*gap:21px/.test(read('app.css')),'от кнопки: 16 до кольца кнопки, док 21; запас — из --listpad, формула запасная');
+   assert(/const RING = 5, GAP_BTN = 16, GAP_INP = 4;/.test(read('app.js'))&&/if\(!box\.height \|\| !cap\.height\) return;/.test(read('app.js')),'запас снизу движок меряет по реальному верху кнопки; без раскладки не трогает — работает формула');
+   assert(/#scr-list \.scroll\.tight\{padding-bottom:var\(--listpad, calc\(68px \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи зазор как между задачами');
    $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно'); }
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('sort').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */

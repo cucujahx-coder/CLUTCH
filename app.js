@@ -768,7 +768,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v116';
+const APP_V='tasks-v117';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1261,7 +1261,7 @@ function paint(keep){
   shown.forEach((i,k)=>list.appendChild(rowEl(i.x, i.isP, i.next, i.left, shown.length>1?k/(shown.length-1):1)));
   if(!shown.length) list.innerHTML = '<div class="empty">'+esc(tab.empty)+'</div>';
  }
- drawFind(); drawTabs(); drawSort();
+ drawFind(); drawTabs(); drawSort(); fitList();
  if(MODE==='two' || view==='detail') paintDetail();   /* закрытый экран чата не перерисовываем */
  if(!keep) toBottom();
 }
@@ -1360,6 +1360,21 @@ function armRubber(el){
    перерисовался: scrollTop=scrollHeight в перевёрнутом контейнере обрезается до нуля,
    то есть до низа, — и это работает в обе стороны реализации. Чтение offsetHeight
    заставляет браузер применить новые размеры до правки прокрутки. */
+/* Сколько оставить под списком, чтобы последняя задача встала над кнопкой. Меряем, а не
+   считаем формулой: у кнопки внешнее кольцо рисуется тенью (RING) и в прямоугольник не входит,
+   а над строкой ввода могут стоять чипы вложений. Без разложенной раскладки (первый кадр,
+   jsdom) не трогаем ничего — работает запасная формула в CSS. */
+const RING = 5, GAP_BTN = 16, GAP_INP = 4;
+function fitList(){
+ if(!scroll || !composer) return;
+ const box = scroll.getBoundingClientRect(), cap = composer.getBoundingClientRect();
+ if(!box.height || !cap.height) return;
+ /* чипы вложений стоят над строкой ввода — верх берём по самому высокому из них */
+ const chips = $('pend'), cb = chips && !chips.hidden ? chips.getBoundingClientRect() : null;
+ const top = Math.min(cap.top - (mini() ? RING : 0), cb && cb.height ? cb.top : Infinity);
+ const pad = Math.max(0, Math.round(box.bottom - top + (mini() ? GAP_BTN : GAP_INP)));
+ scroll.style.setProperty('--listpad', pad + 'px');
+}
 function toBottom(){
  if(!scroll) return;
  /* Список под логотипом (S.up) покоится наверху — у обычного контейнера это ноль прокрутки,
@@ -1938,7 +1953,7 @@ function openComposer(voice){
  composer.classList.remove('mini'); scroll.classList.add('tight');
  $('dock').classList.add('hide');
  $('veil-b').style.height = 'calc(68px + 24px + var(--foot) + var(--pend, 0px) + var(--safe-b))';
- drawAdd(); toBottom();          /* .tight меняет запас снизу — доводим список до строки ввода */
+ fitList(); drawAdd(); toBottom();   /* .tight меняет запас снизу — пересчитываем и доводим список */
  /* Отклик — до фокуса: последним действием жеста должен остаться именно focus(),
     иначе iOS не считает поле активным и клавиатуру не открывает. */
  if(voice){ composer.style.transform = ''; dictate(nt, addBtn, drawAdd); return; }
@@ -1953,7 +1968,7 @@ function closeComposer(){
  ntPick = []; paintNtPick();          /* отменили задачу — отменили и её вложения */
  $('dock').classList.remove('hide'); scroll.classList.remove('tight');
  $('veil-b').style.height = '';
- drawAdd(); toBottom();
+ fitList(); drawAdd(); toBottom();
 }
 /* Открываем по click, не по touchend: iOS отдаёт клавиатуру только из «настоящего» жеста,
    а touchend с preventDefault она за такой не считает */
@@ -2094,6 +2109,7 @@ function drawChips(box, arr, redraw){
     в --pend своего экрана: на неё поднимается дно прокрутки, иначе лента лезет под чипы */
  const scr = box.closest('.screen');
  if(scr) scr.style.setProperty('--pend', box.offsetHeight ? (box.offsetHeight + 8) + 'px' : '0px');
+ fitList();   /* чипы поднимают строку ввода — запас под списком меряем заново */
 }
 function paintPending(){ drawChips($('pend2'), pending, paintPending); }
 function paintNtPick(){ drawChips($('pend'), ntPick, paintNtPick); }
@@ -2141,14 +2157,17 @@ armRubber(scroll); armRubber(thread);
 paint();
 /* Шрифт приезжает после первой отрисовки и меняет высоту строк — доводим список ещё раз.
    pageshow — возврат к вкладке из кэша назад-вперёд, там раскладка тоже может быть старой */
-addEventListener('load', toBottom);
-addEventListener('pageshow', toBottom);
-try{ document.fonts && document.fonts.ready.then(toBottom); }catch(e){}
+const refit = () => { fitList(); toBottom(); };
+addEventListener('load', refit);
+addEventListener('pageshow', refit);
+addEventListener('resize', refit);
+addEventListener('orientationchange', ()=>setTimeout(refit, 200));
+try{ document.fonts && document.fonts.ready.then(refit); }catch(e){}
 
 /* Поверхность для тестов и консоли: S переприсваивается при загрузке, поэтому отдаётся геттером */
 window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, addTask, addStep, makeProject,
   delItem, fmtDue, flush, paint, openPri, closePri, showToast, hideToast,
-  chatPayload, chatMessages, md, runTool, undoAct, byShort, shortId, fileBody, fmtSize, attach,
+  chatPayload, chatMessages, md, runTool, undoAct, byShort, shortId, fileBody, fmtSize, attach, fitList,
   settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles, needsReply,
   get pending(){return pending}, get undos(){return undos}, get undoNote(){return undoNote}};
 
