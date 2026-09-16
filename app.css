@@ -624,6 +624,13 @@ body.two #scr-detail,body.two #scr-list.away{transform:none}
   border-radius:18px;background:var(--g1c);font-size:15px}
 .si>span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
 .si .as{flex:none;font-size:13px;color:var(--muted)}
+/* лист срока: ряд быстрых вариантов и родные поля даты и времени — у iOS в них своё колесо */
+.quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.quick .mi{flex:1 1 auto;min-width:calc(50% - 3px);height:44px;border-radius:22px;font-size:15px}
+.quick .mi.on{background:var(--inv);color:var(--on-inv)}
+.si .fld{flex:none;border:0;border-radius:14px;background:var(--g2a);color:var(--text);
+  font-family:var(--font);font-size:16px;padding:6px 10px;min-height:32px}
+.si .fld::-webkit-date-and-time-value{text-align:right}
 .se{font-size:13px;line-height:1.5;color:var(--muted);padding:0 6px}
 .mi{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;margin-bottom:8px;padding:0 14px;
   border:0;border-radius:18px;background:var(--g1c);color:var(--text);

@@ -73,6 +73,7 @@ const P = {
   clip:'M21 12.5 12.5 21a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10.5 19',
   up:'M12 19V5M5 12l7-7 7 7',
   down:'M12 5v14M5 12l7 7 7-7',
+  clock:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7v5l3 2',
   mic:'M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3M5 10v1a7 7 0 0 0 14 0v-1M12 19v3',
   back:'M15 5l-7 7 7 7',
   plus:'M12 5v14M5 12h14',
@@ -781,7 +782,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v128';
+const APP_V='tasks-v129';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1556,6 +1557,7 @@ function openPri(x, row){
  const el = document.createElement('div'); el.className = 'pri';
  el.innerHTML = PRI.map(p => '<button class="press'+(Number(x.pri||0)===p.v?' on':'')+'" data-v="'+p.v+'" '+
    'aria-label="Приоритет '+(p.v||'нет')+'">'+(p.v?'<span class="dotc" style="--ring:'+(p.v/4)+'"></span>':'—')+'</button>').join('')+
+   '<button class="press edit" data-due="1" aria-label="Срок">'+Ic(P.clock,18)+'</button>'+
    '<button class="press edit" data-edit="1" aria-label="Переименовать">'+Ic(P.edit,18)+'</button>';
  el.style.top = Math.max(16, Math.min(rb.top - hb.top, hb.height - ROW_H - 16)) + 'px';
  host.appendChild(back); host.appendChild(el);
@@ -1566,6 +1568,60 @@ function openPri(x, row){
   x.pri = Number(b.dataset.v); save(); tap(8); closePri(); paint(1);
  });
  el.querySelector('[data-edit]').onclick = () => { tap(8); closePri(); editRow(row, x); };
+ el.querySelector('[data-due]').onclick = () => { tap(8); closePri(); openDue(x); };
+}
+
+/* ---------- срок руками ----------
+   Дату и время до этого ставил только чат. Лист с быстрыми вариантами («сегодня», «завтра»,
+   «в выходные», «через неделю») и родными полями даты и времени: у iOS в них свои колёса,
+   свой календарь и свой язык — рисовать их заново значит спорить с системой. Изменение
+   показывается плашкой с «Вернуть», как выполнение (v129, этап 2 календаря). */
+let dueEl = null;
+/* ближайшая суббота; если сегодня воскресенье — сегодня же (выходные ещё идут) */
+const weekendDay = () => { const w = new Date().getDay(); return plus(w===0?0:(6-w)); };
+function openDue(x){
+ const was = {due:x.due||null, at:x.at||null};
+ const set = (due, at) => {
+  x.due = due; x.at = due ? (at===undefined ? (x.at||null) : at) : null;
+  save(); paint(1); hideDue(); tap(8);
+  undoBuf = {undo:()=>{ x.due = was.due; x.at = was.at; }};
+  showToast(due ? 'Срок → ' + fmtDue(due) + (fmtAt(x.at) ? ', ' + fmtAt(x.at) : '') : 'Срок снят');
+ };
+ if(!dueEl){
+  dueEl = document.createElement('div');
+  dueEl.className = 'sheet due'; dueEl.hidden = true;
+  dueEl.innerHTML = '<div class="sheet-back"></div><div class="sheet-body" role="dialog" aria-label="Срок"></div>';
+  dueEl.querySelector('.sheet-back').onclick = hideDue;
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && dueEl && !dueEl.hidden) hideDue(); });
+  document.body.appendChild(dueEl);
+ }
+ const body = dueEl.querySelector('.sheet-body');
+ const quick = [['Сегодня', plus(0)], ['Завтра', plus(1)], ['В выходные', weekendDay()], ['Через неделю', plus(7)]];
+ body.innerHTML =
+  '<div class="sheet-title">Срок</div>'+
+  '<div class="quick">'+quick.map(([n,d])=>'<button class="mi press'+(x.due===d?' on':'')+'" type="button" data-set="'+d+'">'+esc(n)+'</button>').join('')+'</div>'+
+  '<div class="sh">Точно</div>'+
+  '<div class="si"><span>Дата</span><input class="fld" type="date" id="due-d" value="'+esc(x.due||'')+'"></div>'+
+  '<div class="si"><span>Время</span><input class="fld" type="time" id="due-t" value="'+esc(fmtAt(x.at))+'"></div>'+
+  '<div class="quick">'+
+   '<button class="mi press" type="button" data-clear="t">Убрать время</button>'+
+   '<button class="mi press" type="button" data-clear="d">Снять срок</button>'+
+  '</div>';
+ body.querySelectorAll('[data-set]').forEach(b => b.onclick = () => set(b.dataset.set));
+ body.querySelector('[data-clear="d"]').onclick = () => set(null);
+ body.querySelector('[data-clear="t"]').onclick = () => set(x.due, null);
+ body.querySelector('#due-d').onchange = e => { const v = e.target.value; if(v) set(v); };
+ body.querySelector('#due-t').onchange = e => {
+  const v = fmtAt(e.target.value);
+  set(x.due || plus(0), v || null);   /* время без даты не имеет смысла — ставим сегодня */
+ };
+ dueEl.hidden = false; tap(8);
+}
+function hideDue(){
+ if(!dueEl || dueEl.hidden) return;
+ if(RM){ dueEl.hidden = true; return; }
+ dueEl.classList.add('out');
+ setTimeout(()=>{ dueEl.hidden = true; dueEl.classList.remove('out'); }, 200);
 }
 /* Правка названия прямо в строке: карандаш в капсуле долгого нажатия. Заголовок строки
    заменяется полем, Enter или уход фокуса сохраняют, Escape отменяет. У проекта правится
@@ -1965,7 +2021,9 @@ function drawSort(){
  s.setAttribute('aria-label', S.up ? 'Список сверху вниз, под логотипом' : 'Список снизу вверх, от кнопки');
 }
 $('sort').onclick = () => { tap(8); S.up = S.up?0:1; save(); paint(); if(S.up) scroll.scrollTop = 0; };
-$('undo').onclick = () => { if(undoBuf){ mark(undoBuf.x,0); save(); paint(1); tap(8); } hideToast(); };
+/* Плашка откатывает не только выполнение: undoBuf может нести свою функцию возврата
+   (срок, повтор), иначе — привычное снятие отметки. */
+$('undo').onclick = () => { if(undoBuf){ if(undoBuf.undo) undoBuf.undo(); else mark(undoBuf.x,0); save(); paint(1); tap(8); } hideToast(); };
 
 /* большая кнопка с пауком разворачивается в строку ввода */
 $('shutter').innerHTML = SPIDER_JUMP;
@@ -2252,7 +2310,8 @@ try{ document.fonts && document.fonts.ready.then(refit); }catch(e){}
 window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, addTask, addStep, makeProject,
   delItem, fmtDue, flush, paint, openPri, closePri, showToast, hideToast,
   chatPayload, chatMessages, md, runTool, undoAct, byShort, shortId, fileBody, fmtSize, attach, fitList, grow,
-  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles, needsReply, fmtAt,
+  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles, needsReply, fmtAt, openDue,
+  todayISO: today,
   get pending(){return pending}, get undos(){return undos}, get undoNote(){return undoNote}};
 
 /* Открыть страницу с ?debug — поверх интерфейса появятся живые числа: размеры окна и

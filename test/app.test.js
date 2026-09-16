@@ -54,12 +54,35 @@ async function common(file){
    t.at='25:00'; w.app.paint(); assert(!r0().querySelector('.at'),'кривое время не показывается');
    t.at=''; w.app.paint(); }
  assert(w.app.fmtAt('7:5')===''&&w.app.fmtAt('07:05')==='07:05','время только ЧЧ:ММ');
+ /* срок руками: часы в капсуле долгого нажатия открывают лист с быстрыми вариантами и полями */
+ { const t=w.app.S.ts.find(x=>x.pj===null&&!x.done), r=()=>rows().find(y=>+y.dataset.id===t.id);
+   const was={due:t.due,at:t.at};
+   r().dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true}));
+   const clock=d.querySelector('.pri [data-due]');
+   assert(!!clock,'в капсуле есть кнопка срока');
+   clock.click();
+   const body=d.querySelector('.sheet.due .sheet-body');
+   assert(body&&body.querySelectorAll('[data-set]').length===4&&body.querySelector('#due-d')&&body.querySelector('#due-t'),'лист: четыре быстрых варианта, поле даты и поле времени');
+   body.querySelector('[data-set]').click();
+   assert(t.due===w.app.todayISO()&&$('toast').classList.contains('on'),'быстрый вариант ставит срок и показывает плашку');
+   $('undo').click();
+   assert(t.due===was.due&&(t.at||null)===(was.at||null),'«Вернуть» откатывает срок, а не снимает отметку');
+   r().dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true})); d.querySelector('.pri [data-due]').click();
+   const tf=d.querySelector('#due-t'); tf.value='08:15'; tf.dispatchEvent(new w.Event('change'));
+   assert(t.at==='08:15'&&t.due,'время без даты ставит сегодня');
+   r().dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true})); d.querySelector('.pri [data-due]').click();
+   d.querySelector('[data-clear="d"]').click();
+   assert(t.due===null&&t.at===null,'снятие срока снимает и время');
+   t.due=was.due; t.at=was.at; w.app.paint(); w.app.hideToast();
+   /* долгое нажатие ставит suppressRow, чтобы тот же жест не открыл строку; в жизни его
+      снимает следующий pointerdown по строке — в тесте делаем это руками */
+   r().dispatchEvent(new w.Event('pointerdown',{bubbles:true})); r().dispatchEvent(new w.Event('pointerup',{bubbles:true})); }
  assert(/\.t2\{font-size:14px;color:var\(--text-2\)/.test(read('app.css'))&&/--text-2:#B4B4B4/.test(read('app.css')),'имя проекта читается: своя ступень цвета, а не приглушённый --muted');
  assert(w.app.kindOf({t:'Каждый день звонить маме',pj:null})==='routine'&&w.app.kindOf({t:'Напомнить про паспорт',pj:null})==='reminder','рутина и напоминание по словам');
  assert(w.app.kindOf({t:'Купить молоко',pj:null,kind:'idea'})==='idea'&&w.app.kindOf({t:'Вычитка',pj:3})==='step','явный kind важнее догадки, шаг — по проекту');
 
  /* строки — стеклянные капсулы, ни шапки со списком, ни фильтров, ни меню действий */
- assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet'),'ни шапки «Входящие», ни фильтров, ни меню действий');
+ assert(!$('inbox')&&!d.querySelector('.topbar')&&!d.querySelector('.sheet:not([hidden])'),'ни шапки «Входящие», ни фильтров, ни открытых листов');
  assert(/\.topbtn\{[^}]*right:16px[^}]*\}/.test(read('app.css'))&&!/\.topbtn[^{]*\{[^}]*translateX/.test(read('app.css')),'угловые кнопки на кромке 16 px, как строки и док — без сдвига внутрь');
  assert($('find').closest('.dock')&&/\.dock #find\{position:absolute;right:0;bottom:0/.test(read('app.css')),'выполненные внизу — на кромке справа от капсулы видов');
  assert(/\.brand\{[^}]*left:16px/.test(read('app.css'))&&!/\.brand\{[^}]*translateX\(-50%\)/.test(read('app.css')),'логотип у левой кромки 16, не по центру');
