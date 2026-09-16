@@ -119,19 +119,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 
 /* Полосы затемнения: содержимое уезжает под них и просвечивает сквозь размытие.
    Маска гасит и заливку, и сам блюр к краю — резкой границы не остаётся */
-.veil{position:absolute;left:0;right:0;z-index:2;pointer-events:none;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
-/* Пикселизация полос затемнения (v112–113): содержимое под ними разбивается на соты — тот же
-   шестиугольник, из которого сложен паук (pointy-top, как #hexcell). Настоящей пикселизации в
-   CSS нет, поэтому внутри каждой соты лежит своё, гораздо более сильное размытие: слой с
-   backdrop-filter:blur(22px) замаскирован сеткой шестиугольников, а в швах между ними виден
-   обычный блюр полосы — граница ячейки и читается как крупный пиксель. Первый подход (печатать
-   швы цветом фона поверх блюра) не сработал вовсе: тёмное по тёмному не видно. Маска самой
-   полосы (плавное затухание) действует и на псевдоэлемент, поэтому соты тают вместе с ней.
-   Это второй backdrop-filter на экране — если на iPhone появится рывок при прокрутке, снимать
-   надо его, а не блюр полосы. */
-.veil::after{content:'';position:absolute;inset:0;-webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px);
-  -webkit-mask-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%208.66%2015'%3E%3Cpath%20fill='%23fff'%20d='M4.33%20-4.3L8.054%20-2.15L8.054%202.15L4.33%204.3L0.606%202.15L0.606%20-2.15ZM4.33%2010.7L8.054%2012.85L8.054%2017.15L4.33%2019.3L0.606%2017.15L0.606%2012.85ZM0%203.2L3.724%205.35L3.724%209.65L0%2011.8L-3.724%209.65L-3.724%205.35ZM8.66%203.2L12.384%205.35L12.384%209.65L8.66%2011.8L4.936%209.65L4.936%205.35Z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%208.66%2015'%3E%3Cpath%20fill='%23fff'%20d='M4.33%20-4.3L8.054%20-2.15L8.054%202.15L4.33%204.3L0.606%202.15L0.606%20-2.15ZM4.33%2010.7L8.054%2012.85L8.054%2017.15L4.33%2019.3L0.606%2017.15L0.606%2012.85ZM0%203.2L3.724%205.35L3.724%209.65L0%2011.8L-3.724%209.65L-3.724%205.35ZM8.66%203.2L12.384%205.35L12.384%209.65L8.66%2011.8L4.936%209.65L4.936%205.35Z'/%3E%3C/svg%3E");
-  -webkit-mask-size:8.66px 15px;mask-size:8.66px 15px}
+.veil{position:absolute;left:0;right:0;z-index:2;pointer-events:none;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .veil.top{top:0;height:calc(76px + var(--safe-t));   /* исходные 76: поднимали до 100 и 128 (v87, v94), в v98 владелец вернул */
   background:linear-gradient(to bottom,rgba(var(--veil-rgb),.85),rgba(var(--veil-rgb),.35) 65%,transparent);
   -webkit-mask-image:linear-gradient(to bottom,#000 55%,transparent);mask-image:linear-gradient(to bottom,#000 55%,transparent)}
@@ -229,7 +217,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 
 /* низ отсчитывается от клавиатуры: композер 68 + его отступ + зазор 16 */
 .scroll{position:absolute;left:16px;right:16px;top:calc(72px + var(--safe-t));
-  bottom:calc(68px + 16px + var(--foot) + var(--pend, 0px) + var(--safe-b));
+  bottom:calc(var(--comph, 44px) + 16px + var(--foot) + var(--pend, 0px) + var(--safe-b));
   /* scroll, а не auto: при auto короткий список стоит намертво — жест не ловится и
      отдачи нет. overscroll-behavior здесь не ставить: по спецификации contain оставляет
      резинку, но на iOS он гасил её вместе с перебросом — список не пружинил даже с
@@ -263,7 +251,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 #scr-list .scroll{top:0;bottom:0;gap:0;flex-direction:column-reverse;padding-top:0;
   padding-bottom:var(--listpad, calc(76px + 21px + 44px + 47px + var(--pend, 0px) + var(--safe-b)))}
 /* строка ввода открыта: дока нет, между ней и ближайшей задачей — зазор как между задачами, 4 (v107) */
-#scr-list .scroll.tight{padding-bottom:var(--listpad, calc(68px + 4px + var(--foot) + var(--pend, 0px) + var(--safe-b)))}
+#scr-list .scroll.tight{padding-bottom:var(--listpad, calc(var(--comph, 44px) + 4px + var(--foot) + var(--pend, 0px) + var(--safe-b)))}
 /* Порядок «сверху вниз»: список растёт от логотипа, контейнер обычный, колпак уходит первым.
    Запас снизу и колпак сверху — те же, что в режиме от кнопки (v114: отступы «в одну строку»,
    хвост-распорка, прижим к строке ввода и пинок прокрутки откачены — с ними список работал криво). */
@@ -351,8 +339,8 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    Геометрия едет по --ease-ios (отскок на ширине вылезал бы за поля), подъём — по --bounce.
    Список переходов вынесен в --tr-composer: .easing добавляет к нему bottom, не теряя остальное. */
 .composer{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + var(--safe-b));z-index:5;
-  height:68px;padding:11px;border-radius:28px;display:flex;align-items:center;gap:6px;
-  background:var(--surf-inp);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:var(--glass);
+  height:44px;padding:4px;border-radius:22px;display:flex;align-items:flex-end;gap:4px;
+  background:var(--surf);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:var(--glass);
   --tr-composer:left .3s var(--e-move),right .3s var(--e-move),height .3s var(--e-move),
     border-radius .3s var(--e-move),padding .3s var(--e-move),background .22s var(--e-move),
     transform .32s var(--e-over),box-shadow .18s var(--e-move);
@@ -370,7 +358,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .composer.mini{left:calc(50% - 38px);right:calc(50% - 38px);height:76px;padding:0;border-radius:38px;
   background:var(--hot);-webkit-backdrop-filter:none;backdrop-filter:none;transform:translateY(-75px);   /* 26 + 44 + 21 − 16 */
   box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--g3a),var(--edge)}   /* исходная обводка: зазор + серое кольцо, кант без тени (v92, владелец вернул) */
-.composer.mini .inp{width:0;flex:0 0 0;padding:0;opacity:0;pointer-events:none}
+.composer.mini .inp{width:0;flex:0 0 0;height:0;min-height:0;padding:0;opacity:0;pointer-events:none}
 .composer.mini #clip,.composer.mini #add{width:0;height:0;flex:0 0 0;opacity:0;pointer-events:none;box-shadow:none;overflow:hidden}
 .composer .inp,.composer #clip{transition:width var(--t-base) var(--e-move),opacity var(--t-tap) var(--e-move),flex-basis var(--t-base) var(--e-move)}
 /* содержимое проявляется, когда капсула уже почти раскрылась — иначе поле и кнопки всплывали
@@ -378,14 +366,19 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .composer:not(.mini) #clip{transition-delay:0s,var(--lag),0s}                 /* скрепка, поле, отправка — друг за другом */
 .composer:not(.mini) .inp{transition-delay:0s,calc(var(--lag) * 2),0s}
 .composer:not(.mini) #add{transition-delay:0s,0s,0s,0s,calc(var(--lag) * 3)}
-.rnd{flex:none;width:44px;height:44px;padding:0;border-radius:22px;border:0;background:transparent;color:var(--muted);
+.rnd{flex:none;width:36px;height:36px;padding:0;border-radius:18px;border:0;background:transparent;color:var(--muted);
   display:grid;place-items:center;cursor:pointer;box-shadow:inset 0 0 0 1px var(--g3a);
   transition:background var(--t-fast) var(--e-move),color var(--t-fast) var(--e-move),width var(--t-base) var(--e-move),height var(--t-base) var(--e-move),opacity var(--t-fast) var(--e-move)}
 .rnd.solid{background:var(--g2a);box-shadow:none;color:var(--text)}
 .rnd.go{background:var(--blue);color:var(--on-blue);box-shadow:none}
 .rnd.rec{background:var(--danger);color:#fff;box-shadow:none}
-.inp{flex:1;min-width:0;height:44px;border:0;outline:0;background:transparent;color:var(--text);
-  font-family:var(--font);font-size:17px;padding:0 4px;border-radius:22px}   /* 17 — Safari не зумит от 16 и выше */
+/* Поле — textarea, а не input: длинное сообщение переносится и растит капсулу (grow в движке),
+   потолок — половина видимой области, дальше поле прокручивается внутри себя. Высота строки 20,
+   отступы 8 сверху и снизу: одна строка ровно 36, как круглые кнопки рядом. */
+.inp{flex:1;min-width:0;height:36px;min-height:36px;border:0;outline:0;background:transparent;color:var(--text);
+  font-family:var(--font);font-size:17px;line-height:20px;padding:8px 4px;border-radius:18px;
+  resize:none;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;display:block}   /* 17 — Safari не зумит от 16 и выше */
+.inp::-webkit-scrollbar{width:0}
 .inp::placeholder{color:var(--muted)}
 
 /* ── чат ──────────────────────────────────────────────────────── */
@@ -410,7 +403,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   border:0;background:transparent;color:var(--text);padding:0;width:100%;text-align:center;
   text-overflow:ellipsis;-webkit-user-select:text;user-select:text}
 .title .h1:focus{outline:none}
-#scr-detail .scroll{top:0;bottom:calc(68px + 16px + var(--foot) + var(--pend, 0px) + var(--safe-b));
+#scr-detail .scroll{top:0;bottom:calc(var(--comph, 44px) + 16px + var(--foot) + var(--pend, 0px) + var(--safe-b));
   padding-top:calc(16px + 44px + 16px + var(--safe-t))}
 .empty{margin:auto;padding:24px;text-align:center;font-size:15px;color:var(--muted)}
 
@@ -564,7 +557,7 @@ body.two #scr-detail,body.two #scr-list.away{transform:none}
 
 /* ── вложения, изменения, разметка ответа ─────────────────────── */
 /* чипы выбранных файлов стоят над строкой ввода и поднимаются вместе с ней */
-.pend{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + 68px + 8px + var(--safe-b));z-index:5;
+.pend{position:absolute;left:16px;right:16px;bottom:calc(var(--foot) + var(--comph, 44px) + 8px + var(--safe-b));z-index:5;
   display:flex;flex-wrap:wrap;gap:6px}
 .att{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;max-width:100%;height:32px;
   padding:0 6px 0 12px;border-radius:16px;font-size:13px;color:var(--muted);

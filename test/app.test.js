@@ -68,7 +68,10 @@ async function common(file){
    assert(/if\(scroll && !scroll\.querySelector\('\.tail'\)\) scroll\.insertAdjacentHTML/.test(read('app.js')),'движок достраивает распорку, если разметка старая');
    assert(/#scr-list \.scroll\{[^}]*padding-bottom:var\(--listpad, calc\(76px \+ 21px \+ 44px \+ 47px/.test(read('app.css'))&&/\.dock\{[^}]*gap:21px/.test(read('app.css')),'от кнопки: 16 до кольца кнопки, док 21; запас — из --listpad, формула запасная');
    assert(/const RING = 5, GAP_BTN = 16, GAP_INP = 4;/.test(read('app.js'))&&/if\(!box\.height \|\| !cap\.height\) return;/.test(read('app.js')),'запас снизу движок меряет по реальному верху кнопки; без раскладки не трогает — работает формула');
-   assert(/#scr-list \.scroll\.tight\{padding-bottom:var\(--listpad, calc\(68px \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи зазор как между задачами');
+   assert(/#scr-list \.scroll\.tight\{padding-bottom:var\(--listpad, calc\(var\(--comph, 44px\) \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи зазор как между задачами');
+   assert(/\.composer\{[^}]*height:44px;padding:4px;border-radius:22px[^}]*background:var\(--surf\)/.test(read('app.css'))&&/\.rnd\{[^}]*width:36px;height:36px/.test(read('app.css')),'строка ввода — обычная капсула интерфейса высотой с круглую кнопку');
+   { const inp=$('nt'); assert(inp.tagName==='TEXTAREA'&&/\.inp\{[^}]*resize:none;overflow-y:auto/.test(read('app.css')),'поле — textarea: длинный текст переносится');
+     assert(/const room = Math\.round\(\(\(phone && phone\.clientHeight\) \|\| innerHeight \|\| 0\) \/ 2\) - PAD;/.test(read('app.js')),'растёт не бесконечно — потолок в половину видимой области'); }
    $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно'); }
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('sort').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
@@ -141,7 +144,7 @@ async function common(file){
   assert(kf&&!cj.classList.contains('pull'),'пружина вернулась — прыжок');
   scrollTo(200); assert(!cj.classList.contains('pull')&&!kf.k[0].transform.includes('NaN'),'обычная прокрутка внутри диапазона кнопку не трогает');
  }
- assert(/\.veil\.top\{top:0;height:calc\(76px \+ var\(--safe-t\)\)/.test(read('app.css'))&&/\.veil\.top\{[^}]*rgba\(var\(--veil-rgb\),\.85\),rgba\(var\(--veil-rgb\),\.35\) 65%/.test(read('app.css'))&&/--veil-rgb:16,16,16/.test(read('app.css'))&&/\.veil::after\{[^}]*mask-image:url\("data:image\/svg\+xml,[^"]*hex|\.veil::after\{[^}]*mask-image:url/.test(read('app.css'))&&/\.veil\{[^}]*backdrop-filter:blur\(10px\)/.test(read('app.css')),'верхняя полоса затемнения исходная: 76 px, .85 → .35 — владелец вернул после проб');
+ assert(/\.veil\.top\{top:0;height:calc\(76px \+ var\(--safe-t\)\)/.test(read('app.css'))&&/\.veil\.top\{[^}]*rgba\(var\(--veil-rgb\),\.85\),rgba\(var\(--veil-rgb\),\.35\) 65%/.test(read('app.css'))&&/--veil-rgb:16,16,16/.test(read('app.css'))&&!/\.veil::after/.test(read('app.css'))&&/\.veil\{[^}]*backdrop-filter:blur\(6px\)/.test(read('app.css')),'верхняя полоса затемнения исходная: 76 px, .85 → .35 — владелец вернул после проб');
  assert(/\.dock\{pointer-events:none\}/.test(read('app.css'))&&/\.dock > \*\{pointer-events:auto\}/.test(read('app.css'))&&/\.dock\.hide > \*\{pointer-events:none\}/.test(read('app.css')),'пустое место дока касания не ловит — свайп над кнопкой прокручивает список');
  assert(/\.pull\{transition:none\}/.test(read('app.css'))&&!/calc\([^)]*var\(--pull/.test(read('app.css')),'сжатие идёт за пальцем без перехода; calc() с --pull в CSS нет — Safari его не рисует');
  tch('touchstart',300); tch('touchmove',380); tch('touchcancel');

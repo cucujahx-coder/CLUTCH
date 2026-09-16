@@ -768,7 +768,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v119';
+const APP_V='tasks-v120';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1365,6 +1365,24 @@ function armRubber(el){
    а над строкой ввода могут стоять чипы вложений. Без разложенной раскладки (первый кадр,
    jsdom) не трогаем ничего — работает запасная формула в CSS. */
 const RING = 5, GAP_BTN = 16, GAP_INP = 4;
+/* Поле ввода растёт вместе с текстом: переносы поднимают капсулу, но не выше половины видимой
+   области — дальше текст прокручивается внутри поля. Высоту капсулы ставим inline (её переход
+   есть в --tr-composer), а в --comph кладём её для дна ленты, чипов и запаса списка. */
+const INP_H = 36, PAD = 8;
+function grow(inp){
+ if(!inp) return;
+ const cmp = inp.closest('.composer'); if(!cmp) return;
+ const phone = document.querySelector('.phone');
+ const room = Math.round(((phone && phone.clientHeight) || innerHeight || 0) / 2) - PAD;
+ inp.style.height = 'auto';
+ const h = Math.max(INP_H, Math.min(inp.scrollHeight || INP_H, Math.max(INP_H, room)));
+ inp.style.height = h + 'px';
+ const box = h + PAD;
+ if(!cmp.classList.contains('mini')) cmp.style.height = box + 'px';
+ const scr = cmp.closest('.screen');
+ if(scr) scr.style.setProperty('--comph', box + 'px');
+ fitList();
+}
 function fitList(){
  if(!scroll || !composer) return;
  const box = scroll.getBoundingClientRect(), cap = composer.getBoundingClientRect();
@@ -1960,6 +1978,9 @@ function openComposer(voice){
  fitList(); drawAdd(); toBottom();   /* .tight меняет запас снизу — пересчитываем и доводим список */
  /* Отклик — до фокуса: последним действием жеста должен остаться именно focus(),
     иначе iOS не считает поле активным и клавиатуру не открывает. */
+ /* Ширина поля в этот момент ещё едет из круга, и перенос строк считается по ней неверно —
+    поэтому меряем ещё раз, когда морф закончился */
+ grow(nt); setTimeout(()=>grow(nt), 320);
  if(voice){ composer.style.transform = ''; dictate(nt, addBtn, drawAdd); return; }
  tap(8);
  try{ nt.focus({preventScroll:true}); }catch(e){ nt.focus(); }
@@ -1969,6 +1990,8 @@ function closeComposer(){
  if(mini()) return;
  sweep(composer);                     /* та же вспышка, что при раскрытии: капсула гаснет и сворачивается разом */
  nt.value=''; nt.blur(); composer.classList.add('mini');
+ nt.style.height = ''; composer.style.height = '';   /* mini задаёт свою высоту правилом */
+ const scrL = $('scr-list'); if(scrL) scrL.style.removeProperty('--comph');
  ntPick = []; paintNtPick();          /* отменили задачу — отменили и её вложения */
  $('dock').classList.remove('hide'); scroll.classList.remove('tight');
  $('veil-b').style.height = '';
@@ -2023,7 +2046,7 @@ function voiceEnd(){
   openComposer();
  };
 })();
-nt.oninput = drawAdd;
+nt.oninput = () => { drawAdd(); grow(nt); };
 /* Строку закрывает уход фокуса — но только если фокус вообще был получен: внутри
    превью-iframe и на части устройств focus() не проходит, и строка схлопывалась сразу,
    не успев показаться. Тогда она просто остаётся открытой, и в неё можно ткнуть пальцем. */
@@ -2068,7 +2091,7 @@ function armFocus(el){
 armFocus(msg); armFocus(nt); armFocus(ct);
 /* чат: отправка не уводит фокус из поля, иначе iOS прячет клавиатуру */
 sendBtn.addEventListener('pointerdown', e => e.preventDefault());
-msg.oninput = drawSend;
+msg.oninput = () => { drawSend(); grow(msg); };
 function sendMsg(){
  const v = msg.value.trim();
  if(!v){ dictate(msg, sendBtn, drawSend); return; }
@@ -2161,7 +2184,7 @@ armRubber(scroll); armRubber(thread);
 paint();
 /* Шрифт приезжает после первой отрисовки и меняет высоту строк — доводим список ещё раз.
    pageshow — возврат к вкладке из кэша назад-вперёд, там раскладка тоже может быть старой */
-const refit = () => { fitList(); toBottom(); };
+const refit = () => { grow(nt); grow(msg); fitList(); toBottom(); };
 addEventListener('load', refit);
 addEventListener('pageshow', refit);
 addEventListener('resize', refit);
@@ -2171,7 +2194,7 @@ try{ document.fonts && document.fonts.ready.then(refit); }catch(e){}
 /* Поверхность для тестов и консоли: S переприсваивается при загрузке, поэтому отдаётся геттером */
 window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, addTask, addStep, makeProject,
   delItem, fmtDue, flush, paint, openPri, closePri, showToast, hideToast,
-  chatPayload, chatMessages, md, runTool, undoAct, byShort, shortId, fileBody, fmtSize, attach, fitList,
+  chatPayload, chatMessages, md, runTool, undoAct, byShort, shortId, fileBody, fmtSize, attach, fitList, grow,
   settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles, needsReply,
   get pending(){return pending}, get undos(){return undos}, get undoNote(){return undoNote}};
 

@@ -55,8 +55,8 @@
     <div class="composer mini" id="composer">
       <button class="shutter press" id="shutter" aria-label="Новая задача"></button>
       <button class="rnd press" id="clip" aria-label="Вложение"></button>
-      <input class="inp" type="text" id="nt" placeholder="Новая задача" aria-label="Новая задача"
-             autocomplete="off" autocorrect="off" autocapitalize="sentences" enterkeyhint="done">
+      <textarea class="inp" id="nt" rows="1" placeholder="Новая задача" aria-label="Новая задача"
+             autocomplete="off" autocorrect="off" autocapitalize="sentences" enterkeyhint="done"></textarea>
       <button class="rnd solid press" id="add" aria-label="Добавить задачу"></button>
     </div>
     <div class="pend" id="pend" hidden aria-live="polite"></div>
@@ -72,8 +72,8 @@
     <div class="pend" id="pend2" hidden aria-live="polite"></div>
     <div class="composer" id="composer2">
       <button class="rnd press" id="clip2" aria-label="Вложение"></button>
-      <input class="inp" type="text" id="msg" placeholder="Спросить" aria-label="Сообщение"
-             autocomplete="off" enterkeyhint="send">
+      <textarea class="inp" id="msg" rows="1" placeholder="Спросить" aria-label="Сообщение"
+             autocomplete="off" enterkeyhint="send"></textarea>
       <button class="rnd solid press" id="send" aria-label="Отправить"></button>
     </div>
   </section>
