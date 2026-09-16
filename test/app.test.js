@@ -62,14 +62,11 @@ async function common(file){
  { const before=rows().map(txt).join('|'); $('sort').click();
    assert(w.app.S.up===1&&$('scr-list').classList.contains('top'),'переключили — список под логотипом, сверху вниз');
    assert(rows().map(txt).join('|')===before,'под логотипом порядок тот же: приоритет растёт сверху вниз, срочное внизу');
-   assert(/#scr-list\.top \.scroll\{flex-direction:column;padding-bottom:0\}/.test(read('app.css'))&&/#scr-list\.top \.tail\{display:block;flex:none;height:calc\(76px \+ 53px \+ 44px \+ 47px/.test(read('app.css'))&&/\.tail\{display:none\}/.test(read('app.css'))&&d.querySelector('#scroll > .cap + .tail'),'под логотипом запас снизу — настоящий блок .tail, не padding: Safari его не считает прокручиваемым; от кнопки хвост скрыт');
-   assert(/#scr-list\.top \.cap\{order:-1;height:calc\(16px \+ 44px \+ var\(--rowh\) \+ var\(--safe-t\)\)\}/.test(read('app.css')),'под логотипом: колпак первым и в одну строку (44) от шапки, снизу обычные 16');
-   assert(/#scr-list \.scroll\{[^}]*padding-bottom:calc\(76px \+ 53px \+ 44px \+ 31px \+ var\(--rowh\)/.test(read('app.css')),'от кнопки: одна строка (--rowh) до кольца кнопки');
-   assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ 4px/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight #list\{margin-top:auto\}/.test(read('app.css'))&&/#scr-list\.top \.scroll\.tight \.tail\{height:calc\(68px \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи одна строка, и под логотипом список прижат к строке ввода');
-   $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно');
-   assert(/kickScroll\(\);/.test(read('app.js'))&&/scroll\.style\.overflowY = 'hidden'; void scroll\.offsetHeight/.test(read('app.js')),'после смены направления область прокрутки получает пинок — iOS иначе держит старые границы');
-   /* движок достраивает хвост, если его нет в разметке (старый HTML + новый движок) */
-   assert(/if\(scroll && !scroll\.querySelector\('\.tail'\)\) scroll\.insertAdjacentHTML/.test(read('app.js')),'движок сам достраивает .tail, если разметка старая'); }
+   assert(/#scr-list\.top \.scroll\{flex-direction:column\}/.test(read('app.css'))&&/#scr-list\.top \.cap\{order:-1\}/.test(read('app.css')),'под логотипом: контейнер обычный, колпак уходит первым; запас снизу и колпак — те же, что от кнопки');
+   assert(!/\.tail\{|\.top \.tail|class="tail"|margin-top:auto|kickScroll/.test(read('app.css')+read('app.js')+read('index.html')),'отступы «в одну строку», хвост, прижим к строке ввода и пинок прокрутки откачены (v114)');
+   assert(/#scr-list \.scroll\{[^}]*padding-bottom:calc\(76px \+ 21px \+ 44px \+ 47px/.test(read('app.css'))&&/\.dock\{[^}]*gap:21px/.test(read('app.css')),'от кнопки: 16 до кольца кнопки, док 21');
+   assert(/#scr-list \.scroll\.tight\{padding-bottom:calc\(68px \+ 4px/.test(read('app.css')),'строка ввода открыта: до ближайшей задачи зазор как между задачами');
+   $('sort').click(); assert(w.app.S.up===0&&!$('scr-list').classList.contains('top'),'и обратно'); }
  assert(!!d.querySelector('.brand img')&&!!$('find')&&$('sort').classList.contains('topbtn'),'сверху таблетка с логотипом и кнопка выполненных');
  /* три капсулы в доке выбирают, что показывать; переключателя сортировки нет вовсе */
  const segs=[...d.querySelectorAll('.dockrow .seg')];
@@ -89,14 +86,14 @@ async function common(file){
  /* кнопка и строка ввода — одна капсула: кнопка внутри неё, свёрнутый вид — красный круг на месте кнопки в доке */
  assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');
  const cssMini=read('app.css').replace(/\/\*[\s\S]*?\*\//g,'');
- assert(/\.composer\.mini\{left:calc\(50% - 38px\);right:calc\(50% - 38px\);height:76px;[^}]*background:var\(--hot\)[^}]*transform:translateY\(-107px\)/.test(cssMini),'свёрнутая капсула — круг 76 цвета кнопки, поднятый на место кнопки трансформой');
+ assert(/\.composer\.mini\{left:calc\(50% - 38px\);right:calc\(50% - 38px\);height:76px;[^}]*background:var\(--hot\)[^}]*transform:translateY\(-75px\)/.test(cssMini),'свёрнутая капсула — круг 76 цвета кнопки, поднятый на место кнопки трансформой');
  assert(/\.composer\{[^}]*--tr-composer:left[^}]*transition:var\(--tr-composer\)/.test(cssMini)&&/\.phone\.easing \.composer\{transition:bottom var\(--t-kb\) var\(--e-kb\),var\(--tr-composer\)\}/.test(cssMini),'геометрия капсулы едет одним списком переходов, .easing его дополняет, а не заменяет');
  /* resizes-content на iOS сдвигает экран на высоту клавиатуры всегда, и шапка дёргается; overlays — только когда поле под клавиатурой */
  assert(/interactive-widget=overlays-content/.test(read(file)),'viewport с overlays-content, а не resizes-content');
  /* Список перевёрнут: первый в разметке — у низа, колпак под шапку — над ним. Ноль прокрутки = низ,
     поэтому положение у кнопки не зависит от программной прокрутки, которую iOS при старте глотала */
  const kids=[...$('scroll').children].map(e=>e.id||e.className);
- assert(kids.join(',')==='list,cap,tail','в разметке список первым, колпак вторым, хвост (для режима под логотипом) третьим');
+ assert(kids.join(',')==='list,cap','в разметке список первым, колпак вторым');
  assert(/#scr-list \.scroll\{[^}]*flex-direction:column-reverse;padding-top:0;/.test(read('app.css').replace(/\/\*[\s\S]*?\*\//g,'')),'список рисуется снизу вверх, без padding-top');
  /* Первая задача упирается ровно в 16 px под таблеткой логотипа: 16 сверху + 44 таблетка + 16 зазор */
  assert(/\.cap\{flex:none;height:calc\(16px \+ 44px \+ 16px \+ var\(--safe-t\)\)\}/.test(read('app.css')),'над первой задачей ровно 16 px: колпак = 16 + таблетка 44 + 16');
@@ -109,7 +106,7 @@ async function common(file){
  assert(/translateY\(-?\d/.test(sc.style.transform)&&sc.classList.contains('dragging'),'палец ведёт — список едет за ним без перехода');
  /* Большая кнопка привязана к резинке: тянешь — сжимается на долю тяги, отпустил — прыгает */
  const cmp=$('composer'), sy=()=>+((cmp.style.transform.match(/scale\([\d.]+,([\d.]+)\)/)||[])[1]);
- assert(cmp.classList.contains('pull')&&/^translateY\(-107px\) scale\(1\.0\d+,0\.9\d+\)$/.test(cmp.style.transform),'пока тянешь, кнопка сжата на долю тяги, трансформа inline');
+ assert(cmp.classList.contains('pull')&&/^translateY\(-75px\) scale\(1\.0\d+,0\.9\d+\)$/.test(cmp.style.transform),'пока тянешь, кнопка сжата на долю тяги, трансформа inline');
  const p1=sy(); tch('touchmove',420);
  assert(sy()<p1,'тянешь сильнее — сжимается сильнее');
  tch('touchend');
@@ -125,7 +122,7 @@ async function common(file){
   assert(!fj.classList.contains('pull')&&!fj.style.transform&&!bj.style.transform&&!dj.querySelector('#scr-list .dockrow').classList.contains('pull'),'пружинит только кнопка: таблетки, кнопки шапки и капсула видов стоят');
   tj('touchend');
   assert(kfF===null,'и не прыгают — владелец оставил прыжок одной кнопке');
-  assert(kf&&/^translateY\(-107px\) translateY\(-3\d\.\dpx\) scale\(0\.940,1\.100\)$/.test(kf.k[1].transform)&&kf.k[1].offset<=.3&&kf.o.duration<=300&&kf.k[0].easing==='cubic-bezier(.2,.8,.2,1)'&&kf.o.easing==='cubic-bezier(.34,1.56,.64,1)','отпустили — резкий прыжок: взлёт по --e-out за треть времени, высота по тяге, посадка с перелётом');
+  assert(kf&&/^translateY\(-75px\) translateY\(-3\d\.\dpx\) scale\(0\.940,1\.100\)$/.test(kf.k[1].transform)&&kf.k[1].offset<=.3&&kf.o.duration<=300&&kf.k[0].easing==='cubic-bezier(.2,.8,.2,1)'&&kf.o.easing==='cubic-bezier(.34,1.56,.64,1)','отпустили — резкий прыжок: взлёт по --e-out за треть времени, высота по тяге, посадка с перелётом');
   assert(!cj.classList.contains('pull')&&cj.style.transform==='','после прыжка inline-трансформы нет — кнопка снова управляется классами');
   /* Длинный список: пружина нативная, iOS отдаёт scrollTop за краем — кнопка сжимается и прыгает так же */
   Object.defineProperty(scj,'scrollHeight',{value:1000,configurable:true}); Object.defineProperty(scj,'clientHeight',{value:400,configurable:true});
@@ -209,7 +206,7 @@ async function common(file){
  $('shutter').click();
  assert(!$('composer').classList.contains('mini')&&d.getElementById('scroll').classList.contains('tight'),'паук разворачивает строку ввода');
  assert($('composer').style.transform==='','после разворота инлайновый сдвиг снят — переход идёт к раскрытой капсуле');
- assert(/composer\.style\.transform = 'translateY\(' \+ \(-MINI_Y \+ \(voice \? 0 : \(kbH \|\| 0\)\)\)/.test(read('app.js'))&&/const MINI_Y = 107;/.test(read('app.js'))&&/\.dock\{[^}]*gap:53px/.test(read('app.css')),'точка старта морфа — место кнопки с поправкой на высоту клавиатуры (без неё в голосовом раскрытии)');
+ assert(/composer\.style\.transform = 'translateY\(' \+ \(-MINI_Y \+ \(voice \? 0 : \(kbH \|\| 0\)\)\)/.test(read('app.js'))&&/const MINI_Y = 75;/.test(read('app.js')),'точка старта морфа — место кнопки с поправкой на высоту клавиатуры (без неё в голосовом раскрытии)');
  $('add').click();
  assert(w.app.S.ts.every(x=>x.t!==''),'пустой ввод ничего не добавляет');
  assert(/Микрофон/.test($('nt').placeholder),'без Web Speech кнопка-микрофон подсказывает микрофон на клавиатуре');
@@ -935,13 +932,10 @@ async function haptics(file){
  assert(css('--foot')==='8px'&&css('--safe-b')==='0px','окно равно области, область ниже базы — клавиатура и без фокуса');
  kbw.visualViewport.height=kbw.innerHeight=700; Object.defineProperty(kbw,'innerHeight',{value:700,configurable:true}); vvL.resize();
  assert(css('--foot')==='16px','область ниже базы меньше чем на 150 — полоса браузера, не клавиатура');
- /* компенсация прокрутки: под логотипом список держит верх и не трогается, мелкие сдвиги области — тоже нет */
- { const sc=kbw.document.getElementById('scroll'); kbw.app.S.up=1; kbw.app.paint(); sc.scrollTop=100;
-   kbw.visualViewport.height=400; vvL.resize(); assert(sc.scrollTop===100,'под логотипом высота области меняется — прокрутка списка стоит');
-   kbw.app.S.up=0; kbw.app.paint(); kbw.visualViewport.height=700; vvL.resize();
-   const th=kbw.document.getElementById('thread'); th.scrollTop=100; kbw.visualViewport.height=680; vvL.resize();
-   assert(th.scrollTop===100,'сдвиг области на 20 px — не клавиатура, лента не трогается');
-   kbw.visualViewport.height=400; vvL.resize(); assert(th.scrollTop===380,'сдвиг на клавиатуру — лента держит низ'); }
+ /* компенсация прокрутки — исходная (v114): обычные контейнеры держат низ при любом сдвиге высоты, перевёрнутый список — сам */
+ { const th=kbw.document.getElementById('thread'); th.scrollTop=100; kbw.visualViewport.height=400; vvL.resize();
+   assert(th.scrollTop===400,'область ужалась на 300 — лента держит низ');
+   kbw.visualViewport.height=700; vvL.resize(); }
  Object.defineProperty(kbw,'innerHeight',{value:768,configurable:true});
  /* Высота клавиатуры запомнена; при следующем фокусе контейнер ужимается сразу, до resize —
     чтобы iOS не панорамировала экран. Без resize догадка живёт 700 мс и снимается */

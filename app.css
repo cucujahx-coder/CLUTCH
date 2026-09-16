@@ -135,7 +135,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .veil.top{top:0;height:calc(76px + var(--safe-t));   /* исходные 76: поднимали до 100 и 128 (v87, v94), в v98 владелец вернул */
   background:linear-gradient(to bottom,rgba(var(--veil-rgb),.85),rgba(var(--veil-rgb),.35) 65%,transparent);
   -webkit-mask-image:linear-gradient(to bottom,#000 55%,transparent);mask-image:linear-gradient(to bottom,#000 55%,transparent)}
-.veil.bottom{bottom:0;height:calc(76px + 48px + 44px + 50px + var(--safe-b));
+.veil.bottom{bottom:0;height:calc(76px + 16px + 44px + 50px + var(--safe-b));
   background:linear-gradient(to top,rgba(var(--veil-rgb),.9),rgba(var(--veil-rgb),.45) 60%,transparent);
   -webkit-mask-image:linear-gradient(to top,#000 60%,transparent);mask-image:linear-gradient(to top,#000 60%,transparent);
   transition:height var(--t-kb) var(--e-move)}
@@ -145,7 +145,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    (см. .composer.mini), а место под неё в доке держит та же геометрия: 26 снизу, ряд 44,
    зазор 21 — круг 76 стоит над рядом, и капсула в свёрнутом виде встаёт ровно туда. */
 .dock{position:absolute;left:16px;right:16px;bottom:calc(26px + var(--safe-b));z-index:3;
-  display:flex;flex-direction:column;align-items:center;gap:53px;   /* одна строка (48) до кольца кнопки + 5 на само кольцо (v101; было 16 + 5) */
+  display:flex;flex-direction:column;align-items:center;gap:21px;   /* 16 до кольца кнопки + 5 на само кольцо (v114: зазор в строку, 53, откачен вместе с остальными отступами) */
   transition:opacity var(--t-fast) var(--e-move),transform var(--t-slow) var(--e-over)}
 .dock.hide{opacity:0;transform:translateY(12px) scale(.96);pointer-events:none}
 /* Док — прозрачная коробка 173 px над списком (кнопка + зазор + ряд), и пустое место в ней
@@ -179,7 +179,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .shutter .eye-b{fill:#FFE3C2;opacity:0}
 /* Одна плашка на три вида, активный выделен вложенной капсулой (`.segbar`), а не своим фоном:
    три отдельные капсулы читались как три кнопки, а это один переключатель. Высота ряда
-   остаётся 44 — на ней стоит свёрнутая капсула строки ввода (translateY(-107px)). */
+   остаётся 44 — на ней стоит свёрнутая капсула строки ввода (translateY(-75px)). */
 /* Капсула видов — по центру дока, три иконки по 64: стеклянная, как кнопка выполненных и
    таблетка логотипа (референс владельца — iOS-таблетка с тремя значками). Раньше это был
    плоский ряд во всю ширину с текстом FLOW / PROCESS / FOCUS. */
@@ -255,28 +255,14 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    перевёрнутого контейнера конечный отступ браузеры считают по-разному, а настоящий блок
    попадает в прокрутку всегда. gap:0 — свой зазор между строками у #list есть. */
 #scr-list .scroll{top:0;bottom:0;gap:0;flex-direction:column-reverse;padding-top:0;
-  padding-bottom:calc(76px + 53px + 44px + 31px + var(--rowh) + var(--pend, 0px) + var(--safe-b))}   /* под доком: 53 между капсулами и кнопкой, одна строка до кольца кнопки: 26 + 5 + --rowh */
-/* строка ввода открыта: дока нет, между ней и ближайшей задачей — зазор как между задачами, 4 (v107; в v99 была одна строка, до неё 16).
-   В режиме под логотипом список на это время прижимается к строке ввода: margin-top:auto у #list
-   в обычной колонке сажает короткий список вниз, длинному не мешает (авто-отступ схлопывается в ноль) */
-#scr-list .scroll.tight{padding-bottom:calc(68px + 4px + var(--foot) + var(--pend, 0px) + var(--safe-b))}   /* v107: зазор как между задачами, 4 */
-#scr-list.top .scroll.tight #list{margin-top:auto}
+  padding-bottom:calc(76px + 21px + 44px + 47px + var(--pend, 0px) + var(--safe-b))}   /* под доком, 16 px до кольца кнопки: 26 + 5 + 16 */
+/* строка ввода открыта: дока нет, между ней и ближайшей задачей — зазор как между задачами, 4 (v107) */
+#scr-list .scroll.tight{padding-bottom:calc(68px + 4px + var(--foot) + var(--pend, 0px) + var(--safe-b))}
 /* Порядок «сверху вниз»: список растёт от логотипа, контейнер обычный, колпак уходит первым.
-   Отступ от якоря — одна строка (44), с другой стороны — обычные 16 (v96): у кнопки 44 в режиме
-   от кнопки, под шапкой 44 в режиме под логотипом */
-#scr-list.top .scroll{flex-direction:column;padding-bottom:0}
-#scr-list.top .cap{order:-1;height:calc(16px + 44px + var(--rowh) + var(--safe-t))}
-/* Запас под доком в режиме под логотипом — настоящий блок .tail в конце, а не padding-bottom:
-   Safari на iPhone не включает нижний отступ flex-контейнера в прокручиваемую область, список
-   считал, что ему некуда ехать, и хвост уходил под кнопку без возможности доскроллить
-   (v108, владелец: «отскакивает назад»). В режиме от кнопки хвост скрыт — там запас на
-   стартовой стороне перевёрнутого контейнера, его Safari считает. */
-.tail{display:none}
-#scr-list.top .tail{display:block;flex:none;height:calc(76px + 53px + 44px + 47px + var(--pend, 0px) + var(--safe-b))}
-/* при открытой строке ввода запас снизу тот же, что и в режиме от кнопки: правило .top выше по
-   порядку перебивало бы .tight (одинаковая специфичность) — поэтому повтор здесь */
-#scr-list.top .scroll.tight{padding-bottom:0}
-#scr-list.top .scroll.tight .tail{height:calc(68px + 4px + var(--foot) + var(--pend, 0px) + var(--safe-b))}
+   Запас снизу и колпак сверху — те же, что в режиме от кнопки (v114: отступы «в одну строку»,
+   хвост-распорка, прижим к строке ввода и пинок прокрутки откачены — с ними список работал криво). */
+#scr-list.top .scroll{flex-direction:column}
+#scr-list.top .cap{order:-1}
 
 /* ── строка списка: кружок слева, текст справа ─ */
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */
@@ -367,7 +353,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
    трансформой, а не bottom: bottom под клавиатуру не анимируется намеренно. Стекла нет:
    backdrop-filter между none и blur не переходит, он появляется вместе с раскрытием. */
 .composer.mini{left:calc(50% - 38px);right:calc(50% - 38px);height:76px;padding:0;border-radius:38px;
-  background:var(--hot);-webkit-backdrop-filter:none;backdrop-filter:none;transform:translateY(-107px);   /* 26 + 44 + 53 − 16 */
+  background:var(--hot);-webkit-backdrop-filter:none;backdrop-filter:none;transform:translateY(-75px);   /* 26 + 44 + 21 − 16 */
   box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--g3a),var(--edge)}   /* исходная обводка: зазор + серое кольцо, кант без тени (v92, владелец вернул) */
 .composer.mini .inp{width:0;flex:0 0 0;padding:0;opacity:0;pointer-events:none}
 .composer.mini #clip,.composer.mini #add{width:0;height:0;flex:0 0 0;opacity:0;pointer-events:none;box-shadow:none;overflow:hidden}
@@ -514,7 +500,7 @@ body.nav #scr-detail.on .scroll{transition-delay:var(--lag)}
 .shutter .sw{transition:transform var(--t-base) var(--e-over),opacity var(--t-fast) var(--e-out)}
 .shutter:active .sw{transform:scale(1.14,.8);transition:transform var(--t-tap) var(--e-out)}
 .composer.mini{transform-origin:50% 100%}
-.composer.mini:has(.shutter:active){transform:translateY(-107px) scale(1.06,.9);transition:transform var(--t-tap) var(--e-out)}
+.composer.mini:has(.shutter:active){transform:translateY(-75px) scale(1.06,.9);transition:transform var(--t-tap) var(--e-out)}
 /* Резинка списка: пока тянешь, кнопка и паук сжаты на долю тяги — трансформу ставит JS
    inline, здесь только выключен переход, чтобы шло за пальцем; прыжок на отпускании —
    animate() в JS. calc() в scale() и var() в @keyframes Safari не отрисовал. */

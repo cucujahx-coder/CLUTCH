@@ -768,7 +768,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v113';
+const APP_V='tasks-v114';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1276,7 +1276,7 @@ function paint(keep){
    внутри scale() и var() в @keyframes Safari на телефоне не отрисовал — кнопка стояла. */
 const PULL_FULL = 90, JUMP_MS = 280, OVER_FULL = 60;
 const ROW_H = 48;   /* = --rowh в CSS */
-const MINI_Y = 107; /* сдвиг свёрнутой капсулы на место кнопки: 26 + 44 + (ROW_H + 5) − 16, как translateY в .composer.mini */
+const MINI_Y = 75;  /* сдвиг свёрнутой капсулы на место кнопки: 26 + 44 + 21 − 16, как translateY в .composer.mini */
 function armRubber(el){
  let y0 = null, live = false, snapT = 0, pulled = 0, touching = false, cool = false;
  const short = () => el.scrollHeight - el.clientHeight <= 1;
@@ -1709,13 +1709,8 @@ function trackVH(){
       вверх на высоту клавиатуры. Чтение offsetHeight заставляет браузер применить новую
       высоту: без него scrollTop обрежется по старым размерам. */
    const d = lastH - h;
-   /* У перевёрнутого (column-reverse) списка низ — это ноль прокрутки, он держится сам.
-      Список под логотипом (S.up) держит верх, а не низ — его не трогаем вовсе: сдвиг
-      scrollTop на каждое изменение высоты дрался с прокруткой пальцем (v107, «скролл
-      неисправен»). Мелкие изменения (полоса браузера, дрожание области) — не клавиатура,
-      их тоже пропускаем: компенсируем только сдвиги размером с клавиатуру. */
-   if(Math.abs(d) > 40) document.querySelectorAll('.scroll').forEach(b=>{
-    if(b === scroll && S.up) return;
+   /* У перевёрнутого (column-reverse) списка низ — это ноль прокрутки, он держится сам */
+   document.querySelectorAll('.scroll').forEach(b=>{
     if(getComputedStyle(b).flexDirection === 'column-reverse') return;
     void b.offsetHeight; b.scrollTop += d;
    });
@@ -1875,18 +1870,7 @@ function drawSort(){
  swapIcon(s, S.up ? 'down' : 'up', Ic(S.up ? P.down : P.up, 18));
  s.setAttribute('aria-label', S.up ? 'Список сверху вниз, под логотипом' : 'Список снизу вверх, от кнопки');
 }
-$('sort').onclick = () => { tap(8); S.up = S.up?0:1; save(); paint(); if(S.up) scroll.scrollTop = 0; kickScroll(); };
-/* Хвост под доком для режима под логотипом должен быть в разметке; если приехал новый движок
-   со старым HTML (установленное приложение обновляется по частям), достраиваем его сами —
-   иначе список в этом режиме не прокручивается до конца. */
-if(scroll && !scroll.querySelector('.tail')) scroll.insertAdjacentHTML('beforeend', '<div class="tail" aria-hidden="true"></div>');
-/* iOS прокручивает области асинхронно и после смены направления контейнера (column ↔
-   column-reverse) может держать старые границы прокрутки — список «отскакивает» к покою,
-   хотя ему есть куда ехать. Пинок: на кадр выключить прокрутку и включить снова. */
-function kickScroll(){
- if(!scroll) return;
- scroll.style.overflowY = 'hidden'; void scroll.offsetHeight; scroll.style.overflowY = '';
-}
+$('sort').onclick = () => { tap(8); S.up = S.up?0:1; save(); paint(); if(S.up) scroll.scrollTop = 0; };
 $('undo').onclick = () => { if(undoBuf){ mark(undoBuf.x,0); save(); paint(1); tap(8); } hideToast(); };
 
 /* большая кнопка с пауком разворачивается в строку ввода */
@@ -1967,14 +1951,8 @@ function closeComposer(){
  sweep(composer);                     /* та же вспышка, что при раскрытии: капсула гаснет и сворачивается разом */
  nt.value=''; nt.blur(); composer.classList.add('mini');
  ntPick = []; paintNtPick();          /* отменили задачу — отменили и её вложения */
- /* Снятие .tight меняет запас снизу (и под логотипом снимает прижим к строке ввода) одним
-    кадром — список прыгал, пока клавиатура ещё ехала. FLIP: меряем, где список был, где стал,
-    и провожаем его из старого места в новое за время клавиатуры по её кривой (v101). */
- const y0 = list.getBoundingClientRect().top;
  $('dock').classList.remove('hide'); scroll.classList.remove('tight');
  $('veil-b').style.height = '';
- const d = y0 - list.getBoundingClientRect().top;
- if(!RM && list.animate && Math.abs(d) > 1) list.animate([{transform:'translateY(' + d.toFixed(1) + 'px)'},{transform:'none'}],{duration:250, easing:EASE.kb});
  drawAdd(); toBottom();
 }
 /* Открываем по click, не по touchend: iOS отдаёт клавиатуру только из «настоящего» жеста,
