@@ -626,7 +626,8 @@ body.two #scr-detail,body.two #scr-list.away{transform:none}
 .si .as{flex:none;font-size:13px;color:var(--muted)}
 /* лист срока: ряд быстрых вариантов и родные поля даты и времени — у iOS в них своё колесо */
 .quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
-.quick .mi{flex:1 1 auto;min-width:calc(50% - 3px);height:44px;border-radius:22px;font-size:15px}
+.quick .mi{flex:1 1 calc(50% - 3px);width:auto;min-width:0;margin:0;height:44px;border-radius:22px;
+  justify-content:center;text-align:center;padding:0 12px;font-size:15px}
 .quick .mi.on{background:var(--inv);color:var(--on-inv)}
 .si .fld{flex:none;border:0;border-radius:14px;background:var(--g2a);color:var(--text);
   font-family:var(--font);font-size:16px;padding:6px 10px;min-height:32px}
