@@ -99,6 +99,8 @@ ok(out.includes('"stop":"tool_use"'),'в done видно, что ход зако
 ok(Array.isArray(sent.body.tools)&&sent.body.tools.length>=12,'описания инструментов уходят модели');
 ok(sent.body.tools.every(t=>t.name&&(t.input_schema||t.type)),'у каждого инструмента имя и схема — либо серверный тип');
 ok(sent.body.tools.find(t=>t.name==='task_set_due').input_schema.properties.time,'у срока есть необязательное время');
+ok(sent.body.tools.some(t=>t.name==='task_set_repeat'),'есть инструмент повтора');
+ok(taskBlock({id:'t1',title:'x',isProject:false,due:'2026-09-20',rep:'week'}).includes('повтор: week'),'повтор виден в снимке');
 
 /* ход с вызовом и ответ с результатом — блочные сообщения, пробрасываются как есть */
 upstream(текст('Готово.'));

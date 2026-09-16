@@ -286,6 +286,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .row .t1 .pj{color:var(--muted)}   /* имя проекта перед стрелкой тише самого шага */
 /* время — справа от названия, перед кружком; «на день» его просто не имеет */
 .at{flex:none;font-size:13px;line-height:1;color:var(--muted);font-variant-numeric:tabular-nums;padding-left:8px}
+.rep{flex:none;display:grid;place-items:center;color:var(--muted);padding-left:8px}   /* задача возвращается */
 .row .cell{padding-left:18px}   /* место под точку: 6 + 12 */
 /* точка слева, как в списке недавних у Claude (референс владельца, v93): 6 px, едва заметная
    (v95), по вертикальному центру строки, а не у заголовка (v102 — строка стала двухстрочной);

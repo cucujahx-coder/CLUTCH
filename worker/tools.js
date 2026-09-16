@@ -17,6 +17,11 @@ export const TOOLS=[
    time:{type:['string','null'],description:'ЧЧ:ММ по местному времени, если время названо; null — снять время, оставив дату'}
   },required:['date'],additionalProperties:false}},
 
+ {name:'task_set_repeat',description:'Сделать задачу повторяющейся или снять повтор. Ставь, когда сказали «каждый день», «по будням», «каждую неделю», «раз в месяц». Галочка у такой задачи переносит её на следующий раз.',
+  input_schema:{type:'object',properties:{
+   rule:{type:['string','null'],enum:['day','workday','week','month',null],description:'day, workday, week, month или null, чтобы снять повтор'}
+  },required:['rule'],additionalProperties:false}},
+
  {name:'task_complete',description:'Закрыть текущую задачу или вернуть её в работу.',
   input_schema:{type:'object',properties:{done:{type:'boolean',description:'true — закрыть, false — вернуть'}},required:['done'],additionalProperties:false}},
 

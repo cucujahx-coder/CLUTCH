@@ -54,6 +54,19 @@ async function common(file){
    t.at='25:00'; w.app.paint(); assert(!r0().querySelector('.at'),'кривое время не показывается');
    t.at=''; w.app.paint(); }
  assert(w.app.fmtAt('7:5')===''&&w.app.fmtAt('07:05')==='07:05','время только ЧЧ:ММ');
+ /* повтор: галочка не закрывает, а переносит на следующий раз */
+ { const t=w.app.S.ts.find(x=>x.pj===null&&!x.done), was={due:t.due,rep:t.rep};
+   t.rep='week'; t.due=w.app.todayISO(); w.app.paint();
+   const r=()=>rows().find(y=>+y.dataset.id===t.id);
+   assert(r().querySelector('.rep'),'у повторяющейся задачи значок возврата');
+   const nx=w.app.nextRep(t);
+   assert(nx>w.app.todayISO(),'следующий раз — в будущем');
+   r().querySelector('.ck').click();
+   await wait(260);
+   assert(!t.done&&t.due===nx,'галочка перенесла задачу, а не закрыла');
+   $('undo').click();
+   assert(t.due===w.app.todayISO(),'«Вернуть» возвращает прежний срок');
+   t.rep=was.rep; t.due=was.due; w.app.paint(); w.app.hideToast(); }
  /* срок руками: часы в капсуле долгого нажатия открывают лист с быстрыми вариантами и полями */
  { const t=w.app.S.ts.find(x=>x.pj===null&&!x.done), r=()=>rows().find(y=>+y.dataset.id===t.id);
    const was={due:t.due,at:t.at};

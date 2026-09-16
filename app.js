@@ -74,6 +74,7 @@ const P = {
   up:'M12 19V5M5 12l7-7 7 7',
   down:'M12 5v14M5 12l7 7 7-7',
   clock:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7v5l3 2',
+  rep:'M4 9a8 8 0 0 1 13-3l3 3M20 15a8 8 0 0 1-13 3l-3-3M20 4v5h-5M4 20v-5h5',
   mic:'M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3M5 10v1a7 7 0 0 0 14 0v-1M12 19v3',
   back:'M15 5l-7 7 7 7',
   plus:'M12 5v14M5 12h14',
@@ -271,6 +272,28 @@ const overdue=s=>!!s&&days(s)<0;
    а пояс пришлось бы тащить через всю модель и промт. */
 const TIME=/^([01]\d|2[0-3]):([0-5]\d)$/;
 const fmtAt=s=>TIME.test(String(s||''))?String(s):'';
+/* Повтор задачи (v131, этап 3 календаря): ключ в поле rep. Галочка у такой задачи не
+   закрывает её, а переносит на следующий раз — закрывать нечего, дело возвращается.
+   Хранится ключом, а не правилом вроде RRULE: четырёх случаев хватает, а разбирать
+   и показывать RRULE пришлось бы отдельным кодом. */
+const REP = {day:'каждый день', workday:'по будням', week:'каждую неделю', month:'раз в месяц'};
+const repOf = x => REP[x && x.rep] ? x.rep : '';
+/* Следующий раз считается от срока, но не раньше завтрашнего дня: просроченная
+   повторяющаяся задача не должна уехать в такое же прошлое. */
+function nextRep(x){
+ const k = repOf(x); if(!k) return null;
+ const base = new Date(((x.due && days(x.due) >= 0) ? x.due : today()) + 'T00:00');
+ const step = d => {
+  if(k === 'week') d.setDate(d.getDate() + 7);
+  else if(k === 'month') d.setMonth(d.getMonth() + 1);
+  else d.setDate(d.getDate() + 1);
+  if(k === 'workday') while(d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d;
+ };
+ let d = step(base);
+ while(days(iso(d)) < 0) d = step(d);   /* если срок был давно, шагаем до будущего */
+ return iso(d);
+}
 /* Момент задачи числом — для сортировки внутри дня: «на день» идёт раньше времени */
 const atMin=x=>{ const m=TIME.exec(String((x&&x.at)||'')); return m?+m[1]*60+ +m[2]:-1; };
 
@@ -618,6 +641,14 @@ const ACT={
    ()=>{ o.due=d; if(t!==undefined) o.at=t; if(!d) o.at=null; },
    ()=>{ o.due=was; o.at=wasAt; });
  },
+ task_set_repeat(a,c){
+  const k=a.rule==null?null:String(a.rule);
+  if(k!==null&&!REP[k])return {out:'повтор: day, workday, week, month или null',err:1};
+  const o=c.item, was=o.rep||'', wasD=o.due||null;
+  return act(k?'Повтор → '+REP[k]:'Повтор снят',
+   ()=>{ o.rep = k||undefined; if(k&&!o.due) o.due = today(); },
+   ()=>{ o.rep = was||undefined; o.due = wasD; });
+ },
  task_complete(a,c){
   if(c.isP)return {out:'у проекта нет своей отметки, закрывай шаги',err:1};
   const o=c.item, was={done:o.done,doneAt:o.doneAt};
@@ -782,7 +813,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v130';
+const APP_V='tasks-v131';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -858,7 +889,7 @@ async function chatPayload(item,isP){
   id:shortId(item,isP),
   title:isP?item.n:item.t,
   kind:(KIND[kindOf(item,isP)]||'Задача').toLowerCase(),
-  due:item.due||null, dueWord:fmtDue(item.due)||'', at:fmtAt(item.at)||null,
+  due:item.due||null, dueWord:fmtDue(item.due)||'', at:fmtAt(item.at)||null, rep:repOf(item)||null,
   done:isP?false:!!item.done, isProject:!!isP,
   steps:isP?inPj(item.id).map(x=>({id:'s'+x.id,t:x.t,done:!!x.done})):[],
   /* Содержимое в промт не уходит: только имена и размеры. Исключение — маленькие
@@ -1245,11 +1276,13 @@ function rowEl(x, isP, next, left, ring, atTime){
  const head = isP
    ? '<span class="pj">'+esc(x.n)+' → </span>'+esc((next && next.t) || '')
    : esc(x.t);
- /* Время — справа от названия, перед кружком: оно короткое и не спорит с заголовком */
+ /* Время — справа от названия, перед кружком: оно короткое и не спорит с заголовком.
+    Перед временем — значок повтора, если задача возвращается. */
  const at = fmtAt(isP ? (atTime || '') : x.at);
+ const rep = !isP && repOf(x) ? '<span class="rep" aria-label="'+esc(REP[x.rep])+'">'+Ic(P.rep,14)+'</span>' : '';
  r.innerHTML = '<div class="cell"><span class="sr-only">'+KIND[r.dataset.kind]+': </span>'+
    '<div class="t1">'+head+'</div></div>' +
-   (at ? '<span class="at">'+esc(at)+'</span>' : '') +
+   rep + (at ? '<span class="at">'+esc(at)+'</span>' : '') +
    ckHTML(isP ? {pri:x.pri, done:0, n:x.n} : x, isP ? left : undefined, ring);
  r.querySelector('.ck').onclick = e => { e.stopPropagation(); isP ? ringTap(x, r) : toggle(x, r); };
  const go = () => { if(suppressRow){ suppressRow = false; return; }
@@ -1470,7 +1503,16 @@ function toBottom(){
 /* ---------- выполнение ---------- */
 function toggle(x, row){
  if(x.done){ mark(x,0); save(); paint(1); tap(10); return; }
- tap(25); pop();
+ tap(25);
+ /* Повторяющаяся задача не закрывается: анимация та же, но вместо отметки — следующий срок */
+ const rep = repOf(x);
+ if(rep){
+  const was = {due:x.due||null}, next = nextRep(x);
+  pop(); burst(row, true);
+  undoBuf = {undo:()=>{ x.due = was.due; }};
+  setTimeout(()=>{ x.due = next; save(); paint(1); showToast('Перенесено · ' + fmtDue(next)); }, RM?0:140);
+  return;
+ } pop();
  row.querySelector('.ck').classList.add('on');
  burst(row);
  undoBuf = {x};
@@ -1603,11 +1645,26 @@ function openDue(x){
   '<div class="sh">Точно</div>'+
   '<div class="si"><span>Дата</span><input class="fld" type="date" id="due-d" value="'+esc(x.due||'')+'"></div>'+
   '<div class="si"><span>Время</span><input class="fld" type="time" id="due-t" value="'+esc(fmtAt(x.at))+'"></div>'+
+  '<div class="sh">Повтор</div>'+
+  '<div class="quick">'+
+   ['', 'day', 'workday', 'week', 'month'].map(k =>
+    '<button class="mi press'+(repOf(x)===k?' on':'')+'" type="button" data-rep="'+k+'">'+esc(k?REP[k]:'Не повторять')+'</button>').join('')+
+  '</div>'+
   '<div class="quick">'+
    '<button class="mi press" type="button" data-clear="t">Убрать время</button>'+
    '<button class="mi press" type="button" data-clear="d">Снять срок</button>'+
   '</div>';
  body.querySelectorAll('[data-set]').forEach(b => b.onclick = () => set(b.dataset.set));
+ body.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => {
+  const k = b.dataset.rep, wasR = x.rep || '';
+  x.rep = k || undefined;
+  /* повтору нужен якорь: без срока ставим сегодня, иначе первый перенос считать не от чего */
+  const wasD = x.due || null;
+  if(k && !x.due) x.due = today();
+  save(); paint(1); hideDue(); tap(8);
+  undoBuf = {undo:()=>{ x.rep = wasR || undefined; x.due = wasD; }};
+  showToast(k ? 'Повтор · ' + REP[k] : 'Повтор снят');
+ });
  body.querySelector('[data-clear="d"]').onclick = () => set(null);
  body.querySelector('[data-clear="t"]').onclick = () => set(x.due, null);
  body.querySelector('#due-d').onchange = e => { const v = e.target.value; if(v) set(v); };
@@ -2310,7 +2367,7 @@ try{ document.fonts && document.fonts.ready.then(refit); }catch(e){}
 window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, addTask, addStep, makeProject,
   delItem, fmtDue, flush, paint, openPri, closePri, showToast, hideToast,
   chatPayload, chatMessages, md, runTool, undoAct, byShort, shortId, fileBody, fmtSize, attach, fitList, grow,
-  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles, needsReply, fmtAt, openDue,
+  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles, needsReply, fmtAt, openDue, nextRep, REP,
   todayISO: today,
   get pending(){return pending}, get undos(){return undos}, get undoNote(){return undoNote}};
 
