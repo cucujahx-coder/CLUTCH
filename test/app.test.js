@@ -54,6 +54,8 @@ async function common(file){
    t.at='25:00'; w.app.paint(); assert(!r0().querySelector('.at'),'кривое время не показывается');
    t.at=''; w.app.paint(); }
  assert(w.app.fmtAt('7:5')===''&&w.app.fmtAt('07:05')==='07:05','время только ЧЧ:ММ');
+ /* месяц не перепрыгивает: 31-е плюс месяц — конец следующего, а не 3-е через один */
+ assert(w.app.nextRep({rep:'month',due:'2027-01-31'})==='2027-02-28','раз в месяц с 31-го не улетает в март');
  /* повтор: галочка не закрывает, а переносит на следующий раз */
  { const t=w.app.S.ts.find(x=>x.pj===null&&!x.done), was={due:t.due,rep:t.rep};
    t.rep='week'; t.due=w.app.todayISO(); w.app.paint();
@@ -67,25 +69,33 @@ async function common(file){
    $('undo').click();
    assert(t.due===w.app.todayISO(),'«Вернуть» возвращает прежний срок');
    t.rep=was.rep; t.due=was.due; w.app.paint(); w.app.hideToast(); }
- /* срок руками: часы в капсуле долгого нажатия открывают лист с быстрыми вариантами и полями */
+ /* срок руками: часы в капсуле долгого нажатия открывают лист; он живёт, пока его не закрыли */
  { const t=w.app.S.ts.find(x=>x.pj===null&&!x.done), r=()=>rows().find(y=>+y.dataset.id===t.id);
    const was={due:t.due,at:t.at};
    r().dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true}));
    const clock=d.querySelector('.pri [data-due]');
    assert(!!clock,'в капсуле есть кнопка срока');
    clock.click();
-   const body=d.querySelector('.sheet.due .sheet-body');
-   assert(body&&body.querySelectorAll('[data-set]').length===4&&body.querySelector('#due-d')&&body.querySelector('#due-t'),'лист: четыре быстрых варианта, поле даты и поле времени');
-   body.querySelector('[data-set]').click();
-   assert(t.due===w.app.todayISO()&&$('toast').classList.contains('on'),'быстрый вариант ставит срок и показывает плашку');
+   const sheet=()=>d.querySelector('.sheet.due'), body=()=>sheet().querySelector('.sheet-body');
+   assert(body()&&body().querySelectorAll('[data-set]').length===4&&body().querySelector('#due-d')&&body().querySelector('#due-t'),'лист: четыре быстрых варианта, поле даты и поле времени');
+   body().querySelector('[data-set]').click();
+   assert(t.due===w.app.todayISO(),'быстрый вариант ставит срок');
+   assert(!sheet().hidden&&!$('toast').classList.contains('on'),'лист не захлопывается и плашку раньше времени не показывает');
+   const tf=body().querySelector('#due-t'); tf.value='08:15'; tf.dispatchEvent(new w.Event('change'));
+   assert(t.at==='08:15'&&!sheet().hidden,'время применилось, окно на месте — родные поля шлют change на каждый щелчок колеса');
+   body().querySelector('[data-ok]').click();
+   assert($('toast').classList.contains('on'),'закрыли — одна плашка на все правки');
    $('undo').click();
-   assert(t.due===was.due&&(t.at||null)===(was.at||null),'«Вернуть» откатывает срок, а не снимает отметку');
-   r().dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true})); d.querySelector('.pri [data-due]').click();
-   const tf=d.querySelector('#due-t'); tf.value='08:15'; tf.dispatchEvent(new w.Event('change'));
-   assert(t.at==='08:15'&&t.due,'время без даты ставит сегодня');
+   assert(t.due===was.due&&(t.at||null)===(was.at||null),'«Вернуть» откатывает всё разом, а не снимает отметку');
+   /* у проекта повтора нет: галочка закрывает ближайший шаг, переносить нечего */
+   const pr=rows().find(y=>y.dataset.pj);
+   pr.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true})); d.querySelector('.pri [data-due]').click();
+   assert(!body().querySelector('[data-rep]'),'в листе проекта раздела повтора нет');
+   body().querySelector('[data-ok]').click();
    r().dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true})); d.querySelector('.pri [data-due]').click();
    d.querySelector('[data-clear="d"]').click();
    assert(t.due===null&&t.at===null,'снятие срока снимает и время');
+   body().querySelector('[data-ok]').click();
    t.due=was.due; t.at=was.at; w.app.paint(); w.app.hideToast();
    /* долгое нажатие ставит suppressRow, чтобы тот же жест не открыл строку; в жизни его
       снимает следующий pointerdown по строке — в тесте делаем это руками */
@@ -269,6 +279,7 @@ async function common(file){
  $('shutter').click();
  assert(!$('composer').classList.contains('mini')&&d.getElementById('scroll').classList.contains('tight'),'паук разворачивает строку ввода');
  assert($('composer').style.transform==='','после разворота инлайновый сдвиг снят — переход идёт к раскрытой капсуле');
+ assert(/msg\.value=''; drawSend\(\); grow\(msg\)/.test(read('app.js')),'после отправки поле возвращается в одну строку');
  assert(/composer\.style\.transform = 'translateY\(' \+ \(-MINI_Y \+ \(voice \? 0 : \(kbH \|\| 0\)\)\)/.test(read('app.js'))&&/const MINI_Y = 75;/.test(read('app.js')),'точка старта морфа — место кнопки с поправкой на высоту клавиатуры (без неё в голосовом раскрытии)');
  $('add').click();
  assert(w.app.S.ts.every(x=>x.t!==''),'пустой ввод ничего не добавляет');

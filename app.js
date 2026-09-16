@@ -285,7 +285,14 @@ function nextRep(x){
  const base = new Date(((x.due && days(x.due) >= 0) ? x.due : today()) + 'T00:00');
  const step = d => {
   if(k === 'week') d.setDate(d.getDate() + 7);
-  else if(k === 'month') d.setMonth(d.getMonth() + 1);
+  else if(k === 'month'){
+   /* 31-е плюс месяц — это конец следующего месяца, а не 3-е через один: ставим день на
+      первое, шагаем месяц и возвращаем день, обрезав по длине месяца */
+   const day = d.getDate();
+   d.setDate(1); d.setMonth(d.getMonth() + 1);
+   const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+   d.setDate(Math.min(day, last));
+  }
   else d.setDate(d.getDate() + 1);
   if(k === 'workday') while(d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
   return d;
@@ -643,6 +650,7 @@ const ACT={
    ()=>{ o.due=was; o.at=wasAt; });
  },
  task_set_repeat(a,c){
+  if(c.isP)return {out:'у проекта повтора нет, повторяется задача',err:1};
   const k=a.rule==null?null:String(a.rule);
   if(k!==null&&!REP[k])return {out:'повтор: day, workday, week, month или null',err:1};
   const o=c.item, was=o.rep||'', wasD=o.due||null;
@@ -814,7 +822,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v132';
+const APP_V='tasks-v135';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1689,7 +1697,7 @@ function openPri(x, row){
   x.pri = Number(b.dataset.v); save(); tap(8); closePri(); paint(1);
  });
  el.querySelector('[data-edit]').onclick = () => { tap(8); closePri(); editRow(row, x); };
- el.querySelector('[data-due]').onclick = () => { tap(8); closePri(); openDue(x); };
+ el.querySelector('[data-due]').onclick = () => { tap(8); closePri(); openDue(x, !!row.dataset.pj); };
 }
 
 /* ---------- срок руками ----------
@@ -1697,16 +1705,21 @@ function openPri(x, row){
    «в выходные», «через неделю») и родными полями даты и времени: у iOS в них свои колёса,
    свой календарь и свой язык — рисовать их заново значит спорить с системой. Изменение
    показывается плашкой с «Вернуть», как выполнение (v129, этап 2 календаря). */
-let dueEl = null;
+let dueEl = null, dueDone = null;
 /* ближайшая суббота; если сегодня воскресенье — сегодня же (выходные ещё идут) */
 const weekendDay = () => { const w = new Date().getDay(); return plus(w===0?0:(6-w)); };
-function openDue(x){
- const was = {due:x.due||null, at:x.at||null};
- const set = (due, at) => {
-  x.due = due; x.at = due ? (at===undefined ? (x.at||null) : at) : null;
-  save(); paint(1); hideDue(); tap(8);
-  undoBuf = {undo:()=>{ x.due = was.due; x.at = was.at; }};
-  showToast(due ? 'Срок → ' + fmtDue(due) + (fmtAt(x.at) ? ', ' + fmtAt(x.at) : '') : 'Срок снят');
+function openDue(x, isP){
+ /* Лист живёт, пока его не закрыли: каждая правка применяется сразу, но окно не захлопывается.
+    Раньше любое изменение звало hideDue — родные поля даты и времени шлют change на каждый
+    щелчок колеса, и окно «вылетало» посреди ввода (владелец поймал это первым делом). Плашка
+    с «Вернуть» показывается один раз, на закрытии, и откатывает всё разом. */
+ const was = {due:x.due||null, at:x.at||null, rep:x.rep||''};
+ const changed = () => (x.due||null) !== was.due || (x.at||null) !== was.at || (x.rep||'') !== was.rep;
+ dueDone = () => {
+  if(!changed()) return;
+  undoBuf = {undo:()=>{ x.due = was.due; x.at = was.at; x.rep = was.rep || undefined; }};
+  const lbl = x.due ? 'Срок → ' + fmtDue(x.due) + (fmtAt(x.at) ? ', ' + fmtAt(x.at) : '') : 'Срок снят';
+  showToast(repOf(x) && (x.rep||'') !== was.rep ? lbl + ' · ' + REP[x.rep] : lbl);
  };
  if(!dueEl){
   dueEl = document.createElement('div');
@@ -1717,44 +1730,53 @@ function openDue(x){
   document.body.appendChild(dueEl);
  }
  const body = dueEl.querySelector('.sheet-body');
- const quick = [['Сегодня', plus(0)], ['Завтра', plus(1)], ['В выходные', weekendDay()], ['Через неделю', plus(7)]];
- body.innerHTML =
-  '<div class="sheet-title">Срок</div>'+
-  '<div class="quick">'+quick.map(([n,d])=>'<button class="mi press'+(x.due===d?' on':'')+'" type="button" data-set="'+d+'">'+esc(n)+'</button>').join('')+'</div>'+
-  '<div class="sh">Точно</div>'+
-  '<div class="si"><span>Дата</span><input class="fld" type="date" id="due-d" value="'+esc(x.due||'')+'"></div>'+
-  '<div class="si"><span>Время</span><input class="fld" type="time" id="due-t" value="'+esc(fmtAt(x.at))+'"></div>'+
-  '<div class="sh">Повтор</div>'+
-  '<div class="quick">'+
-   ['', 'day', 'workday', 'week', 'month'].map(k =>
-    '<button class="mi press'+(repOf(x)===k?' on':'')+'" type="button" data-rep="'+k+'">'+esc(k?REP[k]:'Не повторять')+'</button>').join('')+
-  '</div>'+
-  '<div class="quick">'+
-   '<button class="mi press" type="button" data-clear="t">Убрать время</button>'+
-   '<button class="mi press" type="button" data-clear="d">Снять срок</button>'+
-  '</div>';
- body.querySelectorAll('[data-set]').forEach(b => b.onclick = () => set(b.dataset.set));
- body.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => {
-  const k = b.dataset.rep, wasR = x.rep || '';
-  x.rep = k || undefined;
-  /* повтору нужен якорь: без срока ставим сегодня, иначе первый перенос считать не от чего */
-  const wasD = x.due || null;
-  if(k && !x.due) x.due = today();
-  save(); paint(1); hideDue(); tap(8);
-  undoBuf = {undo:()=>{ x.rep = wasR || undefined; x.due = wasD; }};
-  showToast(k ? 'Повтор · ' + REP[k] : 'Повтор снят');
- });
- body.querySelector('[data-clear="d"]').onclick = () => set(null);
- body.querySelector('[data-clear="t"]').onclick = () => set(x.due, null);
- body.querySelector('#due-d').onchange = e => { const v = e.target.value; if(v) set(v); };
- body.querySelector('#due-t').onchange = e => {
-  const v = fmtAt(e.target.value);
-  set(x.due || plus(0), v || null);   /* время без даты не имеет смысла — ставим сегодня */
+ /* Применили — сохранили, перерисовали список и сам лист: подсветка вариантов и значения
+    полей должны совпадать с тем, что теперь в задаче. */
+ const apply = fn => { fn(); save(); paint(1); draw(); tap(8); };
+ const draw = () => {
+  const quick = [['Сегодня', plus(0)], ['Завтра', plus(1)], ['В выходные', weekendDay()], ['Через неделю', plus(7)]];
+  body.innerHTML =
+   '<div class="sheet-title">Срок</div>'+
+   '<div class="quick">'+quick.map(([n,d])=>'<button class="mi press'+(x.due===d?' on':'')+'" type="button" data-set="'+d+'">'+esc(n)+'</button>').join('')+'</div>'+
+   '<div class="sh">Точно</div>'+
+   '<div class="si"><span>Дата</span><input class="fld" type="date" id="due-d" value="'+esc(x.due||'')+'"></div>'+
+   '<div class="si"><span>Время</span><input class="fld" type="time" id="due-t" value="'+esc(fmtAt(x.at))+'"></div>'+
+   /* Повтор — только у задачи: у проекта галочка закрывает ближайший шаг, переносить нечего */
+   (isP ? '' :
+    '<div class="sh">Повтор</div>'+
+    '<div class="quick">'+['', 'day', 'workday', 'week', 'month'].map(k =>
+      '<button class="mi press'+(repOf(x)===k?' on':'')+'" type="button" data-rep="'+k+'">'+esc(k?REP[k]:'Не повторять')+'</button>').join('')+'</div>')+
+   '<div class="quick">'+
+    '<button class="mi press" type="button" data-clear="t">Убрать время</button>'+
+    '<button class="mi press" type="button" data-clear="d">Снять срок</button>'+
+   '</div>'+
+   '<button class="mi press done" type="button" data-ok="1">Готово</button>';
+  body.querySelectorAll('[data-set]').forEach(b => b.onclick = () => apply(()=>{ x.due = b.dataset.set; }));
+  body.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => apply(()=>{
+   const k = b.dataset.rep;
+   x.rep = k || undefined;
+   if(k && !x.due) x.due = today();   /* повтору нужен якорь, иначе перенос не от чего считать */
+  }));
+  body.querySelector('[data-clear="d"]').onclick = () => apply(()=>{ x.due = null; x.at = null; });
+  body.querySelector('[data-clear="t"]').onclick = () => apply(()=>{ x.at = null; });
+  body.querySelector('[data-ok]').onclick = hideDue;
+  /* Родные поля: применяем на каждый change, но лист не трогаем — иначе он закроется
+     посреди прокрутки колеса. Перерисовку тоже не делаем: она сбросила бы фокус в поле. */
+  /* подсветку быстрых вариантов поправляем классом, а не перерисовкой: она сбросила бы фокус */
+  const marks = () => body.querySelectorAll('[data-set]').forEach(b => b.classList.toggle('on', x.due === b.dataset.set));
+  body.querySelector('#due-d').onchange = e => { const v = e.target.value;
+   if(v){ x.due = v; save(); paint(1); marks(); } };
+  body.querySelector('#due-t').onchange = e => { const v = fmtAt(e.target.value);
+   x.at = v || null;
+   if(v && !x.due){ x.due = today(); body.querySelector('#due-d').value = x.due; }   /* время без даты не бывает */
+   save(); paint(1); marks(); };
  };
+ draw();
  dueEl.hidden = false; tap(8);
 }
 function hideDue(){
  if(!dueEl || dueEl.hidden) return;
+ if(dueDone){ const f = dueDone; dueDone = null; f(); }
  if(RM){ dueEl.hidden = true; return; }
  dueEl.classList.add('out');
  setTimeout(()=>{ dueEl.hidden = true; dueEl.classList.remove('out'); }, 200);
@@ -2200,7 +2222,7 @@ function dictate(input, btn, redraw){
  const base = input.value.trim();
  r.onresult = e => {
   let t = ''; for(const res of e.results) t += res[0].transcript;
-  input.value = (base ? base + ' ' : '') + t.trim(); redraw();
+  input.value = (base ? base + ' ' : '') + t.trim(); redraw(); grow(input);
  };
  r.onend = () => { rec = null; recBtn = null; redraw(); };
  r.onerror = () => { if(rec === r) r.onend(); };
@@ -2346,7 +2368,7 @@ msg.oninput = () => { drawSend(); grow(msg); };
 function sendMsg(){
  const v = msg.value.trim();
  if(!v){ dictate(msg, sendBtn, drawSend); return; }
- msg.value=''; drawSend(); tap(14); ask(v);
+ msg.value=''; drawSend(); grow(msg); tap(14); ask(v);   /* выросшее поле возвращаем в строку */
  if(document.activeElement !== msg){ try{ msg.focus({preventScroll:true}); }catch(e){} }
 }
 sendBtn.onclick = sendMsg;
