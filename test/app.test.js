@@ -89,6 +89,7 @@ async function common(file){
  assert(/--glass:[^;]*0 6px 18px rgba\(0,0,0,\.45\)/.test(read('app.css')),'у всего с кантом есть и тень — она в самом токене');
  assert(/\.composer\.mini\{[^}]*box-shadow:0 0 0 3px var\(--bg\),0 0 0 5px var\(--g3a\),var\(--edge\)\}/.test(cssSeg),'у большой кнопки исходная обводка — зазор и серое кольцо — и кант без тени');
  assert($('shutter').querySelectorAll('.sw rect').length===4&&/viewBox="0 0 3 3"/.test($('shutter').innerHTML),'в кнопке логотип — крест из четырёх квадратов, а не паук');
+ assert(/--aim:#00FF00/.test(read('app.css'))&&/\.shutter \.sw\{[^}]*color:var\(--aim\)/.test(read('app.css')),'прицел — чистый зелёный, цвет токеном');
  assert(!!$('shutter')&&!!$('find')&&$('composer').classList.contains('mini'),'снизу кнопка-паук и переключатель, строка ввода свёрнута');
  /* кнопка и строка ввода — одна капсула: кнопка внутри неё, свёрнутый вид — красный круг на месте кнопки в доке */
  assert($('shutter').parentElement===$('composer')&&!$('dock').contains($('shutter')),'кнопка-паук живёт внутри капсулы строки ввода, не в доке');

@@ -35,6 +35,7 @@
   --surf-pri:rgba(26,26,26,.86);  /* капсула приоритета — плотнее прочих */
   --veil-rgb:16,16,16;            /* полосы затемнения: тот же тон, что фон */
   --hot:#E50006;   /* прогресс, срочное, запись, искры, большая кнопка */
+  --aim:#00FF00;   /* прицел в большой кнопке — чистый зелёный, как в образце владельца */
   --blue:#0000FF;  /* активное состояние: фокус строки ввода, включённые кнопки, свои реплики */
   --on-blue:#fff;
   --danger:#E50006;
@@ -147,7 +148,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   display:grid;place-items:center;cursor:pointer;transition:opacity var(--t-tap) var(--e-move)}
 .composer:not(.mini) .shutter{opacity:0;pointer-events:none}
 /* паук на кнопке: в прыжке он вылетает за край, поэтому кнопка ничего не обрезает */
-.shutter .sw{display:block;width:50px;line-height:0;color:#14100E;transform-origin:50% 100%;pointer-events:none}
+.shutter .sw{display:block;width:50px;line-height:0;color:var(--aim);transform-origin:50% 100%;pointer-events:none}
 /* Режим голоса (удержание паука): круг остаётся кругом, белеет, паук перетекает в микрофон,
    вокруг ровное белое дыхание. Микрофон лежит в кнопке всегда и просто гаснет/проявляется —
    так переход один и обратимый. Текст в это время не показывается: строка раскроется, когда
@@ -433,7 +434,6 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   --line:rgba(255,255,255,.28);
 }
 #scr-list.focus .composer.mini{background:#101010}   /* красная кнопка на красном исчезает */
-#scr-list.focus .shutter .sw{color:var(--hot)}       /* логотип на ней — фирменным красным */
 #scr-list.focus .seg.on{color:#fff}
 #scr-list.focus .row::before{background:rgba(255,255,255,.3)}
 #scr-list.focus .rflash{background:#fff}
