@@ -768,7 +768,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v126';
+const APP_V='tasks-v127';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1225,13 +1225,14 @@ function rowEl(x, isP, next, left, ring){
  if(isP) r.dataset.pj = x.id; else r.dataset.id = x.id;
  r.dataset.kind = kindOf(x, isP);
  r.tabIndex = 0;
- /* Две строки (v100, v102): у задачи заголовок — название, подпись — срок; у проекта заголовок —
-    ближайший открытый шаг (что делать), подпись — название проекта (откуда). Пустая подпись
-    не рисуется, заголовок центрируется. */
- const title = isP ? ((next && next.t) || x.n) : x.t;
- const meta  = isP ? x.n : (fmtDue(x.due) || '');
+ /* Одна строка, подзаголовков нет (v127). У задачи это её название; у проекта — имя проекта,
+    стрелка и ближайший открытый шаг: «Переезд офиса → Замерить кабинеты». Имя проекта
+    приглушено, шаг — обычным текстом: делать надо шаг, проект лишь говорит откуда он. */
+ const head = isP
+   ? '<span class="pj">'+esc(x.n)+' → </span>'+esc((next && next.t) || '')
+   : esc(x.t);
  r.innerHTML = '<div class="cell"><span class="sr-only">'+KIND[r.dataset.kind]+': </span>'+
-   '<div class="t1">'+esc(title)+'</div>'+(meta?'<div class="t2">'+esc(meta)+'</div>':'')+'</div>' +
+   '<div class="t1">'+head+'</div></div>' +
    ckHTML(isP ? {pri:x.pri, done:0, n:x.n} : x, isP ? left : undefined, ring);
  r.querySelector('.ck').onclick = e => { e.stopPropagation(); isP ? ringTap(x, r) : toggle(x, r); };
  const go = () => { if(suppressRow){ suppressRow = false; return; }
