@@ -34,7 +34,7 @@ async function common(file){
    assert(rd.querySelector('.t2')&&rd.querySelector('.t2').textContent===w.app.fmtDue(dued.due),'у задачи со сроком подпись — срок');
    const nod=w.app.S.ts.find(x=>x.pj===null&&!x.due&&!x.done);
    assert(!rows().find(r=>+r.dataset.id===nod.id).querySelector('.t2'),'без срока подписи нет — заголовок один'); }
- assert(/--rowh:48px/.test(read('app.css'))&&/\.row\{[^}]*height:var\(--rowh\);padding:6px 6px 6px 16px[^}]*border-radius:24px/.test(read('app.css'))&&/\.pri\{[^}]*height:var\(--rowh\)/.test(read('app.css')),'строка 48 — минимум под две строки текста: 36 + 6×2, радиус 24, капсула приоритета той же высоты');
+ assert(/--rowh:48px/.test(read('app.css'))&&/\.row\{[^}]*height:var\(--rowh\);padding:6px 6px 6px 16px/.test(read('app.css'))&&/\.grp\{[^}]*border-radius:24px/.test(read('app.css'))&&/\.pri\{[^}]*height:var\(--rowh\)/.test(read('app.css')),'строка 48 — минимум под две строки текста: 36 + 6×2, радиус 24, капсула приоритета той же высоты');
  assert(/\.row \.ck\{width:36px;height:36px\}/.test(read('app.css'))&&/\.row \.t1\{font-size:15px;line-height:18px\}/.test(read('app.css'))&&/\.row \.t2\{font-size:12px;line-height:14px/.test(read('app.css'))&&/#list\{[^}]*gap:4px/.test(read('app.css')),'кружок 36, заголовок 15/18, подпись 12/14, зазор 4');
  assert(/\.row::before\{content:'';position:absolute;left:16px;top:50%;width:6px;height:6px;margin-top:-3px[^}]*background:rgba\(224,224,224,\.16\)/.test(read('app.css'))&&/\.row\.ask::before\{background:var\(--blue\)\}/.test(read('app.css'))&&/\.row \.t2\{[^}]*color:var\(--muted\)/.test(read('app.css')),'точка 6 px по вертикальному центру строки, едва заметная, синяя когда ждут ответа; подпись приглушённая');
  { const t0=w.app.S.ts.find(x=>x.pj===null&&!x.done);
@@ -191,9 +191,10 @@ async function common(file){
    const dated=r=>{ const x=r.dataset.pj?w.app.prById(+r.dataset.pj):w.app.byId(+r.dataset.id);
      return r.dataset.pj ? (x.due || w.app.openIn(x.id).some(s=>s.due)) : !!x.due; };
    assert(w.app.S.tab==='process'&&rows().length&&rows().every(dated),'PROCESS показывает только то, у чего есть срок — без срока спрятано');
+   assert(d.querySelectorAll('#list > .grp').length===d.querySelectorAll('#list > .lbl.day').length,'в расписании у каждого дня своя плашка');
    const heads=[...d.querySelectorAll('#list .lbl.day')];
    assert(heads.length&&heads.every(h=>h.textContent.trim()),'дни разделены заголовками');
-   assert(d.querySelector('#list > .lbl.day') === d.querySelector('#list').firstElementChild,'первый заголовок стоит перед первой строкой');
+   assert(d.querySelector('#list').firstElementChild.classList.contains('lbl'),'первый заголовок стоит перед первой плашкой');
    /* хронология от якоря: от кнопки ближайшее внизу, под логотипом — сверху */
    const first=()=>heads[0].textContent;
    assert(/Просрочено|Сегодня|Завтра|\d|[А-Я]/.test(first()),'заголовок дня подписан словами');
@@ -300,6 +301,8 @@ async function common(file){
  assert(/\.sheet\.out \.sheet-body\{animation:sheet-out var\(--t-fast\) var\(--e-in\) forwards\}/.test(css)&&/\.pri\.out\{animation:pri-out var\(--t-tap\) var\(--e-in\) forwards\}/.test(css)&&/\.sheet-back\{animation:fade/.test(css),'лист настроек и капсула приоритета появляются и уходят движением');
  assert(/body\.nav #scr-detail:not\(\.on\) \.scroll\{transform:translateX\(32px\)\}/.test(css)&&/body\.nav #scr-detail\.on \.scroll\{transition-delay:var\(--lag\)\}/.test(css),'лента догоняет экран чата на шаг позже, только в nav');
  assert(/function swapIcon/.test(js)&&(js.match(/swapIcon\(/g)||[]).length>=5,'смена иконок на кнопках идёт через swapIcon');
+ assert(/\.grp\{[^}]*border-radius:24px;overflow:hidden;\s*background:var\(--surf-row\)/.test(css)&&/\.row\{[^}]*background:transparent;border-radius:0/.test(css)&&/\.row \+ \.row::after\{[^}]*left:18px/.test(css),'задачи собраны в одну плашку: стекло у группы, строки прозрачные, между ними волосок от текста');
+ assert(d.querySelectorAll('#list > .grp').length===1&&d.querySelector('#list > .grp .row'),'вне расписания плашка одна на весь список');
  assert(/\.row\{[^}]*flex-direction:row;[^}]*padding:6px 6px 6px 16px/.test(css)&&/\.step\{[^}]*flex-direction:row;/.test(css),'кружки справа: обычный порядок у строк и шагов, отступ текста слева');
  assert(/@font-face\{font-family:"Play"/.test(css)&&/play-cyrillic-400-normal\.woff2/.test(css),'Play подключён файлами рядом с HTML');
  assert(/\.scroll\{[^}]*overflow-y:scroll/.test(css.replace(/\/\*[\s\S]*?\*\//g,'')),'прокрутка живая всегда: при auto короткий список стоит намертво');

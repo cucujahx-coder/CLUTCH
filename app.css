@@ -234,6 +234,11 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .scroll.rubber{transition:transform var(--t-slow) var(--e-move)}
 .scroll.dragging{transition:none}
 #list{display:flex;flex-direction:column;gap:4px;flex:none}
+/* Задачи собраны в одну большую плашку, а не стоят отдельными капсулами (v122): стекло и радиус
+   у группы, строки внутри прозрачные и разделены волоском от текста. В расписании групп столько
+   же, сколько дней: заголовок дня — между ними. */
+.grp{display:flex;flex-direction:column;flex:none;border-radius:24px;overflow:hidden;
+  background:var(--surf-row);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 
 /* Список рисуется снизу вверх: column-reverse, первый элемент разметки — у низа. Ноль прокрутки
    здесь и есть низ, поэтому положение покоя у кнопки не зависит ни от программной прокрутки, ни
@@ -271,8 +276,9 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* плашка задачи — та же стеклянная капсула, что таблетка лого */
 /* кружок справа, текст слева: обычный порядок, разметка не меняется (кружок в ней последний) */
 .row{position:relative;display:flex;flex-direction:row;align-items:center;gap:10px;height:var(--rowh);padding:6px 6px 6px 16px;flex:none;
-  background:var(--surf-row);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  border-radius:24px;cursor:pointer;transition:background var(--t-tap) var(--e-out);overflow:hidden}
+  background:transparent;border-radius:0;cursor:pointer;transition:background var(--t-tap) var(--e-out);overflow:hidden}
+/* волосок между задачами — от текста, а не во всю ширину, как в списках iOS */
+.row + .row::after{content:'';position:absolute;left:18px;right:0;top:0;height:1px;background:var(--line);opacity:.45}
 /* Строка списка — 48 (v100): минимум, куда влезают две строки текста — заголовок 15/18 и
    подпись 12/14 (у задачи срок, у проекта следующий шаг и срок); кружок 36, радиус 24 */
 .row .ck{width:36px;height:36px}

@@ -768,7 +768,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v121';
+const APP_V='tasks-v122';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1241,12 +1241,21 @@ function rowEl(x, isP, next, left, ring){
  armPri(r, x);
  return r;
 }
+/* Строки живут не в списке напрямую, а в общей плашке: одна на весь список, а в расписании
+   по одной на день. Заголовки дней стоят между плашками. */
+function group(){
+ const g = document.createElement('div');
+ g.className = 'grp';
+ list.appendChild(g);
+ return g;
+}
 function paint(keep){
  /* del — корзина: из списков пропадает, но byId находит, иначе не сработала бы отмена */
  const dn = S.ts.filter(x=>x.done && !x.del);
  list.innerHTML = '';
  if(S.showDone){
-  dn.forEach((x,i)=>list.appendChild(rowEl(x,0,undefined,undefined,dn.length>1?i/(dn.length-1):1)));
+  const g = group();
+  dn.forEach((x,i)=>g.appendChild(rowEl(x,0,undefined,undefined,dn.length>1?i/(dn.length-1):1)));
   if(!dn.length) list.innerHTML = '<div class="empty">Пока ничего не сделано.</div>';
  } else {
   const items = [];
@@ -1270,16 +1279,18 @@ function paint(keep){
      от кнопки сегодня внизу, у пальца; под логотипом сегодня сверху, как в календаре. */
   if(tab.cal) shown.sort((a,b)=> S.up ? a.due.localeCompare(b.due) : b.due.localeCompare(a.due));
   /* кольцо: шаг прозрачности по числу строк — верхняя 0, нижняя (самая срочная) 100 % */
-  let day = null;
+  let day = null, g = (!tab.cal && shown.length) ? group() : null;
   shown.forEach((i,k)=>{
+   /* новый день — свой заголовок и своя плашка под ним */
    if(tab.cal && dayKey(i.due) !== day){
     day = dayKey(i.due);
     const h = document.createElement('div');
     h.className = 'lbl day' + (days(i.due) < 0 ? ' late' : '');
     h.textContent = dayLabel(i.due);
     list.appendChild(h);
+    g = group();
    }
-   list.appendChild(rowEl(i.x, i.isP, i.next, i.left, shown.length>1?k/(shown.length-1):1));
+   g.appendChild(rowEl(i.x, i.isP, i.next, i.left, shown.length>1?k/(shown.length-1):1));
   });
   if(!shown.length) list.innerHTML = '<div class="empty">'+esc(tab.empty)+'</div>';
  }
