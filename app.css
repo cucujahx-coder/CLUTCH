@@ -147,7 +147,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   display:grid;place-items:center;cursor:pointer;transition:opacity var(--t-tap) var(--e-move)}
 .composer:not(.mini) .shutter{opacity:0;pointer-events:none}
 /* паук на кнопке: в прыжке он вылетает за край, поэтому кнопка ничего не обрезает */
-.shutter .sw{display:block;width:55px;line-height:0;color:#14100E;transform-origin:50% 100%;pointer-events:none}
+.shutter .sw{display:block;width:50px;line-height:0;color:#14100E;transform-origin:50% 100%;pointer-events:none}
 /* Режим голоса (удержание паука): круг остаётся кругом, белеет, паук перетекает в микрофон,
    вокруг ровное белое дыхание. Микрофон лежит в кнопке всегда и просто гаснет/проявляется —
    так переход один и обратимый. Текст в это время не показывается: строка раскроется, когда
@@ -163,8 +163,6 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 /* активная кнопка — фирменный синий, как включённые кнопки; свечение в его же тон */
 .composer.mini.voice{background:var(--blue);animation:breathe var(--t-breathe) var(--e-breathe) infinite}
 .shutter .sw svg{display:block;width:100%;height:auto}
-.shutter .eye{fill:#FFE3C2}
-.shutter .eye-b{fill:#FFE3C2;opacity:0}
 /* Одна плашка на три вида, активный выделен вложенной капсулой (`.segbar`), а не своим фоном:
    три отдельные капсулы читались как три кнопки, а это один переключатель. Высота ряда
    остаётся 44 — на ней стоит свёрнутая капсула строки ввода (translateY(-75px)). */
@@ -435,7 +433,7 @@ button,.press,.row,.step,.t1,.t2,.lbl{
   --line:rgba(255,255,255,.28);
 }
 #scr-list.focus .composer.mini{background:#101010}   /* красная кнопка на красном исчезает */
-#scr-list.focus .shutter .sw{color:var(--hot)}       /* паук на ней — фирменным красным */
+#scr-list.focus .shutter .sw{color:var(--hot)}       /* логотип на ней — фирменным красным */
 #scr-list.focus .seg.on{color:#fff}
 #scr-list.focus .row::before{background:rgba(255,255,255,.3)}
 #scr-list.focus .rflash{background:#fff}
