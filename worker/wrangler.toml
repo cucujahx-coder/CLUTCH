@@ -6,7 +6,7 @@ compatibility_date = "2026-09-11"
 # id namespace подставить своим: wrangler kv namespace create PUSH
 [[kv_namespaces]]
 binding = "PUSH"
-id = "ПОДСТАВИТЬ_ID"
+id = "659a04904911401a901f61ba18c916c0"
 
 [triggers]
 crons = ["* * * * *"]
