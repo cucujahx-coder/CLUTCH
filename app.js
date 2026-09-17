@@ -822,7 +822,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v139';
+const APP_V='tasks-v140';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1295,7 +1295,7 @@ function needsReply(x){
  return !!(last && last.a !== undefined && last.u === undefined && /\?[^.!?]*$/.test(String(last.a).trim()));
 }
 /* Строка списка: задача или проект */
-function rowEl(x, isP, next, left, ring, atTime, dueDay){
+function rowEl(x, isP, next, left, ring, atTime, dueDay, cal){
  const r = document.createElement('div');
  r.className = 'row' + (x.done ? ' done' : '') + (needsReply(x) ? ' ask' : '');
  if(isP) r.dataset.pj = x.id; else r.dataset.id = x.id;
@@ -1304,14 +1304,14 @@ function rowEl(x, isP, next, left, ring, atTime, dueDay){
  /* Одна строка, подзаголовков нет (v127). У задачи это её название; у проекта — имя проекта,
     стрелка и ближайший открытый шаг: «Переезд офиса → Замерить кабинеты». Имя проекта
     приглушено, шаг — обычным текстом: делать надо шаг, проект лишь говорит откуда он. */
- /* Две строки (v139, владелец вернул подзаголовок). Заголовок: время спереди и приглушённо
-    (v137 — отдельной колонки у него нет), дальше само дело; у проекта — имя проекта, стрелка
-    и ближайший открытый шаг. Подзаголовок — срок словами; нет срока, нет и строки. */
+ /* Две строки (v140). Заголовок: время спереди и приглушённо (v137 — отдельной колонки у него
+    нет), дальше само дело: у задачи её название, у проекта ближайший открытый шаг.
+    Подзаголовок: **у проекта всегда имя проекта** — и в списке, и в расписании; у задачи срок
+    словами, а в расписании его нет вовсе — дата уже стоит в заголовке дня. */
  const at = fmtAt(isP ? (atTime || '') : x.at);
- const head = (at ? '<span class="tm">'+esc(at)+' </span>' : '') + (isP
-   ? '<span class="pj">'+esc(x.n)+' → </span>'+esc((next && next.t) || '')
-   : esc(x.t));
- const meta = fmtDue(isP ? (dueDay || x.due) : x.due);
+ const head = (at ? '<span class="tm">'+esc(at)+' </span>' : '') +
+   esc(isP ? ((next && next.t) || x.n) : x.t);
+ const meta = isP ? x.n : (cal ? '' : fmtDue(x.due));
  const rep = !isP && repOf(x) ? '<span class="rep" aria-label="'+esc(REP[x.rep])+'">'+Ic(P.rep,14)+'</span>' : '';
  r.innerHTML = '<div class="cell"><span class="sr-only">'+KIND[r.dataset.kind]+': </span>'+
    '<div class="t1">'+head+'</div>'+(meta?'<div class="t2">'+esc(meta)+'</div>':'')+'</div>' +
@@ -1381,7 +1381,7 @@ function paint(keep){
     list.appendChild(h);
     g = group();
    }
-   g.appendChild(rowEl(i.x, i.isP, i.next, i.left, shown.length>1?k/(shown.length-1):1, i.at, i.due));
+   g.appendChild(rowEl(i.x, i.isP, i.next, i.left, shown.length>1?k/(shown.length-1):1, i.at, i.due, !!tab.cal));
   });
   if(!shown.length) list.innerHTML = '<div class="empty">'+esc(tab.empty)+'</div>';
  }

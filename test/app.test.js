@@ -26,19 +26,19 @@ async function common(file){
  /* порядок хронологический, задачи и проекты одним рядом: в демо-наборе проекты созданы первыми */
  assert(kinds==='project,project,payment,call,meeting,task,purchase','тип каждой строки угадан: '+kinds);
  /* одна строка: у задачи её название; у проекта имя проекта, стрелка и ближайший шаг */
- const pj=n=>rows().find(r=>r.dataset.pj&&r.querySelector('.pj')&&r.querySelector('.pj').textContent.startsWith(n));
+ const pj=n=>rows().find(r=>r.dataset.pj&&r.querySelector('.t2')&&r.querySelector('.t2').textContent===n);
  { const dued=w.app.S.ts.find(x=>x.pj===null&&x.due&&!x.done);
    const rd=rows().find(r=>+r.dataset.id===dued.id);
    assert(rd.querySelector('.t2')&&rd.querySelector('.t2').textContent===w.app.fmtDue(dued.due),'у задачи со сроком подзаголовок — срок словами');
    const nod=w.app.S.ts.find(x=>x.pj===null&&!x.due&&!x.done);
    assert(!rows().find(r=>+r.dataset.id===nod.id).querySelector('.t2'),'без срока подзаголовка нет');
    const p0=rows().find(r=>r.dataset.pj), nm=w.app.prById(+p0.dataset.pj).n;
-   assert(p0.querySelector('.pj').textContent===nm+' → ','у проекта сначала имя проекта и стрелка');
-   assert(txt(p0)===nm+' → '+w.app.openIn(+p0.dataset.pj)[0].t,'а за стрелкой — ближайший открытый шаг');
+   assert(txt(p0)===w.app.openIn(+p0.dataset.pj)[0].t,'у проекта заголовок — ближайший открытый шаг');
+   assert(p0.querySelector('.t2').textContent===nm,'а имя проекта — в подзаголовке');
    const t0=rows().find(r=>r.dataset.id);
-   assert(!t0.querySelector('.pj')&&txt(t0)===w.app.byId(+t0.dataset.id).t,'у задачи — только её название'); }
+   assert(txt(t0)===w.app.byId(+t0.dataset.id).t,'у задачи заголовок — её название'); }
  assert(/--rowh:48px/.test(read('app.css'))&&/\.row\{[^}]*height:var\(--rowh\);padding:6px 6px 6px 16px/.test(read('app.css'))&&/\.grp\{[^}]*border-radius:24px/.test(read('app.css'))&&/\.pri\{[^}]*height:var\(--rowh\)/.test(read('app.css')),'строка 48 — минимум под две строки текста: 36 + 6×2, радиус 24, капсула приоритета той же высоты');
- assert(/\.row \.ck\{width:36px;height:36px\}/.test(read('app.css'))&&/\.row \.t1\{font-size:15px;line-height:18px\}/.test(read('app.css'))&&/\.row \.t1 \.pj\{color:var\(--muted\)\}/.test(read('app.css'))&&/#list\{[^}]*gap:4px/.test(read('app.css')),'кружок 36, заголовок 15/18, подпись 12/14, зазор 4');
+ assert(/\.row \.ck\{width:36px;height:36px\}/.test(read('app.css'))&&/\.row \.t1\{font-size:15px;line-height:18px\}/.test(read('app.css'))&&/#list\{[^}]*gap:4px/.test(read('app.css')),'кружок 36, заголовок 15/18, подпись 12/14, зазор 4');
  assert(/\.row::before\{content:'';position:absolute;left:16px;top:50%;width:6px;height:6px;margin-top:-3px[^}]*background:var\(--blue\)/.test(read('app.css'))&&/\.row\.ask::before\{box-shadow/.test(read('app.css')),'точка 6 px по вертикальному центру строки, синяя у всех; ожидание ответа — свечением');
  { const t0=w.app.S.ts.find(x=>x.pj===null&&!x.done);
    t0.chat=[{u:'что делать?'},{a:'Перенести на пятницу или оставить?'}]; w.app.paint();
@@ -48,7 +48,7 @@ async function common(file){
    t0.chat.push({a:'Хорошо, оставил.'}); w.app.paint();
    assert(!rows().find(r=>+r.dataset.id===t0.id).classList.contains('ask'),'реплика без вопроса не ждёт ответа');
    t0.chat=[]; w.app.paint(); }
- assert(pj('Запуск лендинга')&&txt(pj('Запуск лендинга'))==='Запуск лендинга → Написать текст оффера','у проекта: имя, стрелка, ближайший открытый шаг');
+ assert(pj('Запуск лендинга')&&txt(pj('Запуск лендинга'))==='Написать текст оффера','у проекта: шаг в заголовке, имя в подзаголовке');
  /* время — необязательное, справа от названия; в расписании внутри дня «на день» выше времени */
  { const t=w.app.S.ts.find(x=>x.pj===null&&!x.done);
    const r0=()=>rows().find(r=>+r.dataset.id===t.id);
@@ -214,7 +214,7 @@ async function common(file){
  assert(pr.querySelector('.ck .num').textContent==='3','в кружке проекта число открытых шагов');
  pr.querySelector('.ck').click();
  await wait(220);
- assert(txt(pj('Запуск лендинга'))==='Запуск лендинга → Вычитка','следующий шаг сдвинулся — за стрелкой теперь он');
+ assert(txt(pj('Запуск лендинга'))==='Вычитка','следующий шаг сдвинулся — теперь он в заголовке');
 
  /* открытие карточки и шаги в чате */
  pj('Запуск лендинга').click();
@@ -251,6 +251,9 @@ async function common(file){
      return r.dataset.pj ? (x.due || w.app.openIn(x.id).some(s=>s.due)) : !!x.due; };
    assert(w.app.S.tab==='process'&&rows().length&&rows().every(dated),'PROCESS показывает только то, у чего есть срок — без срока спрятано');
    assert(d.querySelectorAll('#list > .grp').length===d.querySelectorAll('#list > .lbl.day').length,'в расписании у каждого дня своя плашка');
+   { const pr=rows().find(r=>r.dataset.pj), tk=rows().find(r=>r.dataset.id);
+     assert(pr&&pr.querySelector('.t2').textContent===w.app.prById(+pr.dataset.pj).n,'в расписании у проекта в подзаголовке тоже имя проекта');
+     assert(!tk||!tk.querySelector('.t2'),'у задачи в расписании подзаголовка нет — дата уже в заголовке дня'); }
    const heads=[...d.querySelectorAll('#list .lbl.day')];
    assert(heads.length&&heads.every(h=>h.textContent.trim()),'дни разделены заголовками');
    assert(d.querySelector('#list').firstElementChild.classList.contains('lbl'),'первый заголовок стоит перед первой плашкой');
