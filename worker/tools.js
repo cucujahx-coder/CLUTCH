@@ -29,10 +29,10 @@ export const TOOLS=[
   input_schema:{type:'object',properties:{tail:str('Например: черновик письма, жду счёт, выбрали клинику')},required:['tail'],additionalProperties:false}},
 
  {name:'task_make_project',description:'Сделать текущую задачу проектом и завести шаги. Само название задачи станет первым шагом.',
-  input_schema:{type:'object',properties:{steps:{type:'array',items:{type:'string'},description:'Названия шагов по порядку'}},required:['steps'],additionalProperties:false}},
+  input_schema:{type:'object',properties:{steps:{type:'array',items:{type:'string'},description:'Названия шагов по порядку, каждое в два слова'}},required:['steps'],additionalProperties:false}},
 
  {name:'task_add_step',description:'Добавить шаг в текущий проект.',
-  input_schema:{type:'object',properties:{title:str('Название шага'),after:str('Идентификатор шага, после которого вставить; без него — в конец')},required:['title'],additionalProperties:false}},
+  input_schema:{type:'object',properties:{title:str('Название шага: два слова, глагол и предмет'),after:str('Идентификатор шага, после которого вставить; без него — в конец')},required:['title'],additionalProperties:false}},
 
  {name:'task_complete_step',description:'Закрыть шаг проекта или открыть обратно.',
   input_schema:{type:'object',properties:{step:str('Идентификатор шага, например s2'),done:{type:'boolean'}},required:['step','done'],additionalProperties:false}},
@@ -41,7 +41,7 @@ export const TOOLS=[
   input_schema:{type:'object',properties:{step:str('Идентификатор шага')},required:['step'],additionalProperties:false}},
 
  {name:'task_create',description:'Создать другую задачу.',
-  input_schema:{type:'object',properties:{title:str('Название'),due:{type:['string','null'],description:'YYYY-MM-DD или null'},steps:{type:'array',items:{type:'string'},description:'Если задача сразу проект'}},required:['title'],additionalProperties:false}},
+  input_schema:{type:'object',properties:{title:str('Название'),due:{type:['string','null'],description:'YYYY-MM-DD или null'},steps:{type:'array',items:{type:'string'},description:'Если задача сразу проект: названия шагов, каждое в два слова'}},required:['title'],additionalProperties:false}},
 
  {name:'task_delete',description:'Переместить запись в корзину. Только после подтверждения пользователя.',
   input_schema:{type:'object',properties:{id:str('Идентификатор записи, например t12 или p8')},required:['id'],additionalProperties:false}},

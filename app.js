@@ -435,9 +435,12 @@ function makeProject(){
 function addStep(title){
  if(S.cur.k!=='p')return;
  const id=S.seq++;
- S.ts.push({id,t:title,due:null,pj:S.cur.id,done:0,doneAt:null,pri:0,tail:null,n:0,a:'Разговора ещё не было.',chat:[]});
+ const st={id,t:title,due:null,pj:S.cur.id,done:0,doneAt:null,pri:0,tail:null,n:0,a:'Разговора ещё не было.',chat:[]};
+ S.ts.push(st);
  save(); paint(1);
  fly(thread.querySelector('.steps .step:last-child'));
+ shortenTitle(st);          /* у шага название такое же короткое, как у задачи */
+ return st;
 }
 
 /* ---------- чат ----------
@@ -676,7 +679,7 @@ const ACT={
   const steps=(Array.isArray(a.steps)?a.steps:[]).map(x=>String(x||'').trim()).filter(Boolean).slice(0,30);
   const pid=S.seq++, was={n:o.n,chat:o.chat};
   const made=[];
-  return act('Проект из задачи, шагов: '+(steps.length+1),()=>{
+  const r=act('Проект из задачи, шагов: '+(steps.length+1),()=>{
    S.pr.push({id:pid,n:o.t,due:o.due,why:'Проект создан из задачи.',chat:o.chat.slice()});
    o.pj=pid; o.chat=[]; o.n=0;
    for(const t of steps){const id=S.seq++; made.push(id); S.ts.push(mkStep(id,t,pid));}
@@ -687,17 +690,21 @@ const ACT={
    o.pj=null; o.chat=was.chat; o.n=was.chat.length;
    S.cur={k:'t',id:o.id};
   });
+  shortenSteps(made);
+  return r;
  },
  task_add_step(a,c){
   if(!c.isP)return {out:'шаги есть только у проекта',err:1};
   const t=String(a.title||'').trim(); if(!t)return {out:'пустое название',err:1};
   const id=S.seq++, pid=c.item.id;
   const after=a.after?byShort(a.after):null;
-  return act('Шаг: '+t,()=>{
+  const r=act('Шаг: '+t,()=>{
    const st=mkStep(id,t,pid);
    const i=after?S.ts.indexOf(after):-1;
    if(i>=0)S.ts.splice(i+1,0,st); else S.ts.push(st);
   },()=>{S.ts=S.ts.filter(x=>x.id!==id)});
+  shortenSteps([id]);
+  return r;
  },
  task_complete_step(a,c){
   const st=byShort(a.step);
@@ -717,7 +724,7 @@ const ACT={
   if(d!==null&&!/^\d{4}-\d{2}-\d{2}$/.test(d))return {out:'дата должна быть YYYY-MM-DD',err:1};
   const id=S.seq++, steps=(Array.isArray(a.steps)?a.steps:[]).map(x=>String(x||'').trim()).filter(Boolean).slice(0,30);
   const made=[]; let pid=null;
-  return act('Новая задача: '+t,()=>{
+  const r=act('Новая задача: '+t,()=>{
    if(steps.length){
     pid=S.seq++;
     S.pr.push({id:pid,n:t,due:d,why:'Проект создан ассистентом.',chat:[]});
@@ -729,6 +736,8 @@ const ACT={
    S.ts=S.ts.filter(x=>x.id!==id&&!made.includes(x.id));
    if(pid!==null)S.pr=S.pr.filter(x=>x.id!==pid);
   });
+  shortenSteps(made);
+  return r;
  },
  task_delete(a){
   const o=byShort(a.id);
@@ -822,7 +831,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v140';
+const APP_V='tasks-v141';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1152,6 +1161,13 @@ async function shortenTitle(x){
  if(!live||live.t!==was)return;         /* название успели поправить руками — чужое не перетираем */
  live.t0=was; live.t=title;
  save(); paint();
+}
+/* Шаги — такие же имена, как у задач (v141). Заводит их обычно модель, и промт требует
+   от неё того же, но источник правды — код: что пришло длиннее, дошлифовываем тем же
+   дешёвым вызовом. Последовательно, а не пачкой: в проекте бывает и тридцать шагов,
+   и столько одновременных запросов на воркер слать незачем. */
+async function shortenSteps(ids){
+ for(const id of ids||[]){ const x=byId(id); if(x) await shortenTitle(x); }
 }
 
 /* ---------- настройки ----------
@@ -2470,7 +2486,7 @@ try{ document.fonts && document.fonts.ready.then(refit); }catch(e){}
 window.app = {get S(){return S}, kindOf, byId, prById, inPj, openIn, curItem, addTask, addStep, makeProject,
   delItem, fmtDue, flush, paint, openPri, closePri, showToast, hideToast,
   chatPayload, chatMessages, md, runTool, undoAct, byShort, shortId, fileBody, fmtSize, attach, fitList, grow,
-  settings, squeeze, spendUsd, addSpend, shortenTitle, tidyTitle, srvLabel, pullFiles, needsReply, fmtAt, openDue, nextRep, REP,
+  settings, squeeze, spendUsd, addSpend, shortenTitle, shortenSteps, tidyTitle, srvLabel, pullFiles, needsReply, fmtAt, openDue, nextRep, REP,
   todayISO: today,
   get pending(){return pending}, get undos(){return undos}, get undoNote(){return undoNote}};
 

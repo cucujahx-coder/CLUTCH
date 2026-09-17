@@ -587,6 +587,29 @@ async function titles(){
  w.fetch=async()=>{race.t='Правка руками'; return {ok:true,json:async()=>({title:'Сделать что-то'})}};
  await A.shortenTitle(race);
  assert(race.t==='Правка руками','ручная правка во время запроса не перетирается');
+
+ /* Шаги проекта зовутся так же коротко (v141): шаг стоит в списке на месте заголовка,
+    и длинная фраза ломает строку. Проверяем оба пути — руками и инструментом модели. */
+ const tick=()=>new Promise(r=>setTimeout(r,0));
+ const pj=A.S.pr.find(x=>!x.del);
+ A.S.cur={k:'p',id:pj.id};
+ w.fetch=async()=>({ok:true,json:async()=>({title:'Найти грузчиков'})});
+ const step=A.addStep('Найти грузчиков с машиной на субботу');
+ await tick();
+ assert(step.t==='Найти грузчиков','шаг, заведённый руками, сокращается как задача');
+ assert(step.t0==='Найти грузчиков с машиной на субботу','у шага тоже сохраняется исходник');
+
+ w.fetch=async()=>({ok:true,json:async()=>({title:'Собрать коробки'})});
+ await A.runTool({id:'st1',name:'task_add_step',input:{title:'Собрать коробки в кладовке и подписать'}},pj,true);
+ await tick();
+ const made=A.inPj(pj.id).slice(-1)[0];
+ assert(made.t==='Собрать коробки','шаг от модели тоже сокращается — источник правды код');
+
+ let hits=0;
+ w.fetch=async()=>{hits++; return {ok:true,json:async()=>({title:'что-то'})}};
+ await A.runTool({id:'st2',name:'task_add_step',input:{title:'Купить скотч'}},pj,true);
+ await tick();
+ assert(hits===0,'на шаг из двух слов запрос не тратится');
 }
 
 /* ---------- память, расход, настройки ---------- */
