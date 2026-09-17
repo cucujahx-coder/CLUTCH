@@ -287,6 +287,8 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .row .t1 .pj{color:var(--muted)}   /* имя проекта перед стрелкой тише самого шага */
 /* время стоит в самом названии, спереди и тише его: сначала «когда», потом «что» */
 .row .t1 .tm{color:var(--muted);font-variant-numeric:tabular-nums}
+/* подзаголовок — срок словами; пустого не бывает, строка просто не рисуется */
+.row .t2{font-size:12px;line-height:14px;margin-top:0;color:var(--muted)}
 .rep{flex:none;display:grid;place-items:center;color:var(--muted);padding-left:8px}   /* задача возвращается */
 .row .cell{padding-left:18px}   /* место под точку: 6 + 12 */
 /* точка слева, как в списке недавних у Claude (референс владельца, v93): 6 px, по вертикальному

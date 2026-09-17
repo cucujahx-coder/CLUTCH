@@ -27,7 +27,11 @@ async function common(file){
  assert(kinds==='project,project,payment,call,meeting,task,purchase','тип каждой строки угадан: '+kinds);
  /* одна строка: у задачи её название; у проекта имя проекта, стрелка и ближайший шаг */
  const pj=n=>rows().find(r=>r.dataset.pj&&r.querySelector('.pj')&&r.querySelector('.pj').textContent.startsWith(n));
- { assert(rows().every(r=>!r.querySelector('.t2')),'подзаголовков у строк нет — всё в одну строку');
+ { const dued=w.app.S.ts.find(x=>x.pj===null&&x.due&&!x.done);
+   const rd=rows().find(r=>+r.dataset.id===dued.id);
+   assert(rd.querySelector('.t2')&&rd.querySelector('.t2').textContent===w.app.fmtDue(dued.due),'у задачи со сроком подзаголовок — срок словами');
+   const nod=w.app.S.ts.find(x=>x.pj===null&&!x.due&&!x.done);
+   assert(!rows().find(r=>+r.dataset.id===nod.id).querySelector('.t2'),'без срока подзаголовка нет');
    const p0=rows().find(r=>r.dataset.pj), nm=w.app.prById(+p0.dataset.pj).n;
    assert(p0.querySelector('.pj').textContent===nm+' → ','у проекта сначала имя проекта и стрелка');
    assert(txt(p0)===nm+' → '+w.app.openIn(+p0.dataset.pj)[0].t,'а за стрелкой — ближайший открытый шаг');
