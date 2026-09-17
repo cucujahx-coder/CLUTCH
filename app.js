@@ -822,7 +822,7 @@ async function runTool(tu,item,isP){
 /* Версия сборки. Должна совпадать с V в sw.js — тест это проверяет. Видна в настройках:
    без неё «приехало обновление или нет» выясняется только гаданием, а на телефоне
    установленное приложение умеет держаться за старый код дольше, чем кажется. */
-const APP_V='tasks-v136';
+const APP_V='tasks-v137';
 const API='https://clutch.gloomnotgloom.com';
 
 /* Переписка в формате блоков Anthropic. Ход модели с вызовами и ответ клиента с
@@ -1304,16 +1304,17 @@ function rowEl(x, isP, next, left, ring, atTime){
  /* Одна строка, подзаголовков нет (v127). У задачи это её название; у проекта — имя проекта,
     стрелка и ближайший открытый шаг: «Переезд офиса → Замерить кабинеты». Имя проекта
     приглушено, шаг — обычным текстом: делать надо шаг, проект лишь говорит откуда он. */
- const head = isP
-   ? '<span class="pj">'+esc(x.n)+' → </span>'+esc((next && next.t) || '')
-   : esc(x.t);
- /* Время — справа от названия, перед кружком: оно короткое и не спорит с заголовком.
-    Перед временем — значок повтора, если задача возвращается. */
+ /* Время пишется в самом названии, отдельного места в строке у него нет (v137): так строка
+    остаётся одной фразой, а не таблицей из колонок. Стоит спереди и приглушено, как имя
+    проекта — сначала «когда», потом «что». */
  const at = fmtAt(isP ? (atTime || '') : x.at);
+ const head = (at ? '<span class="tm">'+esc(at)+' </span>' : '') + (isP
+   ? '<span class="pj">'+esc(x.n)+' → </span>'+esc((next && next.t) || '')
+   : esc(x.t));
  const rep = !isP && repOf(x) ? '<span class="rep" aria-label="'+esc(REP[x.rep])+'">'+Ic(P.rep,14)+'</span>' : '';
  r.innerHTML = '<div class="cell"><span class="sr-only">'+KIND[r.dataset.kind]+': </span>'+
    '<div class="t1">'+head+'</div></div>' +
-   rep + (at ? '<span class="at">'+esc(at)+'</span>' : '') +
+   rep +
    ckHTML(isP ? {pri:x.pri, done:0, n:x.n} : x, isP ? left : undefined, ring);
  r.querySelector('.ck').onclick = e => { e.stopPropagation(); isP ? ringTap(x, r) : toggle(x, r); };
  const go = () => { if(suppressRow){ suppressRow = false; return; }

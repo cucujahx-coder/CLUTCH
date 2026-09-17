@@ -48,10 +48,11 @@ async function common(file){
  /* время — необязательное, справа от названия; в расписании внутри дня «на день» выше времени */
  { const t=w.app.S.ts.find(x=>x.pj===null&&!x.done);
    const r0=()=>rows().find(r=>+r.dataset.id===t.id);
-   assert(!r0().querySelector('.at'),'без времени в строке ничего не приписано');
+   assert(!r0().querySelector('.tm')&&txt(r0())===t.t,'без времени в названии только само название');
    t.due=w.app.S.ts.find(y=>y.due&&y.pj===null).due; t.at='09:30'; w.app.paint();
-   assert(r0().querySelector('.at')&&r0().querySelector('.at').textContent==='09:30','время стоит справа от названия');
-   t.at='25:00'; w.app.paint(); assert(!r0().querySelector('.at'),'кривое время не показывается');
+   assert(r0().querySelector('.tm')&&txt(r0())==='09:30 '+t.t,'время пишется в названии спереди, отдельной колонки нет');
+   assert(!r0().querySelector('.at'),'старого отдельного места у времени больше нет');
+   t.at='25:00'; w.app.paint(); assert(!r0().querySelector('.tm'),'кривое время не показывается');
    t.at=''; w.app.paint(); }
  assert(w.app.fmtAt('7:5')===''&&w.app.fmtAt('07:05')==='07:05','время только ЧЧ:ММ');
  /* месяц не перепрыгивает: 31-е плюс месяц — конец следующего, а не 3-е через один */
