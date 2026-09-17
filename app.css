@@ -289,12 +289,13 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 .row .t1 .tm{color:var(--muted);font-variant-numeric:tabular-nums}
 .rep{flex:none;display:grid;place-items:center;color:var(--muted);padding-left:8px}   /* задача возвращается */
 .row .cell{padding-left:18px}   /* место под точку: 6 + 12 */
-/* точка слева, как в списке недавних у Claude (референс владельца, v93): 6 px, едва заметная
-   (v95), по вертикальному центру строки, а не у заголовка (v102 — строка стала двухстрочной);
-   когда ассистент ждёт ответа (.row.ask) — фирменная синяя. Псевдоэлемент строки, разметка та же */
+/* точка слева, как в списке недавних у Claude (референс владельца, v93): 6 px, по вертикальному
+   центру строки (v102 — строка стала двухстрочной). **Синяя у всех** (v138): раньше была едва
+   заметной, а синей становилась только там, где ассистент ждёт ответа — владелец попросил синие
+   по умолчанию. Ожидание ответа теперь отличается не цветом, а свечением вокруг точки. */
 .row::before{content:'';position:absolute;left:16px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;
-  background:rgba(224,224,224,.16);transition:background var(--t-fast) var(--e-out)}
-.row.ask::before{background:var(--blue)}
+  background:var(--blue);transition:box-shadow var(--t-fast) var(--e-out)}
+.row.ask::before{box-shadow:0 0 0 3px rgba(0,0,255,.35)}
 @media (hover:hover){.row:hover{background:var(--surf-row-h)}}
 .cell{min-width:0;flex:1}
 .t1{font-size:17px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -441,7 +442,8 @@ button,.press,.row,.step,.t1,.t2,.lbl{
 #scr-list.focus .composer.mini{background:#101010}   /* красная кнопка на красном исчезает */
 #scr-list.focus .shutter .sw{color:var(--hot)}       /* паук на ней — фирменным красным */
 #scr-list.focus .seg.on{color:#fff}
-#scr-list.focus .row::before{background:rgba(255,255,255,.3)}
+#scr-list.focus .row::before{background:#fff}   /* на красном синяя точка пропадает */
+#scr-list.focus .row.ask::before{box-shadow:0 0 0 3px rgba(255,255,255,.35)}
 #scr-list.focus .rflash{background:#fff}
 
 /* ── плашка о выполненном ────────────────────────────────────────

@@ -35,7 +35,7 @@ async function common(file){
    assert(!t0.querySelector('.pj')&&txt(t0)===w.app.byId(+t0.dataset.id).t,'у задачи — только её название'); }
  assert(/--rowh:48px/.test(read('app.css'))&&/\.row\{[^}]*height:var\(--rowh\);padding:6px 6px 6px 16px/.test(read('app.css'))&&/\.grp\{[^}]*border-radius:24px/.test(read('app.css'))&&/\.pri\{[^}]*height:var\(--rowh\)/.test(read('app.css')),'строка 48 — минимум под две строки текста: 36 + 6×2, радиус 24, капсула приоритета той же высоты');
  assert(/\.row \.ck\{width:36px;height:36px\}/.test(read('app.css'))&&/\.row \.t1\{font-size:15px;line-height:18px\}/.test(read('app.css'))&&/\.row \.t1 \.pj\{color:var\(--muted\)\}/.test(read('app.css'))&&/#list\{[^}]*gap:4px/.test(read('app.css')),'кружок 36, заголовок 15/18, подпись 12/14, зазор 4');
- assert(/\.row::before\{content:'';position:absolute;left:16px;top:50%;width:6px;height:6px;margin-top:-3px[^}]*background:rgba\(224,224,224,\.16\)/.test(read('app.css'))&&/\.row\.ask::before\{background:var\(--blue\)\}/.test(read('app.css')),'точка 6 px по вертикальному центру строки, едва заметная, синяя когда ждут ответа');
+ assert(/\.row::before\{content:'';position:absolute;left:16px;top:50%;width:6px;height:6px;margin-top:-3px[^}]*background:var\(--blue\)/.test(read('app.css'))&&/\.row\.ask::before\{box-shadow/.test(read('app.css')),'точка 6 px по вертикальному центру строки, синяя у всех; ожидание ответа — свечением');
  { const t0=w.app.S.ts.find(x=>x.pj===null&&!x.done);
    t0.chat=[{u:'что делать?'},{a:'Перенести на пятницу или оставить?'}]; w.app.paint();
    assert(rows().find(r=>+r.dataset.id===t0.id).classList.contains('ask'),'последняя реплика ассистента кончается вопросом — строка помечена');
